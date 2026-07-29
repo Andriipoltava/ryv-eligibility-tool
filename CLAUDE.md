@@ -161,9 +161,42 @@ before Elementor's own dependency-enqueuing on the same hook - the widget
 declares them via `get_script_depends()`/`get_style_depends()`, which only
 works if registration already happened.
 
+### Admin builder SPA (`admin/src/`)
+
+React (via `@wordpress/scripts`) app that replaces the default post editor
+for `ryv_forms`. `admin/class-ryv-builder-page.php` filters
+`get_edit_post_link` and hooks `load-post.php`/`load-post-new.php` so every
+entry point (list table, admin bar, direct URL, "Add New") lands on the
+builder instead of Gutenberg/classic. It's a list/detail editor, not a
+drag-and-drop graph canvas - a node list per state plus a detail panel where
+each option's/node's `next_node` is a `<select>` populated from the current
+state's actual node ids (so it's impossible to route to a nonexistent node
+from the UI). Renaming a node id (`App.js`'s `renameNode()`) rewrites every
+reference to it - `entry_node` and any option/node `next_node` - across the
+whole state, not just the node being renamed.
+
+The builder round-trips the **entire** schema on save (`includes/class-ryv-admin-api.php`,
+`GET`/`POST /ryv/v1/admin/form/{post_id}`) rather than merging partial
+updates server-side - it loads everything into memory once, edits happen
+client-side, "Save" PUTs the whole thing back. Auth-gated by
+`current_user_can('edit_post', $post_id)`, distinct from the public,
+read-only `RYV_API`. New-post creation reuses core's already-REST-enabled
+`ryv_forms` endpoint (`POST /wp/v2/ryv_forms`) rather than adding a bespoke
+one - only the schema blob is genuinely custom.
+
+Build it with `npm run admin:build` (or `admin:start` to watch). Output goes
+to `admin/build/` and **is committed**, same as `assets/css/app.css` - no
+build step at WP plugin deploy time. Note the CSS output is named
+`style-index.css` (`@wordpress/scripts`'s frontend/editor-style-splitting
+convention), not `index.css` - `class-ryv-builder-page.php`'s `enqueue()`
+depends on that exact name.
+
 ## Status
 
 Implemented: CPT + postmeta schema, YAML importer/parser, REST API, frontend
-decision engine, Elementor widget (content + style controls). Not yet built:
-a visual form-builder admin SPA for editing `_ryv_form_schema` directly
-(rather than only via YAML import).
+decision engine, Elementor widget (content + style controls), admin builder
+SPA. All phases from the original plan are built. Elementor widget rendering
+and the builder's REST-backed save/load have been verified by code review
+and manual testing in a dev harness, but not yet inside a live Elementor
+editor session (Elementor was downloaded locally but left deliberately
+inactive - see git history around the Phase 4/5 boundary).

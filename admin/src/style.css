@@ -1,0 +1,132 @@
+.ryv-builder-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.ryv-builder-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.ryv-builder-states {
+  margin-bottom: 1.5rem;
+}
+
+.ryv-builder-state-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  list-style: none;
+  margin: 0.5rem 0;
+  padding: 0;
+}
+
+.ryv-builder-state-list li {
+  display: flex;
+  align-items: center;
+  background: #fff;
+  border: 1px solid #ccd0d4;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.ryv-builder-state-list li button:first-child {
+  border: none;
+  background: none;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.ryv-builder-state-list li button.is-active {
+  background: #2271b1;
+  color: #fff;
+}
+
+.ryv-builder-add-state {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.ryv-builder-add-state .components-base-control {
+  margin-bottom: 0;
+}
+
+.ryv-builder-body {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.ryv-builder-node-list {
+  list-style: none;
+  margin: 0.5rem 0;
+  padding: 0;
+}
+
+.ryv-builder-node-list li {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  border: 1px solid #ccd0d4;
+  border-radius: 4px;
+  margin-bottom: 4px;
+  background: #fff;
+}
+
+.ryv-builder-node-list li.is-active {
+  border-color: #2271b1;
+}
+
+.ryv-builder-node-list li button:first-child {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  border: none;
+  background: none;
+  padding: 8px 10px;
+  cursor: pointer;
+}
+
+.ryv-builder-node-type {
+  font-size: 11px;
+  text-transform: uppercase;
+  color: #646970;
+}
+
+.ryv-builder-node-title {
+  font-size: 12px;
+  color: #1d2327;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ryv-builder-node-editor {
+  background: #fff;
+  border: 1px solid #ccd0d4;
+  border-radius: 4px;
+  padding: 1.5rem;
+}
+
+.ryv-builder-option-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr auto;
+  gap: 0.5rem;
+  align-items: flex-end;
+  margin-bottom: 0.75rem;
+}
+
+.ryv-builder-new {
+  max-width: 480px;
+}
