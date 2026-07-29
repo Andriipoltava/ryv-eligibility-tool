@@ -58,6 +58,7 @@ class RYV_US_States {
 		'oklahoma'       => 'Oklahoma',
 		'oregon'         => 'Oregon',
 		'pennsylvania'   => 'Pennsylvania',
+		'puerto-rico'    => 'Puerto Rico',
 		'rhode-island'   => 'Rhode Island',
 		'south-carolina' => 'South Carolina',
 		'south-dakota'   => 'South Dakota',

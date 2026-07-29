@@ -1,3 +1,69 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer components {
+  .ryv-app-wrapper {
+    @apply ryv-relative ryv-max-w-xl ryv-mx-auto;
+  }
+
+  .ryv-list {
+    @apply ryv-flex ryv-flex-col ryv-gap-6;
+  }
+
+  .ryv-card {
+    @apply ryv-transition-all ryv-duration-200 ryv-ease-out ryv-opacity-100 ryv-translate-y-0;
+  }
+  .ryv-card-enter {
+    @apply ryv-opacity-0 ryv-translate-y-2;
+  }
+
+  .ryv-question-title {
+    @apply ryv-text-lg ryv-font-semibold ryv-mb-4 ryv-text-ryv-text;
+  }
+
+  .ryv-content {
+    @apply ryv-text-ryv-text ryv-mb-4 ryv-leading-relaxed;
+  }
+  .ryv-content a {
+    @apply ryv-underline ryv-text-ryv-primary;
+  }
+
+  .ryv-option-btn {
+    @apply ryv-block ryv-w-full ryv-text-left ryv-px-4 ryv-py-3 ryv-mb-2 ryv-rounded-lg ryv-border ryv-border-gray-300 ryv-bg-white ryv-text-ryv-text ryv-transition-colors ryv-duration-150;
+  }
+  .ryv-option-btn:hover {
+    @apply ryv-border-ryv-primary;
+  }
+  .ryv-option-btn:focus-visible {
+    @apply ryv-outline-none ryv-ring-2 ryv-ring-ryv-primary;
+  }
+  .ryv-option-btn[aria-pressed='true'] {
+    @apply ryv-border-2 ryv-border-ryv-primary ryv-bg-gray-50;
+  }
+
+  .ryv-continue-btn {
+    @apply ryv-inline-flex ryv-items-center ryv-px-5 ryv-py-2.5 ryv-rounded-lg ryv-bg-ryv-primary ryv-text-white ryv-font-medium ryv-transition-opacity ryv-duration-150;
+  }
+  .ryv-continue-btn:hover {
+    @apply ryv-opacity-90;
+  }
+  .ryv-continue-btn:disabled {
+    @apply ryv-opacity-40 ryv-cursor-not-allowed;
+  }
+
+  .ryv-input {
+    @apply ryv-w-full ryv-px-4 ryv-py-2.5 ryv-rounded-lg ryv-border ryv-border-gray-300 ryv-mb-4;
+  }
+  .ryv-input:focus-visible {
+    @apply ryv-outline-none ryv-ring-2 ryv-ring-ryv-primary;
+  }
+
+  .ryv-error-box {
+    @apply ryv-p-4 ryv-rounded-lg ryv-bg-red-50 ryv-text-red-700 ryv-border ryv-border-red-200;
+  }
+
+  .ryv-loading {
+    @apply ryv-text-ryv-secondary ryv-text-sm ryv-py-8 ryv-text-center;
+  }
+}

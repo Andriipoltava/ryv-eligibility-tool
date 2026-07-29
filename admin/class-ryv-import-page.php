@@ -75,24 +75,33 @@ class RYV_Import_Page {
 		check_admin_referer( self::NONCE_ACTION, 'ryv_import_nonce' );
 
 		try {
-			$post_id   = $this->resolve_target_post();
-			$state_id  = $this->resolve_state_id();
-			$file_path = $this->validate_and_get_uploaded_file();
+			$post_id         = $this->resolve_target_post();
+			$state_override  = $this->resolve_state_override();
+			$file_path       = $this->validate_and_get_uploaded_file();
 
 			$raw    = RYV_YAML_Parser::parse_file( $file_path );
 			$parser = new RYV_YAML_Parser();
-			$result = $parser->build_graph( $raw );
+			$result = $parser->parse( $raw, $state_override );
 
-			$this->merge_state_into_post( $post_id, $state_id, $result );
+			$this->merge_states_into_post( $post_id, $result['states'] );
 
 			$this->store_result(
 				array(
-					'success'  => true,
-					'post_id'  => $post_id,
-					'state_id' => $state_id,
-					'nodes'    => count( $result['nodes'] ),
-					'warnings' => $result['warnings'],
-					'skipped'  => $result['skipped'],
+					'success'     => true,
+					'post_id'     => $post_id,
+					'states'      => array_map(
+						static function ( $state ) {
+							return array(
+								'id'    => $state['state_id'],
+								'label' => $state['label'],
+								'nodes' => count( $state['nodes'] ),
+							);
+						},
+						array_values( $result['states'] )
+					),
+					'warnings'    => $result['warnings'],
+					'skipped'     => $result['skipped'],
+					'unassigned'  => $result['unassigned'],
 				)
 			);
 		} catch ( \Throwable $e ) {
@@ -151,20 +160,19 @@ class RYV_Import_Page {
 	}
 
 	/**
-	 * Resolve and sanitize the state slug from $_POST.
+	 * Resolve the optional state override from $_POST. Most RYV exports
+	 * bundle every state into one file (a state-select element followed by
+	 * per-state gated containers) which the parser auto-splits on its own;
+	 * this override only matters when auto-detection finds nothing, e.g. a
+	 * hand-trimmed file containing just one state's elements.
 	 *
-	 * @return string
-	 * @throws RuntimeException On invalid input.
+	 * @return string|null
 	 */
-	private function resolve_state_id(): string {
-		$raw = isset( $_POST['ryv_state_id'] ) ? wp_unslash( $_POST['ryv_state_id'] ) : '';
+	private function resolve_state_override(): ?string {
+		$raw  = isset( $_POST['ryv_state_override'] ) ? wp_unslash( $_POST['ryv_state_override'] ) : '';
 		$slug = sanitize_title( $raw );
 
-		if ( '' === $slug ) {
-			throw new RuntimeException( __( 'A valid state is required (e.g. "alabama").', 'ryv-eligibility-tool' ) );
-		}
-
-		return $slug;
+		return '' === $slug ? null : $slug;
 	}
 
 	/**
@@ -202,14 +210,15 @@ class RYV_Import_Page {
 	}
 
 	/**
-	 * Merge a freshly-parsed state graph into a form post's schema meta,
-	 * preserving any other states already stored there.
+	 * Merge one or more freshly-parsed state graphs into a form post's
+	 * schema meta, preserving any other states already stored there (so
+	 * re-importing, e.g. an updated voting_rights.yml, only touches the
+	 * states present in that file).
 	 *
-	 * @param int    $post_id  Target `ryv_forms` post ID.
-	 * @param string $state_id Sanitized state slug.
-	 * @param array  $result   Output of RYV_YAML_Parser::build_graph().
+	 * @param int   $post_id Target `ryv_forms` post ID.
+	 * @param array $states  state_id => { state_id, label, entry_node, nodes }, from RYV_YAML_Parser::parse().
 	 */
-	private function merge_state_into_post( int $post_id, string $state_id, array $result ) {
+	private function merge_states_into_post( int $post_id, array $states ) {
 		$existing_json = get_post_meta( $post_id, RYV_CPT::SCHEMA_META_KEY, true );
 		$schema        = json_decode( (string) $existing_json, true );
 
@@ -217,11 +226,9 @@ class RYV_Import_Page {
 			$schema = array( 'states' => array() );
 		}
 
-		$schema['states'][ $state_id ] = array(
-			'state_id'   => $state_id,
-			'entry_node' => $result['entry_node'],
-			'nodes'      => $result['nodes'],
-		);
+		foreach ( $states as $state_id => $state ) {
+			$schema['states'][ $state_id ] = $state;
+		}
 
 		update_post_meta(
 			$post_id,

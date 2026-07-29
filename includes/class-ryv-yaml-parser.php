@@ -72,7 +72,7 @@ class RYV_YAML_Parser {
 	 * Drupal #types that carry no eligibility logic and are dropped
 	 * entirely (quietly, no warning needed).
 	 */
-	const SKIP_TYPES = array( 'actions' );
+	const SKIP_TYPES = array( 'actions', 'webform_actions' );
 
 	/**
 	 * Read and YAML-decode a file on disk.

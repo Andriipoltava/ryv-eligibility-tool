@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 ?>
 <div class="wrap">
 	<h1><?php esc_html_e( 'Import Drupal Webform YAML', 'ryv-eligibility-tool' ); ?></h1>
-	<p><?php esc_html_e( 'Upload a Drupal Webform element-tree YAML export for a single state. It will be converted into the RYV decision graph and merged into the form you select below under that state.', 'ryv-eligibility-tool' ); ?></p>
+	<p><?php esc_html_e( 'Upload a Drupal Webform element-tree YAML export. Files that bundle every state (a state-select element followed by per-state gated containers - the standard RYV export shape) are automatically split and every state is imported in one go.', 'ryv-eligibility-tool' ); ?></p>
 
 	<?php if ( $result ) : ?>
 		<?php if ( ! empty( $result['success'] ) ) : ?>
@@ -21,20 +21,29 @@ if ( ! defined( 'ABSPATH' ) ) {
 				<p>
 					<?php
 					printf(
-						/* translators: 1: node count, 2: state id, 3: edit link */
-						esc_html__( 'Imported %1$d node(s) into state "%2$s". %3$s', 'ryv-eligibility-tool' ),
-						(int) $result['nodes'],
-						esc_html( $result['state_id'] ),
+						/* translators: 1: state count, 2: edit link */
+						esc_html__( 'Imported %1$d state(s). %2$s', 'ryv-eligibility-tool' ),
+						count( $result['states'] ),
 						'<a href="' . esc_url( get_edit_post_link( $result['post_id'] ) ) . '">' . esc_html__( 'Edit form', 'ryv-eligibility-tool' ) . '</a>'
 					);
 					?>
 				</p>
+				<?php if ( ! empty( $result['states'] ) ) : ?>
+					<ul style="list-style: disc; margin-left: 1.5em;">
+						<?php foreach ( $result['states'] as $state ) : ?>
+							<li><?php echo esc_html( $state['label'] ); ?> (<code><?php echo esc_html( $state['id'] ); ?></code>) - <?php echo esc_html( $state['nodes'] ); ?> <?php esc_html_e( 'nodes', 'ryv-eligibility-tool' ); ?></li>
+						<?php endforeach; ?>
+					</ul>
+				<?php endif; ?>
+				<?php if ( ! empty( $result['unassigned'] ) ) : ?>
+					<p><?php esc_html_e( 'Not assigned to any state (needs manual placement in the form builder):', 'ryv-eligibility-tool' ); ?> <code><?php echo esc_html( implode( ', ', $result['unassigned'] ) ); ?></code></p>
+				<?php endif; ?>
 				<?php if ( ! empty( $result['skipped'] ) ) : ?>
 					<p><?php esc_html_e( 'Skipped elements (no eligibility logic, e.g. submit buttons or malformed entries):', 'ryv-eligibility-tool' ); ?> <code><?php echo esc_html( implode( ', ', $result['skipped'] ) ); ?></code></p>
 				<?php endif; ?>
 				<?php if ( ! empty( $result['warnings'] ) ) : ?>
 					<p><strong><?php esc_html_e( 'Needs manual review:', 'ryv-eligibility-tool' ); ?></strong></p>
-					<ul style="list-style: disc; margin-left: 1.5em;">
+					<ul style="list-style: disc; margin-left: 1.5em; max-height: 20em; overflow-y: auto;">
 						<?php foreach ( $result['warnings'] as $warning ) : ?>
 							<li><?php echo esc_html( $warning ); ?></li>
 						<?php endforeach; ?>
@@ -72,10 +81,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 				</td>
 			</tr>
 			<tr>
-				<th scope="row"><label for="ryv_state_id"><?php esc_html_e( 'State', 'ryv-eligibility-tool' ); ?></label></th>
+				<th scope="row"><label for="ryv_state_override"><?php esc_html_e( 'State Override', 'ryv-eligibility-tool' ); ?></label></th>
 				<td>
-					<input type="text" name="ryv_state_id" id="ryv_state_id" class="regular-text" placeholder="alabama" required />
-					<p class="description"><?php esc_html_e( 'Slug this YAML file\'s questionnaire belongs to. Existing data for this state on the target form will be overwritten.', 'ryv-eligibility-tool' ); ?></p>
+					<input type="text" name="ryv_state_override" id="ryv_state_override" class="regular-text" placeholder="alabama" />
+					<p class="description"><?php esc_html_e( 'Leave blank for standard RYV exports - states are auto-detected from the file. Only set this to force the entire file to import as one named state (e.g. a hand-trimmed single-state file where auto-detection finds nothing).', 'ryv-eligibility-tool' ); ?></p>
 				</td>
 			</tr>
 			<tr>

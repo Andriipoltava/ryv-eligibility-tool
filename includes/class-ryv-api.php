@@ -91,10 +91,12 @@ class RYV_API {
 		$states = $this->get_states_meta( $post_id );
 
 		$out = array();
-		foreach ( array_keys( $states ) as $state_id ) {
+		foreach ( $states as $state_id => $state_data ) {
+			$label = ! empty( $state_data['label'] ) ? (string) $state_data['label'] : RYV_US_States::label( $state_id );
+
 			$out[] = array(
 				'id'    => $state_id,
-				'label' => RYV_US_States::label( $state_id ),
+				'label' => $label,
 			);
 		}
 
