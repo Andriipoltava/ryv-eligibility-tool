@@ -1,0 +1,13 @@
+{
+  "name": "ryv-eligibility-tool",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Build tooling for the RYV Eligibility Tool WordPress plugin (Tailwind CSS compilation for the frontend decision-engine widget).",
+  "scripts": {
+    "build": "tailwindcss -i ./assets/src/input.css -o ./assets/css/app.css --minify",
+    "watch": "tailwindcss -i ./assets/src/input.css -o ./assets/css/app.css --watch"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.4.13"
+  }
+}
