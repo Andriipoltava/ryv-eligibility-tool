@@ -33,6 +33,13 @@ final class RYV_Plugin {
 	private $cpt = null;
 
 	/**
+	 * Import page controller instance (admin-only).
+	 *
+	 * @var RYV_Import_Page|null
+	 */
+	private $import_page = null;
+
+	/**
 	 * Get (or create) the singleton instance.
 	 *
 	 * @return RYV_Plugin
@@ -72,7 +79,19 @@ final class RYV_Plugin {
 	 * Require class files.
 	 */
 	private function includes() {
+		if ( file_exists( RYV_PLUGIN_DIR . 'vendor/autoload.php' ) ) {
+			require_once RYV_PLUGIN_DIR . 'vendor/autoload.php';
+		}
+
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-cpt.php';
+		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-yaml-parser.php';
+		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-us-states.php';
+		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-api.php';
+		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-assets.php';
+
+		if ( is_admin() ) {
+			require_once RYV_PLUGIN_DIR . 'admin/class-ryv-import-page.php';
+		}
 	}
 
 	/**
@@ -80,6 +99,12 @@ final class RYV_Plugin {
 	 */
 	private function init_hooks() {
 		$this->cpt = new RYV_CPT();
+		new RYV_API();
+		new RYV_Assets();
+
+		if ( is_admin() ) {
+			$this->import_page = new RYV_Import_Page();
+		}
 	}
 
 	/**

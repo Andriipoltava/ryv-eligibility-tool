@@ -1,0 +1,13 @@
+{
+    "name": "restoreyourvote/ryv-eligibility-tool",
+    "description": "PHP dependencies for the RYV Eligibility Tool WordPress plugin.",
+    "type": "wordpress-plugin",
+    "license": "GPL-2.0-or-later",
+    "require": {
+        "php": ">=8.0",
+        "symfony/yaml": "^6.4"
+    },
+    "config": {
+        "sort-packages": true
+    }
+}
