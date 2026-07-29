@@ -88,6 +88,7 @@ final class RYV_Plugin {
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-us-states.php';
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-api.php';
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-assets.php';
+		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-elementor.php';
 
 		if ( is_admin() ) {
 			require_once RYV_PLUGIN_DIR . 'admin/class-ryv-import-page.php';
@@ -101,6 +102,7 @@ final class RYV_Plugin {
 		$this->cpt = new RYV_CPT();
 		new RYV_API();
 		new RYV_Assets();
+		new RYV_Elementor();
 
 		if ( is_admin() ) {
 			$this->import_page = new RYV_Import_Page();

@@ -30,7 +30,10 @@ class RYV_Assets {
 	 * Constructor.
 	 */
 	public function __construct() {
-		add_action( 'wp_enqueue_scripts', array( $this, 'register' ) );
+		// Priority 5: the Elementor widget references these handles via
+		// get_script_depends()/get_style_depends() and enqueues them on this
+		// same hook - registration has to land first.
+		add_action( 'wp_enqueue_scripts', array( $this, 'register' ), 5 );
 	}
 
 	/**
