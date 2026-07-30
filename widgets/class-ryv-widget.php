@@ -105,6 +105,7 @@ class RYV_Widget extends \Elementor\Widget_Base {
 
 		$this->end_controls_section();
 
+		$this->register_label_controls();
 		$this->register_color_controls();
 		$this->register_typography_controls();
 		$this->register_button_style_controls();
@@ -141,6 +142,61 @@ class RYV_Widget extends \Elementor\Widget_Base {
 		}
 
 		return $options;
+	}
+
+	/**
+	 * Chrome text that isn't question content (that already comes from the
+	 * schema) - "Start Over", the loading/error messages, the dropdown
+	 * placeholder. Each defaults to its current hardcoded string (see
+	 * renderer.js's DEFAULT_LABELS) so leaving these blank changes nothing.
+	 */
+	private function register_label_controls() {
+		$this->start_controls_section(
+			'labels_section',
+			array(
+				'label' => __( 'Labels', 'ryv-eligibility-tool' ),
+				'tab'   => \Elementor\Controls_Manager::TAB_CONTENT,
+			)
+		);
+
+		$this->add_control(
+			'label_start_over',
+			array(
+				'label'       => __( '"Start Over" Button', 'ryv-eligibility-tool' ),
+				'type'        => \Elementor\Controls_Manager::TEXT,
+				'placeholder' => __( 'Start Over', 'ryv-eligibility-tool' ),
+			)
+		);
+
+		$this->add_control(
+			'label_loading',
+			array(
+				'label'       => __( 'Loading Text', 'ryv-eligibility-tool' ),
+				'type'        => \Elementor\Controls_Manager::TEXT,
+				'placeholder' => __( 'Loading…', 'ryv-eligibility-tool' ),
+			)
+		);
+
+		$this->add_control(
+			'label_retry',
+			array(
+				'label'       => __( 'Retry Button (on error)', 'ryv-eligibility-tool' ),
+				'type'        => \Elementor\Controls_Manager::TEXT,
+				'placeholder' => __( 'Try Again', 'ryv-eligibility-tool' ),
+			)
+		);
+
+		$this->add_control(
+			'label_select_placeholder',
+			array(
+				'label'       => __( 'Dropdown Placeholder', 'ryv-eligibility-tool' ),
+				'type'        => \Elementor\Controls_Manager::TEXT,
+				'placeholder' => __( '— Select —', 'ryv-eligibility-tool' ),
+				'description' => __( 'Only used when a picker or question is set to display as a dropdown.', 'ryv-eligibility-tool' ),
+			)
+		);
+
+		$this->end_controls_section();
 	}
 
 	/**
@@ -251,6 +307,74 @@ class RYV_Widget extends \Elementor\Widget_Base {
 				'name'     => 'button_typography',
 				'label'    => __( 'Typography', 'ryv-eligibility-tool' ),
 				'selector' => '{{WRAPPER}} .ryv-option-btn',
+			)
+		);
+
+		$this->add_control(
+			'button_layout',
+			array(
+				'label'   => __( 'Layout', 'ryv-eligibility-tool' ),
+				'type'    => \Elementor\Controls_Manager::SELECT,
+				'default' => 'column',
+				'options' => array(
+					'column' => __( 'Column (stacked, one per row)', 'ryv-eligibility-tool' ),
+					'row'    => __( 'Row (side by side)', 'ryv-eligibility-tool' ),
+				),
+				'selectors' => array(
+					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-btn-direction: {{VALUE}};',
+				),
+			)
+		);
+
+		$this->add_control(
+			'button_wrap',
+			array(
+				'label'        => __( 'Wrap to New Line', 'ryv-eligibility-tool' ),
+				'type'         => \Elementor\Controls_Manager::SWITCHER,
+				'label_on'     => __( 'Yes', 'ryv-eligibility-tool' ),
+				'label_off'    => __( 'No', 'ryv-eligibility-tool' ),
+				'return_value' => 'wrap',
+				'default'      => 'wrap',
+				'condition'    => array(
+					'button_layout' => 'row',
+				),
+				'selectors'    => array(
+					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-btn-wrap: {{VALUE}};',
+				),
+			)
+		);
+
+		$this->add_control(
+			'button_width',
+			array(
+				'label'       => __( 'Button Width', 'ryv-eligibility-tool' ),
+				'type'        => \Elementor\Controls_Manager::TEXT,
+				'placeholder' => __( '100%', 'ryv-eligibility-tool' ),
+				'description' => __(
+					'Any valid CSS width - e.g. "100%" (default), "auto" (fit content), or a fixed size like "200px". Only matters for Row layout - Column stretches to fill the width regardless.',
+					'ryv-eligibility-tool'
+				),
+				'selectors'   => array(
+					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-btn-width: {{VALUE}};',
+				),
+			)
+		);
+
+		$this->add_control(
+			'button_gap',
+			array(
+				'label'      => __( 'Gap Between Buttons', 'ryv-eligibility-tool' ),
+				'type'       => \Elementor\Controls_Manager::SLIDER,
+				'size_units' => array( 'px' ),
+				'range'      => array(
+					'px' => array(
+						'min' => 0,
+						'max' => 40,
+					),
+				),
+				'selectors'  => array(
+					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-btn-gap: {{SIZE}}{{UNIT}};',
+				),
 			)
 		);
 
@@ -879,9 +1003,37 @@ class RYV_Widget extends \Elementor\Widget_Base {
 		$show_start_over = 'yes' === $this->get_settings_for_display( 'show_start_over' );
 
 		printf(
-			'<div class="ryv-app-wrapper" data-form-id="%d" data-show-start-over="%d"></div>',
+			'<div class="ryv-app-wrapper" data-form-id="%d" data-show-start-over="%d" data-labels="%s"></div>',
 			absint( $form_id ),
-			$show_start_over ? 1 : 0
+			$show_start_over ? 1 : 0,
+			esc_attr( wp_json_encode( $this->get_label_overrides() ) )
 		);
+	}
+
+	/**
+	 * Only the "Labels" controls the user actually filled in - engine.js
+	 * merges this over its own hardcoded defaults, so an empty setting here
+	 * means "use the default", not "use an empty string".
+	 *
+	 * @return array<string,string>
+	 */
+	private function get_label_overrides(): array {
+		$map = array(
+			'label_start_over'         => 'startOver',
+			'label_loading'            => 'loading',
+			'label_retry'              => 'retry',
+			'label_select_placeholder' => 'selectPlaceholder',
+		);
+
+		$overrides = array();
+
+		foreach ( $map as $setting_key => $label_key ) {
+			$value = $this->get_settings_for_display( $setting_key );
+			if ( '' !== trim( (string) $value ) ) {
+				$overrides[ $label_key ] = $value;
+			}
+		}
+
+		return $overrides;
 	}
 }

@@ -38,8 +38,23 @@
    * fallback so an untouched widget instance renders identically to before.
    */
 
+  /*
+   * Holds the .ryv-option-btn list for both the state picker and any
+   * radio/checkbox question rendered as buttons - a flex container so the
+   * Elementor widget's layout controls (direction/wrap/gap) can arrange the
+   * buttons in a column (default, current look) or a wrapping row, without
+   * touching the question title that sits outside this wrapper.
+   */
+  .ryv-options-list {
+    display: flex;
+    flex-direction: var(--ryv-btn-direction, column);
+    flex-wrap: var(--ryv-btn-wrap, nowrap);
+    gap: var(--ryv-btn-gap, 0.5rem);
+  }
+
   .ryv-option-btn {
-    @apply ryv-block ryv-w-full ryv-text-left ryv-mb-2 ryv-transition-colors ryv-duration-150;
+    @apply ryv-text-left ryv-transition-colors ryv-duration-150;
+    width: var(--ryv-btn-width, 100%);
     color: var(--ryv-btn-text-color, var(--ryv-text-color, #1f2937));
     background-color: var(--ryv-btn-bg, #fff);
     border-style: solid;

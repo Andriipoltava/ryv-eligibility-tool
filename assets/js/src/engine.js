@@ -22,6 +22,7 @@ export class RYVDecisionEngine {
     // setting existed - default to showing the button, matching how those
     // placements already behaved.
     this.showStartOver = root.dataset.showStartOver !== '0';
+    this.labels = { ...renderer.DEFAULT_LABELS, ...this.parseLabelsAttribute(root) };
     this.list = null;
     this.nodes = {};
     this.entryNode = null;
@@ -34,6 +35,20 @@ export class RYVDecisionEngine {
     this.cardElements = new Map(); // id -> DOM element
   }
 
+  /**
+   * `data-labels` is a JSON object of overrides for a subset of
+   * renderer.DEFAULT_LABELS (only keys with a non-empty value in the widget's
+   * "Labels" controls are included, see class-ryv-widget.php). Malformed or
+   * absent JSON falls back to no overrides rather than breaking the mount.
+   */
+  parseLabelsAttribute(root) {
+    try {
+      return JSON.parse(root.dataset.labels || '{}');
+    } catch (err) {
+      return {};
+    }
+  }
+
   mount() {
     this.root.classList.add('ryv-app-wrapper');
     this.list = renderer.createList();
@@ -42,7 +57,7 @@ export class RYVDecisionEngine {
   }
 
   async loadForm() {
-    this.appendCard(LOADING_CARD_ID, renderer.renderLoadingCard());
+    this.appendCard(LOADING_CARD_ID, renderer.renderLoadingCard(this.labels));
     try {
       const data = await fetchForm(this.formId);
       this.availableStates = data.states || [];
@@ -52,7 +67,7 @@ export class RYVDecisionEngine {
       this.renderStateCard();
     } catch (err) {
       this.truncateFrom(0);
-      this.appendCard(ERROR_CARD_ID, renderer.renderErrorCard(err.message, () => this.loadForm()));
+      this.appendCard(ERROR_CARD_ID, renderer.renderErrorCard(err.message, () => this.loadForm(), this.labels));
     }
   }
 
@@ -62,7 +77,8 @@ export class RYVDecisionEngine {
       this.stateId,
       (stateId) => this.onSelectState(stateId),
       this.stateDisplayStyle,
-      this.statePickerLabel
+      this.statePickerLabel,
+      this.labels
     );
     this.appendCard(STATE_CARD_ID, card, false);
   }
@@ -77,7 +93,7 @@ export class RYVDecisionEngine {
     if (!changed) return;
 
     this.answers = new Map();
-    this.appendCard(LOADING_CARD_ID, renderer.renderLoadingCard());
+    this.appendCard(LOADING_CARD_ID, renderer.renderLoadingCard(this.labels));
 
     try {
       const data = await fetchFormState(this.formId, stateId);
@@ -87,7 +103,10 @@ export class RYVDecisionEngine {
       this.renderFrom(this.entryNode, true);
     } catch (err) {
       this.truncateFrom(this.indexOf(LOADING_CARD_ID));
-      this.appendCard(ERROR_CARD_ID, renderer.renderErrorCard(err.message, () => this.onSelectState(stateId)));
+      this.appendCard(
+        ERROR_CARD_ID,
+        renderer.renderErrorCard(err.message, () => this.onSelectState(stateId), this.labels)
+      );
     }
   }
 
@@ -110,7 +129,7 @@ export class RYVDecisionEngine {
       const node = this.nodes[current];
 
       if (!node) {
-        this.appendCard(current, renderer.renderErrorCard('This step could not be found.'), animate);
+        this.appendCard(current, renderer.renderErrorCard('This step could not be found.', null, this.labels), animate);
         return;
       }
 
@@ -154,15 +173,16 @@ export class RYVDecisionEngine {
           node,
           this.answers.get(nodeId) || [],
           (values) => this.onAnswerChange(nodeId, values),
-          nodeId
+          nodeId,
+          this.labels
         );
       case 'text':
       case 'textarea':
         return renderer.renderInputCard(node, this.answers.get(nodeId) || '', (value) => this.onAnswerChange(nodeId, value));
       case 'markup':
-        return renderer.renderMarkupCard(node, isTerminal && this.showStartOver, () => this.restart());
+        return renderer.renderMarkupCard(node, isTerminal && this.showStartOver, () => this.restart(), this.labels);
       default:
-        return renderer.renderUnsupportedCard(node, isTerminal && this.showStartOver, () => this.restart());
+        return renderer.renderUnsupportedCard(node, isTerminal && this.showStartOver, () => this.restart(), this.labels);
     }
   }
 

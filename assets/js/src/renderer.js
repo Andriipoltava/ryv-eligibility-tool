@@ -11,6 +11,22 @@
  * directly.
  */
 
+/**
+ * Every hardcoded piece of chrome text (not question content, which already
+ * comes from the schema), with its current value as the default - the
+ * widget's "Labels" controls override individual keys per-instance; engine.js
+ * merges them over this before passing `labels` down to these functions, so
+ * nothing here needs its own fallback.
+ */
+export const DEFAULT_LABELS = {
+  loading: 'Loading…',
+  error: 'Something went wrong.',
+  retry: 'Try Again',
+  startOver: 'Start Over',
+  selectPlaceholder: '— Select —',
+  noStatesConfigured: 'No states are configured for this form yet.',
+};
+
 function el(tag, opts = {}, children = []) {
   const node = document.createElement(tag);
   if (opts.className) node.className = opts.className;
@@ -62,18 +78,18 @@ export function appendCard(container, card, animate = true) {
   return card;
 }
 
-export function renderLoadingCard() {
-  return el('div', { className: 'ryv-loading', text: 'Loading…' });
+export function renderLoadingCard(labels = DEFAULT_LABELS) {
+  return el('div', { className: 'ryv-loading', text: labels.loading });
 }
 
-export function renderErrorCard(message, onRetry) {
+export function renderErrorCard(message, onRetry, labels = DEFAULT_LABELS) {
   const box = el('div', { className: 'ryv-error-box' });
-  box.appendChild(el('p', { text: message || 'Something went wrong.' }));
+  box.appendChild(el('p', { text: message || labels.error }));
   if (onRetry) {
     box.appendChild(
       el('button', {
         className: 'ryv-continue-btn ryv-mt-3',
-        text: 'Try Again',
+        text: labels.retry,
         attrs: { type: 'button' },
         on: { click: onRetry },
       })
@@ -82,12 +98,19 @@ export function renderErrorCard(message, onRetry) {
   return box;
 }
 
-export function renderStateCard(states, selectedStateId, onSelect, displayStyle = 'buttons', label = 'Select your state') {
+export function renderStateCard(
+  states,
+  selectedStateId,
+  onSelect,
+  displayStyle = 'buttons',
+  label = 'Select your state',
+  labels = DEFAULT_LABELS
+) {
   const wrap = el('div');
   wrap.appendChild(titleEl(label));
 
   if (!states || states.length === 0) {
-    wrap.appendChild(el('p', { className: 'ryv-loading', text: 'No states are configured for this form yet.' }));
+    wrap.appendChild(el('p', { className: 'ryv-loading', text: labels.noStatesConfigured }));
     return wrap;
   }
 
@@ -97,7 +120,8 @@ export function renderStateCard(states, selectedStateId, onSelect, displayStyle 
     selectedStateId,
     onSelect,
     displayStyle,
-    'ryv-state'
+    'ryv-state',
+    labels
   );
 
   return wrap;
@@ -116,11 +140,12 @@ export function renderStateCard(states, selectedStateId, onSelect, displayStyle 
  * @param {string} displayStyle 'buttons' | 'radio' | 'dropdown'
  * @param {string} radioGroupName Unique `name` for the radio inputs, so multiple
  *   single-choice cards on the same page don't cross-select each other.
+ * @param {object} labels
  */
-function renderSingleChoiceOptions(wrap, options, selectedValue, onSelect, displayStyle, radioGroupName) {
+function renderSingleChoiceOptions(wrap, options, selectedValue, onSelect, displayStyle, radioGroupName, labels = DEFAULT_LABELS) {
   if (displayStyle === 'dropdown') {
     const select = el('select', { className: 'ryv-select' });
-    select.appendChild(el('option', { text: '— Select —', attrs: { value: '', disabled: true } }));
+    select.appendChild(el('option', { text: labels.selectPlaceholder, attrs: { value: '', disabled: true } }));
     options.forEach((option) => {
       const opt = el('option', { text: option.label, attrs: { value: option.value } });
       if (option.value === selectedValue) opt.setAttribute('selected', 'selected');
@@ -147,7 +172,11 @@ function renderSingleChoiceOptions(wrap, options, selectedValue, onSelect, displ
     return;
   }
 
-  // 'buttons' (default) - unchanged look/behavior.
+  // 'buttons' (default) - unchanged look/behavior. Wrapped in its own flex
+  // container (.ryv-options-list) so the Elementor widget's layout controls
+  // (direction/wrap/gap/width) can target just the option list, not
+  // whatever else is in `wrap` (the question title).
+  const list = el('div', { className: 'ryv-options-list' });
   options.forEach((option) => {
     const isSelected = option.value === selectedValue;
     const btn = el('button', {
@@ -156,8 +185,9 @@ function renderSingleChoiceOptions(wrap, options, selectedValue, onSelect, displ
       attrs: { type: 'button', 'aria-pressed': isSelected ? 'true' : 'false' },
       on: { click: () => onSelect(option.value) },
     });
-    wrap.appendChild(btn);
+    list.appendChild(btn);
   });
+  wrap.appendChild(list);
 }
 
 /**
@@ -166,8 +196,9 @@ function renderSingleChoiceOptions(wrap, options, selectedValue, onSelect, displ
  * @param {(values: string[]) => void} onChange Called with the full set of selected value(s) after every click -
  *   immediately, no separate Continue step. An empty array means the answer was cleared.
  * @param {string} nodeId Node id, used to give the radio-input group a unique `name`.
+ * @param {object} labels
  */
-export function renderQuestionCard(node, selectedValues, onChange, nodeId) {
+export function renderQuestionCard(node, selectedValues, onChange, nodeId, labels = DEFAULT_LABELS) {
   const wrap = el('div');
   wrap.appendChild(titleEl(node.title));
 
@@ -184,11 +215,13 @@ export function renderQuestionCard(node, selectedValues, onChange, nodeId) {
       selectedValues && selectedValues[0],
       (value) => onChange(value ? [value] : []),
       node.display_style,
-      `ryv-node-${nodeId}`
+      `ryv-node-${nodeId}`,
+      labels
     );
     return wrap;
   }
 
+  const list = el('div', { className: 'ryv-options-list' });
   const buttons = new Map();
 
   (node.options || []).forEach((option) => {
@@ -218,9 +251,10 @@ export function renderQuestionCard(node, selectedValues, onChange, nodeId) {
       onChange(Array.from(selected));
     });
 
-    wrap.appendChild(btn);
+    list.appendChild(btn);
   });
 
+  wrap.appendChild(list);
   return wrap;
 }
 
@@ -266,7 +300,7 @@ export function renderInputCard(node, previousValue, onChange) {
  * imported (or a schema edited) by an admin with `manage_options`, the same
  * trust boundary WordPress applies to post content - not user input.
  */
-export function renderMarkupCard(node, isTerminal, onRestart) {
+export function renderMarkupCard(node, isTerminal, onRestart, labels = DEFAULT_LABELS) {
   const wrap = el('div');
   if (node.title) {
     wrap.appendChild(titleEl(node.title));
@@ -280,7 +314,7 @@ export function renderMarkupCard(node, isTerminal, onRestart) {
     wrap.appendChild(
       el('button', {
         className: 'ryv-continue-btn',
-        text: 'Start Over',
+        text: labels.startOver,
         attrs: { type: 'button' },
         on: { click: onRestart },
       })
@@ -290,7 +324,7 @@ export function renderMarkupCard(node, isTerminal, onRestart) {
   return wrap;
 }
 
-export function renderUnsupportedCard(node, isTerminal, onRestart) {
+export function renderUnsupportedCard(node, isTerminal, onRestart, labels = DEFAULT_LABELS) {
   const wrap = el('div', { className: 'ryv-error-box' });
   wrap.appendChild(
     el('p', {
@@ -301,7 +335,7 @@ export function renderUnsupportedCard(node, isTerminal, onRestart) {
     wrap.appendChild(
       el('button', {
         className: 'ryv-continue-btn ryv-mt-3',
-        text: 'Start Over',
+        text: labels.startOver,
         attrs: { type: 'button' },
         on: { click: onRestart },
       })
