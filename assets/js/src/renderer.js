@@ -24,7 +24,6 @@ export const DEFAULT_LABELS = {
   retry: 'Try Again',
   startOver: 'Start Over',
   selectPlaceholder: '— Select —',
-  noStatesConfigured: 'No states are configured for this form yet.',
 };
 
 function el(tag, opts = {}, children = []) {
@@ -98,39 +97,11 @@ export function renderErrorCard(message, onRetry, labels = DEFAULT_LABELS) {
   return box;
 }
 
-export function renderStateCard(
-  states,
-  selectedStateId,
-  onSelect,
-  displayStyle = 'buttons',
-  label = 'Select your state',
-  labels = DEFAULT_LABELS
-) {
-  const wrap = el('div');
-  wrap.appendChild(titleEl(label));
-
-  if (!states || states.length === 0) {
-    wrap.appendChild(el('p', { className: 'ryv-loading', text: labels.noStatesConfigured }));
-    return wrap;
-  }
-
-  renderSingleChoiceOptions(
-    wrap,
-    states.map((state) => ({ value: state.id, label: state.label })),
-    selectedStateId,
-    onSelect,
-    displayStyle,
-    'ryv-state',
-    labels
-  );
-
-  return wrap;
-}
-
 /**
- * Shared single-select rendering for the state picker and radio-type question
- * nodes: 'buttons' (default, current look), 'radio' (actual radio inputs), or
- * 'dropdown' (a native <select>). Checkbox nodes never call this - they
+ * Shared single-select rendering for radio-type question nodes (including
+ * the "select your state" node - it's an ordinary radio node, not a special
+ * case): 'buttons' (default, current look), 'radio' (actual radio inputs),
+ * or 'dropdown' (a native <select>). Checkbox nodes never call this - they
  * always render as the button list, regardless of a node's display_style.
  *
  * @param {HTMLElement} wrap Container to append into.

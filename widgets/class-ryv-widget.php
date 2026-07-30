@@ -103,11 +103,38 @@ class RYV_Widget extends \Elementor\Widget_Base {
 			)
 		);
 
+		$this->add_control(
+			'show_title',
+			array(
+				'label'        => __( 'Show Form Title', 'ryv-eligibility-tool' ),
+				'type'         => \Elementor\Controls_Manager::SWITCHER,
+				'label_on'     => __( 'Show', 'ryv-eligibility-tool' ),
+				'label_off'    => __( 'Hide', 'ryv-eligibility-tool' ),
+				'return_value' => 'yes',
+				'default'      => 'yes',
+				'description'  => __( 'The eligibility form\'s own title, rendered above the questionnaire.', 'ryv-eligibility-tool' ),
+			)
+		);
+
+		$this->add_control(
+			'show_description',
+			array(
+				'label'        => __( 'Show Form Description', 'ryv-eligibility-tool' ),
+				'type'         => \Elementor\Controls_Manager::SWITCHER,
+				'label_on'     => __( 'Show', 'ryv-eligibility-tool' ),
+				'label_off'    => __( 'Hide', 'ryv-eligibility-tool' ),
+				'return_value' => 'yes',
+				'default'      => 'yes',
+				'description'  => __( 'The eligibility form\'s own description (set on import, or the post\'s excerpt), rendered below the title.', 'ryv-eligibility-tool' ),
+			)
+		);
+
 		$this->end_controls_section();
 
 		$this->register_label_controls();
 		$this->register_color_controls();
 		$this->register_typography_controls();
+		$this->register_header_style_controls();
 		$this->register_button_style_controls();
 		$this->register_continue_button_style_controls();
 		$this->register_dropdown_style_controls();
@@ -278,6 +305,109 @@ class RYV_Widget extends \Elementor\Widget_Base {
 				'name'     => 'results_typography',
 				'label'    => __( 'Results', 'ryv-eligibility-tool' ),
 				'selector' => '{{WRAPPER}} .ryv-content',
+			)
+		);
+
+		$this->end_controls_section();
+	}
+
+	/**
+	 * The form's own title/description (see show_title/show_description on
+	 * the Content tab and render()) - printed as an <h2>/<p> *above*
+	 * .ryv-app-wrapper, i.e. as its preceding siblings, not descendants.
+	 * Every other Style section bridges non-typography properties through a
+	 * CSS var written onto '{{WRAPPER}} .ryv-app-wrapper', but a custom
+	 * property set there is invisible to a preceding sibling (CSS custom
+	 * properties only cascade to descendants) - so Color/Margin here are
+	 * scoped to '{{WRAPPER}}' itself instead, which is an ancestor of both
+	 * the header markup and .ryv-app-wrapper since render() prints them in
+	 * the same call. Typography still targets the header selectors
+	 * directly, matching register_typography_controls()'s own precedent
+	 * (Elementor's typography group doesn't support CSS-var output either
+	 * way).
+	 */
+	private function register_header_style_controls() {
+		$this->start_controls_section(
+			'header_style_section',
+			array(
+				'label' => __( 'Header', 'ryv-eligibility-tool' ),
+				'tab'   => \Elementor\Controls_Manager::TAB_STYLE,
+			)
+		);
+
+		$this->add_group_control(
+			\Elementor\Group_Control_Typography::get_type(),
+			array(
+				'name'     => 'header_title_typography',
+				'label'    => __( 'Title Typography', 'ryv-eligibility-tool' ),
+				'selector' => '{{WRAPPER}} .ryv-header-title',
+			)
+		);
+
+		$this->add_control(
+			'header_title_color',
+			array(
+				'label'     => __( 'Title Color', 'ryv-eligibility-tool' ),
+				'type'      => \Elementor\Controls_Manager::COLOR,
+				'selectors' => array(
+					'{{WRAPPER}}' => '--ryv-header-title-color: {{VALUE}};',
+				),
+			)
+		);
+
+		$this->add_control(
+			'header_title_margin_bottom',
+			array(
+				'label'      => __( 'Title Bottom Spacing', 'ryv-eligibility-tool' ),
+				'type'       => \Elementor\Controls_Manager::SLIDER,
+				'size_units' => array( 'px' ),
+				'range'      => array(
+					'px' => array(
+						'min' => 0,
+						'max' => 60,
+					),
+				),
+				'selectors'  => array(
+					'{{WRAPPER}}' => '--ryv-header-title-margin-bottom: {{SIZE}}{{UNIT}};',
+				),
+			)
+		);
+
+		$this->add_group_control(
+			\Elementor\Group_Control_Typography::get_type(),
+			array(
+				'name'     => 'header_description_typography',
+				'label'    => __( 'Description Typography', 'ryv-eligibility-tool' ),
+				'selector' => '{{WRAPPER}} .ryv-header-description',
+			)
+		);
+
+		$this->add_control(
+			'header_description_color',
+			array(
+				'label'     => __( 'Description Color', 'ryv-eligibility-tool' ),
+				'type'      => \Elementor\Controls_Manager::COLOR,
+				'selectors' => array(
+					'{{WRAPPER}}' => '--ryv-header-description-color: {{VALUE}};',
+				),
+			)
+		);
+
+		$this->add_control(
+			'header_description_margin_bottom',
+			array(
+				'label'      => __( 'Description Bottom Spacing', 'ryv-eligibility-tool' ),
+				'type'       => \Elementor\Controls_Manager::SLIDER,
+				'size_units' => array( 'px' ),
+				'range'      => array(
+					'px' => array(
+						'min' => 0,
+						'max' => 60,
+					),
+				),
+				'selectors'  => array(
+					'{{WRAPPER}}' => '--ryv-header-description-margin-bottom: {{SIZE}}{{UNIT}};',
+				),
 			)
 		);
 
@@ -1002,12 +1132,45 @@ class RYV_Widget extends \Elementor\Widget_Base {
 
 		$show_start_over = 'yes' === $this->get_settings_for_display( 'show_start_over' );
 
+		$this->render_header( absint( $form_id ) );
+
 		printf(
 			'<div class="ryv-app-wrapper" data-form-id="%d" data-show-start-over="%d" data-labels="%s"></div>',
 			absint( $form_id ),
 			$show_start_over ? 1 : 0,
 			esc_attr( wp_json_encode( $this->get_label_overrides() ) )
 		);
+	}
+
+	/**
+	 * The form post's own title/description, printed as plain server-side
+	 * HTML *above* the .ryv-app-wrapper mount point - unlike the
+	 * questionnaire itself, this needs no JS/REST round trip, since the
+	 * widget already has the post available at render time.
+	 *
+	 * @param int $form_id The `ryv_forms` post ID.
+	 */
+	private function render_header( int $form_id ) {
+		$show_title       = 'yes' === $this->get_settings_for_display( 'show_title' );
+		$show_description = 'yes' === $this->get_settings_for_display( 'show_description' );
+
+		if ( ! $show_title && ! $show_description ) {
+			return;
+		}
+
+		$post = get_post( $form_id );
+
+		if ( ! $post ) {
+			return;
+		}
+
+		if ( $show_title && '' !== trim( $post->post_title ) ) {
+			printf( '<h2 class="ryv-header-title">%s</h2>', esc_html( $post->post_title ) );
+		}
+
+		if ( $show_description && '' !== trim( $post->post_excerpt ) ) {
+			printf( '<p class="ryv-header-description">%s</p>', esc_html( $post->post_excerpt ) );
+		}
 	}
 
 	/**

@@ -27,7 +27,7 @@ const DISPLAY_STYLE_OPTIONS = [
 /**
  * @param {(oldId: string, newId: string) => void} onRename Renaming fixes up
  *   every reference to this node (entry_node + every option's/node's
- *   next_node) across the active state - see App.js's renameNode().
+ *   next_node) across the whole graph - see App.js's renameNode().
  */
 export default function NodeEditor({ node, nodeId, allNodeIds, onChange, onRename }) {
   const [idDraft, setIdDraft] = useState(nodeId);

@@ -13,8 +13,11 @@ if ( ! defined( 'ABSPATH' ) ) {
  * Class RYV_CPT
  *
  * Each `ryv_forms` post represents one eligibility questionnaire. The full
- * decision graph (states, questions, options, routing) lives in a single
- * JSON blob in the `_ryv_form_schema` postmeta - not in nested repeaters.
+ * decision graph - one universal flat DAG, `{entry_node, nodes}` - lives in
+ * a single JSON blob in the `_ryv_form_schema` postmeta, not in nested
+ * repeaters. get_schema()/save_schema() are the one canonical read/write
+ * path for that meta; every other class should go through them rather than
+ * hand-rolling get_post_meta()/json_decode()/wp_slash(wp_json_encode()).
  */
 class RYV_CPT {
 
@@ -108,6 +111,58 @@ class RYV_CPT {
 					return current_user_can( 'edit_posts' );
 				},
 			)
+		);
+	}
+
+	/**
+	 * The canonical schema read path: decode postmeta, transparently
+	 * migrate a legacy per-state schema to the flat DAG shape if found
+	 * (persisting the migration immediately so it only ever runs once per
+	 * post - see RYV_Schema_Migrator), and normalize missing keys.
+	 *
+	 * @param int $post_id Post ID.
+	 * @return array{entry_node: ?string, nodes: array}
+	 */
+	public static function get_schema( int $post_id ): array {
+		$json   = get_post_meta( $post_id, self::SCHEMA_META_KEY, true );
+		$schema = json_decode( (string) $json, true );
+
+		if ( ! is_array( $schema ) ) {
+			$schema = array();
+		}
+
+		if ( isset( $schema['states'] ) && is_array( $schema['states'] ) ) {
+			$schema = RYV_Schema_Migrator::migrate( $schema );
+			self::save_schema( $post_id, $schema );
+		}
+
+		if ( ! isset( $schema['nodes'] ) || ! is_array( $schema['nodes'] ) ) {
+			$schema['nodes'] = array();
+		}
+
+		if ( ! array_key_exists( 'entry_node', $schema ) ) {
+			$schema['entry_node'] = null;
+		}
+
+		return $schema;
+	}
+
+	/**
+	 * The canonical schema write path.
+	 *
+	 * wp_slash() is required: update_post_meta() unslashes its input before
+	 * storing (WP's meta API assumes slashed data), so an un-slashed JSON
+	 * string loses every "\"" and "\uXXXX" escape on the way into the DB,
+	 * corrupting it into invalid JSON on the next read.
+	 *
+	 * @param int   $post_id Post ID.
+	 * @param array $schema  `{entry_node, nodes}` schema to store.
+	 */
+	public static function save_schema( int $post_id, array $schema ): void {
+		update_post_meta(
+			$post_id,
+			self::SCHEMA_META_KEY,
+			wp_slash( wp_json_encode( $schema, JSON_UNESCAPED_SLASHES ) )
 		);
 	}
 }

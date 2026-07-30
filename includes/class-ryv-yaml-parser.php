@@ -22,17 +22,19 @@ use Symfony\Component\Yaml\Yaml;
  * order" unless a downstream element is conditionally gated on that specific
  * option's value, in which case the option routes straight to it.
  *
- * Real RYV exports bundle *every* state into one file: a single state-select
- * element at the root, followed by ~50 sibling `container` elements, each
- * gated by `#states.visible` on that selector with a specific state value.
- * parse() auto-detects that shape and splits it into one subtree per state;
- * see build_subtree() for the per-state graph-building algorithm itself.
+ * The whole document - including what used to be treated as a special
+ * "state selector" - is flattened into ONE graph via build_subtree(). A
+ * gated container (e.g. RYV's real exports: ~50 sibling `container`
+ * elements, each visible only when a particular radio/select answer is
+ * given) never becomes a node itself; its own #states gate is instead
+ * carried down onto the first real leaf it produces, via flatten()'s
+ * $container_gates side channel - see that method's docblock for exactly
+ * why a side channel rather than mutating the leaf.
  *
  * Anything the translator can't confidently resolve (compound #states
- * conditions, unmapped element types, optgroups, top-level elements outside
- * any detected state container, etc.) is still imported - never silently
- * dropped - but flagged in `warnings`/`unassigned` for manual follow-up in
- * the Phase 5 visual builder.
+ * conditions, unmapped element types, optgroups, etc.) is still imported -
+ * never silently dropped - but flagged in `warnings` for manual follow-up in
+ * the form builder.
  */
 class RYV_YAML_Parser {
 
@@ -96,142 +98,36 @@ class RYV_YAML_Parser {
 	}
 
 	/**
-	 * Parse a decoded Drupal webform structure into one or more per-state
-	 * decision graphs.
+	 * Parse a decoded Drupal webform structure into one flat decision graph.
 	 *
-	 * Auto-detects the "which state" selector (the first top-level select/
-	 * radios element with #options) and treats every sibling `container`
-	 * gated on that selector as one state's subtree. If no such shape is
-	 * found (e.g. the file already *is* a single state's element tree, with
-	 * no wrapping per-state containers), everything falls back into one
-	 * subtree under the caller-supplied $fallback_state_id.
-	 *
-	 * @param array       $parsed             Output of parse_file() / Yaml::parse().
-	 * @param string|null $fallback_state_id  State slug to use when auto-detection finds no per-state containers.
+	 * @param array $parsed Output of parse_file() / Yaml::parse().
 	 * @return array {
-	 *     @type string|null $selector_id Detected state-selector element id, or null.
-	 *     @type array        $states     state_id => { state_id, label, entry_node, nodes }.
+	 *     @type string|null $title       The webform's own root `title:`, if present.
+	 *     @type string|null $description The webform's own root `description:`, if present.
+	 *     @type string|null $entry_node  First node id in document order, or null if the file had no elements.
+	 *     @type array        $nodes      node_id => { type, title, content, source_type, options[], next_node? }.
 	 *     @type string[]     $warnings   Ambiguous/unsupported constructs, for manual follow-up.
 	 *     @type string[]     $skipped    Element keys dropped entirely (e.g. submit actions).
-	 *     @type string[]     $unassigned Top-level elements that could not be assigned to any state.
 	 * }
-	 * @throws RuntimeException If no state containers are found and no fallback id was given.
 	 */
-	public function parse( array $parsed, ?string $fallback_state_id = null ): array {
-		$warnings   = array();
-		$skipped    = array();
-		$unassigned = array();
-		$states     = array();
+	public function parse( array $parsed ): array {
+		$warnings = array();
+		$skipped  = array();
+
+		$title       = isset( $parsed['title'] ) && is_string( $parsed['title'] ) ? $parsed['title'] : null;
+		$description = isset( $parsed['description'] ) && is_string( $parsed['description'] ) ? $parsed['description'] : null;
 
 		$elements_root = $this->resolve_elements_root( $parsed );
-		$selector       = $this->find_state_selector( $elements_root );
-
-		if ( null !== $selector ) {
-			foreach ( $elements_root as $key => $def ) {
-				$key = (string) $key;
-
-				if ( ! is_array( $def ) || ! isset( $def['#type'] ) ) {
-					continue;
-				}
-
-				if ( sanitize_key( $key ) === $selector['id'] || in_array( $def['#type'], self::SKIP_TYPES, true ) ) {
-					continue;
-				}
-
-				if ( ! in_array( $def['#type'], self::CONTAINER_TYPES, true ) ) {
-					$unassigned[] = $key;
-					continue;
-				}
-
-				$condition = ! empty( $def['#states'] ) && is_array( $def['#states'] )
-					? $this->extract_visibility_condition( $def['#states'], $key, $warnings )
-					: null;
-
-				if ( null === $condition || $condition['source_id'] !== $selector['id'] ) {
-					$warnings[]   = "Container '{$key}': not gated on the detected state selector '{$selector['id']}' - not assigned to any state.";
-					$unassigned[] = $key;
-					continue;
-				}
-
-				$raw_value = $condition['value'];
-				$label     = $selector['options'][ $raw_value ] ?? $raw_value;
-				$state_id  = sanitize_title( $label );
-
-				if ( '' === $state_id ) {
-					$warnings[]   = "Container '{$key}': condition value '{$raw_value}' did not produce a usable state id - skipped.";
-					$unassigned[] = $key;
-					continue;
-				}
-
-				if ( isset( $states[ $state_id ] ) ) {
-					$warnings[] = "Duplicate state container for '{$label}' ('{$key}') - it overwrites an earlier container for the same state.";
-				}
-
-				$children = $this->container_children( $def );
-
-				if ( empty( $children ) ) {
-					$warnings[]   = "Container '{$key}' ({$label}) has no child elements - skipped.";
-					$unassigned[] = $key;
-					continue;
-				}
-
-				$subtree = $this->build_subtree( $children, $warnings, $skipped );
-
-				$states[ $state_id ] = array(
-					'state_id'   => $state_id,
-					'label'      => $label,
-					'entry_node' => $subtree['entry_node'],
-					'nodes'      => $subtree['nodes'],
-				);
-			}
-		}
-
-		if ( empty( $states ) ) {
-			if ( null === $fallback_state_id || '' === $fallback_state_id ) {
-				throw new RuntimeException( 'Could not auto-detect any per-state sections in this file (no state-selector + gated containers found). Provide a state override to import it as a single state.' );
-			}
-
-			$subtree = $this->build_subtree( $elements_root, $warnings, $skipped );
-
-			$states[ $fallback_state_id ] = array(
-				'state_id'   => $fallback_state_id,
-				'label'      => RYV_US_States::label( $fallback_state_id ),
-				'entry_node' => $subtree['entry_node'],
-				'nodes'      => $subtree['nodes'],
-			);
-		}
+		$subtree       = $this->build_subtree( $elements_root, $warnings, $skipped );
 
 		return array(
-			'selector_id' => $selector['id'] ?? null,
-			'states'      => $states,
+			'title'       => $title,
+			'description' => $description,
+			'entry_node'  => $subtree['entry_node'],
+			'nodes'       => $subtree['nodes'],
 			'warnings'    => $warnings,
 			'skipped'     => $skipped,
-			'unassigned'  => $unassigned,
 		);
-	}
-
-	/**
-	 * Find the state-selection element: the first top-level select/radios
-	 * element (in document order) that carries its own #options list.
-	 *
-	 * @param array $elements_root Top-level element definitions.
-	 * @return array{id:string,options:array}|null
-	 */
-	private function find_state_selector( array $elements_root ): ?array {
-		foreach ( $elements_root as $key => $def ) {
-			if ( ! is_array( $def ) || ! isset( $def['#type'] ) ) {
-				continue;
-			}
-
-			if ( in_array( $def['#type'], array( 'select', 'radios' ), true ) && ! empty( $def['#options'] ) && is_array( $def['#options'] ) ) {
-				return array(
-					'id'      => sanitize_key( (string) $key ),
-					'options' => $def['#options'],
-				);
-			}
-		}
-
-		return null;
 	}
 
 	/**
@@ -252,19 +148,40 @@ class RYV_YAML_Parser {
 	}
 
 	/**
-	 * Build one flat, routed node graph from a set of sibling element
-	 * definitions (either a whole file's root, or one state container's
-	 * children). This is the core translation: document-order linear
-	 * fallback, overridden per-option by any downstream #states gate.
+	 * Build one flat, routed node graph from the whole document's top-level
+	 * element definitions. Document-order linear fallback, overridden per
+	 * option by any downstream #states gate (including gates that lived on
+	 * a container rather than a leaf - see flatten()).
 	 *
 	 * @param array    $elements Element definitions keyed by machine name.
-	 * @param string[] $warnings Accumulator (shared across all subtrees in one parse() call).
-	 * @param string[] $skipped  Accumulator (shared across all subtrees in one parse() call).
+	 * @param string[] $warnings Accumulator.
+	 * @param string[] $skipped  Accumulator.
 	 * @return array{entry_node:?string,nodes:array}
 	 */
 	private function build_subtree( array $elements, array &$warnings, array &$skipped ): array {
-		$ordered = array();
-		$this->flatten( $elements, $ordered, $warnings, $skipped );
+		$ordered         = array();
+		$container_gates = array(); // "source_id|value" => target_id, from container-level #states gates (see flatten()).
+		$this->flatten( $elements, $ordered, $warnings, $skipped, $container_gates, null, null );
+
+		// Two different branches of the document could in principle produce
+		// the same sanitized id (a generic Drupal machine name reused
+		// elsewhere) - never let a later one silently overwrite an earlier
+		// node. The first occurrence in document order keeps its id (so any
+		// container gate already pointing at it - see flatten() - stays
+		// valid); only later duplicates are renamed and flagged.
+		$seen_ids = array();
+		foreach ( $ordered as $index => $item ) {
+			$id = $item['id'];
+
+			if ( isset( $seen_ids[ $id ] ) ) {
+				++$seen_ids[ $id ];
+				$new_id     = $id . '_' . $seen_ids[ $id ];
+				$warnings[] = "Element '{$id}': duplicate id - renamed to '{$new_id}'.";
+				$ordered[ $index ]['id'] = $new_id;
+			} else {
+				$seen_ids[ $id ] = 1;
+			}
+		}
 
 		$nodes           = array();
 		$gates_by_source = array(); // source_id => [ value => target_id ].
@@ -285,6 +202,16 @@ class RYV_YAML_Parser {
 			}
 		}
 
+		// Container-derived gates always win for their source/value slot
+		// over whatever a leaf's own (often redundant, sometimes unrelated)
+		// #states resolved to above - see flatten()'s docblock for why this
+		// has to be a side channel rather than mutating the leaf's #states
+		// in place.
+		foreach ( $container_gates as $slot => $target_id ) {
+			list( $source_id, $value ) = explode( '|', $slot, 2 );
+			$gates_by_source[ $source_id ][ $value ] = $target_id;
+		}
+
 		$ids = array_map(
 			static function ( $item ) {
 				return $item['id'];
@@ -292,9 +219,31 @@ class RYV_YAML_Parser {
 			$ordered
 		);
 
+		// Every node also carries the id of whichever TOP-LEVEL source
+		// element it descended from (see flatten()'s $group) - e.g. every
+		// leaf anywhere inside one state's own container shares that
+		// container's group, no matter how deeply nested. A node's default
+		// (non-gated) fallthrough must never cross into a *different*
+		// group: with every state flattened into one continuous document,
+		// simply excluding gate TARGETS isn't enough - most of a state's
+		// own content (everything past its first branch point) carries no
+		// #states at all, so nothing stops a document-order walk from
+		// sailing straight through the end of state A's content and into
+		// state B's, e.g. a "you can vote!" result silently auto-advancing
+		// into an unrelated state's first question instead of terminating.
+		// Bounding the search to "the rest of my own group" reproduces
+		// exactly what the old per-state build_subtree() call gave for
+		// free by construction (each state only ever saw its own elements).
+		$groups = array_map(
+			static function ( $item ) {
+				return $item['group'];
+			},
+			$ordered
+		);
+
 		foreach ( $ids as $index => $id ) {
 			$gated_targets = $gates_by_source[ $id ] ?? array();
-			$default_next  = $this->find_default_next( $ids, $index, $gated_targets );
+			$default_next  = $this->find_default_next( $ids, $groups, $index, $gated_targets );
 
 			if ( ! empty( $nodes[ $id ]['options'] ) ) {
 				foreach ( $nodes[ $id ]['options'] as &$option ) {
@@ -340,12 +289,50 @@ class RYV_YAML_Parser {
 	 * Recursively walk element definitions into a single document-ordered
 	 * list, descending into container types and dropping skip types.
 	 *
-	 * @param array    $elements Element definitions keyed by machine name.
-	 * @param array    $ordered  Accumulator: list of [ id, def ].
-	 * @param string[] $warnings Accumulator.
-	 * @param string[] $skipped  Accumulator.
+	 * A container's own #states gate (e.g. in RYV's real exports: "this
+	 * whole per-state block is only visible when the state selector equals
+	 * X") can't attach to the container itself - containers never become
+	 * nodes - so it's carried down and attached to the first REAL leaf that
+	 * container produces instead, via the $container_gates side channel
+	 * (keyed "source_id|value" => that leaf's id).
+	 *
+	 * This is a side channel rather than writing a synthetic #states onto
+	 * the leaf because, empirically (checked against both real RYV export
+	 * files), a container's first child very often already carries its own
+	 * #states - usually a redundant restatement of the exact same
+	 * condition, occasionally an unrelated or unsupported one - and
+	 * overwriting or fighting over that field is unsafe. A separate
+	 * accumulator resolves correctly regardless of what the leaf's own
+	 * #states says, and never touches it.
+	 *
+	 * $inherited_gate/$gate_consumed thread a gate through arbitrarily many
+	 * levels of container nesting so it still lands on the eventual first
+	 * leaf, however deep (real RYV exports are only one level deep today,
+	 * but nothing here assumes that).
+	 *
+	 * Every leaf produced is also tagged with $group: the id of whichever
+	 * TOP-LEVEL element (a direct child of the very first call's
+	 * $elements, e.g. one state's own container, or the state selector
+	 * itself) it descended from. $group is null on the top-level call and
+	 * gets assigned fresh - one per top-level element - the first time
+	 * flatten() recurses into it; every element nested inside that one
+	 * (however deep) then inherits the exact same group. This is what lets
+	 * build_subtree()'s default-fallthrough search stop at "the end of
+	 * this element's own content" instead of sailing into a sibling
+	 * top-level element's (e.g. a different state's) content once
+	 * everything shares one flat document - see find_default_next().
+	 *
+	 * @param array      $elements        Element definitions keyed by machine name.
+	 * @param array      $ordered         Accumulator: list of [ id, def, group ].
+	 * @param string[]   $warnings        Accumulator.
+	 * @param string[]   $skipped         Accumulator.
+	 * @param array      $container_gates Accumulator: "source_id|value" => target node id.
+	 * @param array|null $inherited_gate  Gate propagated down from an enclosing container, if any.
+	 * @param string|null $group          Group inherited from an enclosing call, or null at the true top level.
 	 */
-	private function flatten( array $elements, array &$ordered, array &$warnings, array &$skipped ): void {
+	private function flatten( array $elements, array &$ordered, array &$warnings, array &$skipped, array &$container_gates, ?array $inherited_gate, ?string $group ): void {
+		$gate_consumed = false;
+
 		foreach ( $elements as $key => $def ) {
 			if ( ! is_array( $def ) ) {
 				continue; // Not an element definition (e.g. a stray scalar property).
@@ -366,14 +353,14 @@ class RYV_YAML_Parser {
 				continue;
 			}
 
+			// A null $group means every item at THIS level is its own
+			// top-level element (the true top-level call); a non-null
+			// $group means we're recursing inside an already-grouped
+			// container, so every descendant shares that same group.
+			$item_group = $group ?? sanitize_key( $key );
+
 			if ( in_array( $type, self::CONTAINER_TYPES, true ) ) {
-				$children = array_filter(
-					$def,
-					static function ( $value, $prop_key ) {
-						return is_array( $value ) && '#' !== substr( (string) $prop_key, 0, 1 );
-					},
-					ARRAY_FILTER_USE_BOTH
-				);
+				$children = $this->container_children( $def );
 
 				if ( empty( $children ) ) {
 					$warnings[] = "Container '{$key}' ({$type}) has no child elements - skipped.";
@@ -381,13 +368,43 @@ class RYV_YAML_Parser {
 					continue;
 				}
 
-				$this->flatten( $children, $ordered, $warnings, $skipped );
+				$own_gate = ( ! empty( $def['#states'] ) && is_array( $def['#states'] ) )
+					? $this->extract_visibility_condition( $def['#states'], $key, $warnings )
+					: null;
+
+				// This container's own gate (if any) is more specific/nearer
+				// than anything inherited from further up, so it wins; if it
+				// has none of its own, keep threading the inherited one down
+				// so it still reaches the eventual first leaf.
+				$gate_to_pass = $own_gate ?? ( $gate_consumed ? null : $inherited_gate );
+				$before_count = count( $ordered );
+
+				$this->flatten( $children, $ordered, $warnings, $skipped, $container_gates, $gate_to_pass, $item_group );
+
+				if ( null !== $gate_to_pass ) {
+					if ( count( $ordered ) > $before_count ) {
+						$entry_id = $ordered[ $before_count ]['id'];
+						$slot     = $gate_to_pass['source_id'] . '|' . $gate_to_pass['value'];
+
+						if ( isset( $container_gates[ $slot ] ) ) {
+							$warnings[] = "Container '{$key}': duplicate gate for the same source/value as an earlier container - it overwrites the earlier target.";
+						}
+
+						$container_gates[ $slot ] = $entry_id;
+					} else {
+						$warnings[] = "Container '{$key}' produced no leaf nodes - its gate has nowhere to route to.";
+					}
+
+					$gate_consumed = true;
+				}
+
 				continue;
 			}
 
 			$ordered[] = array(
-				'id'  => sanitize_key( $key ),
-				'def' => $def,
+				'id'    => sanitize_key( $key ),
+				'def'   => $def,
+				'group' => $item_group,
 			);
 		}
 	}
@@ -523,18 +540,27 @@ class RYV_YAML_Parser {
 
 	/**
 	 * Find the next element in document order that isn't exclusively
-	 * reached via one of this element's own conditional gates.
+	 * reached via one of this element's own conditional gates, without
+	 * crossing into a different top-level group (see flatten()'s $group -
+	 * this is what keeps one state's default fallthrough from spilling
+	 * into the next state's content once every state shares one document).
 	 *
 	 * @param string[] $ids           Document-ordered node ids.
+	 * @param string[] $groups        Parallel array: each id's top-level group.
 	 * @param int      $current_index Index of the current node within $ids.
 	 * @param array    $gated_targets value => target_id map for this node's options.
 	 * @return string|null
 	 */
-	private function find_default_next( array $ids, int $current_index, array $gated_targets ): ?string {
-		$excluded = array_values( $gated_targets );
-		$count    = count( $ids );
+	private function find_default_next( array $ids, array $groups, int $current_index, array $gated_targets ): ?string {
+		$excluded  = array_values( $gated_targets );
+		$count     = count( $ids );
+		$my_group  = $groups[ $current_index ];
 
 		for ( $j = $current_index + 1; $j < $count; $j++ ) {
+			if ( $groups[ $j ] !== $my_group ) {
+				return null;
+			}
+
 			if ( ! in_array( $ids[ $j ], $excluded, true ) ) {
 				return $ids[ $j ];
 			}

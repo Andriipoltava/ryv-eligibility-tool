@@ -1,18 +1,19 @@
-import { fetchForm, fetchFormState, logSubmission } from './api-client.js';
+import { fetchForm, logSubmission } from './api-client.js';
 import * as renderer from './renderer.js';
 
-const STATE_CARD_ID = '__state__';
 const LOADING_CARD_ID = '__loading__';
 const ERROR_CARD_ID = '__error__';
 
 /**
  * One instance per `.ryv-app-wrapper[data-form-id]` on the page.
  *
- * The whole questionnaire is rendered as a single growing list of cards -
- * every question ever reached stays visible and stays clickable. There is
- * no Back/Continue chrome: changing an answer on any card (including the
- * state picker) just recomputes and re-renders everything after it, using
- * whatever the new answer routes to. See onAnswerChange()/renderFrom().
+ * The whole questionnaire - including the "select your state" step, an
+ * ordinary radio node like any other - is one flat decision graph fetched
+ * in a single request and rendered as a growing list of cards. Every
+ * question ever reached stays visible and stays clickable. There is no
+ * Back/Continue chrome: changing any answer just recomputes and re-renders
+ * everything after it, using whatever the new answer routes to. See
+ * onAnswerChange()/renderFrom().
  */
 export class RYVDecisionEngine {
   constructor(root) {
@@ -30,10 +31,6 @@ export class RYVDecisionEngine {
     this.list = null;
     this.nodes = {};
     this.entryNode = null;
-    this.availableStates = [];
-    this.stateDisplayStyle = 'buttons';
-    this.statePickerLabel = 'Select your state';
-    this.stateId = null;
     this.answers = new Map(); // node id -> string[] (radio/checkbox values) | string (text/textarea)
     this.renderedOrder = []; // ids (real node ids, or the sentinel ids above) in on-screen order
     this.cardElements = new Map(); // id -> DOM element
@@ -59,12 +56,12 @@ export class RYVDecisionEngine {
   }
 
   /**
-   * Upsert this attempt's answer trail so far - called after every state
-   * pick and every answer change. No-op until a state has been picked
-   * (nothing meaningful to log before then).
+   * Upsert this attempt's answer trail so far - called after every answer
+   * change. No-op until at least one answer has been recorded (nothing
+   * meaningful to log before then).
    */
   logProgress() {
-    if (!this.stateId) return;
+    if (this.answers.size === 0) return;
 
     const lastRealNodeId = [...this.renderedOrder].reverse().find((id) => this.nodes[id]);
     const answers = {};
@@ -74,7 +71,6 @@ export class RYVDecisionEngine {
 
     logSubmission(this.formId, {
       session_id: this.sessionId,
-      state_id: this.stateId,
       current_node: lastRealNodeId || null,
       answers,
     });
@@ -91,67 +87,24 @@ export class RYVDecisionEngine {
     this.appendCard(LOADING_CARD_ID, renderer.renderLoadingCard(this.labels));
     try {
       const data = await fetchForm(this.formId);
-      this.availableStates = data.states || [];
-      this.stateDisplayStyle = data.state_display_style || 'buttons';
-      this.statePickerLabel = data.state_picker_label || 'Select your state';
+      this.nodes = data.nodes || {};
+      this.entryNode = data.entry_node;
       this.truncateFrom(0);
-      this.renderStateCard();
+      this.renderFrom(this.entryNode, true);
     } catch (err) {
       this.truncateFrom(0);
       this.appendCard(ERROR_CARD_ID, renderer.renderErrorCard(err.message, () => this.loadForm(), this.labels));
     }
   }
 
-  renderStateCard() {
-    const card = renderer.renderStateCard(
-      this.availableStates,
-      this.stateId,
-      (stateId) => this.onSelectState(stateId),
-      this.stateDisplayStyle,
-      this.statePickerLabel,
-      this.labels
-    );
-    this.appendCard(STATE_CARD_ID, card, false);
-  }
-
-  async onSelectState(stateId) {
-    const changed = stateId !== this.stateId;
-    this.stateId = stateId;
-
-    this.truncateFrom(this.indexOf(STATE_CARD_ID));
-    this.renderStateCard();
-
-    if (!changed) return;
-
-    this.answers = new Map();
-    this.appendCard(LOADING_CARD_ID, renderer.renderLoadingCard(this.labels));
-
-    try {
-      const data = await fetchFormState(this.formId, stateId);
-      this.nodes = data.nodes || {};
-      this.entryNode = data.entry_node;
-      this.truncateFrom(this.indexOf(LOADING_CARD_ID));
-      this.renderFrom(this.entryNode, true);
-      this.logProgress();
-    } catch (err) {
-      this.truncateFrom(this.indexOf(LOADING_CARD_ID));
-      this.appendCard(
-        ERROR_CARD_ID,
-        renderer.renderErrorCard(err.message, () => this.onSelectState(stateId), this.labels)
-      );
-    }
-  }
-
   restart() {
-    this.stateId = null;
     this.answers = new Map();
-    this.nodes = {};
     // A fresh id, not a cleared one: without this, restarting would reuse
     // the same session row and RYV_Submission_Log::record() would overwrite
     // the trail that was just abandoned instead of leaving it on record.
     this.sessionId = this.generateSessionId();
     this.truncateFrom(0);
-    this.renderStateCard();
+    this.renderFrom(this.entryNode, true);
   }
 
   /**

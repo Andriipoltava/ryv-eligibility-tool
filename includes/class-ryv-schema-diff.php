@@ -2,8 +2,8 @@
 /**
  * Computes a structural diff between two decoded `_ryv_form_schema` arrays,
  * for RYV_Edit_Log's audit trail. Deliberately shallow beyond the node
- * level - it says *which* states/nodes/fields changed and their old/new
- * values, not a line-level diff of nested arrays like `options`.
+ * level - it says *which* nodes/fields changed and their old/new values,
+ * not a line-level diff of nested arrays like `options`.
  *
  * @package RYV_Eligibility_Tool
  */
@@ -23,73 +23,19 @@ class RYV_Schema_Diff {
 	 * @return array Empty if nothing changed.
 	 */
 	public static function compute( array $old, array $new ): array {
-		$old_states = isset( $old['states'] ) && is_array( $old['states'] ) ? $old['states'] : array();
-		$new_states = isset( $new['states'] ) && is_array( $new['states'] ) ? $new['states'] : array();
+		$old_nodes = isset( $old['nodes'] ) && is_array( $old['nodes'] ) ? $old['nodes'] : array();
+		$new_nodes = isset( $new['nodes'] ) && is_array( $new['nodes'] ) ? $new['nodes'] : array();
 
 		$diff = array();
-
-		$added   = array_values( array_diff( array_keys( $new_states ), array_keys( $old_states ) ) );
-		$removed = array_values( array_diff( array_keys( $old_states ), array_keys( $new_states ) ) );
-
-		if ( $added ) {
-			$diff['states_added'] = $added;
-		}
-		if ( $removed ) {
-			$diff['states_removed'] = $removed;
-		}
-
-		$states_changed = array();
-		foreach ( $new_states as $state_id => $new_state ) {
-			if ( ! isset( $old_states[ $state_id ] ) || ! is_array( $old_states[ $state_id ] ) || ! is_array( $new_state ) ) {
-				continue;
-			}
-
-			$state_diff = self::diff_state( $old_states[ $state_id ], $new_state );
-			if ( $state_diff ) {
-				$states_changed[ $state_id ] = $state_diff;
-			}
-		}
-		if ( $states_changed ) {
-			$diff['states_changed'] = $states_changed;
-		}
-
-		$settings_changed = array();
-		foreach ( array( 'state_display_style', 'state_picker_label' ) as $key ) {
-			$old_val = $old[ $key ] ?? null;
-			$new_val = $new[ $key ] ?? null;
-			if ( $old_val !== $new_val ) {
-				$settings_changed[ $key ] = array(
-					'old' => $old_val,
-					'new' => $new_val,
-				);
-			}
-		}
-		if ( $settings_changed ) {
-			$diff['form_settings_changed'] = $settings_changed;
-		}
-
-		return $diff;
-	}
-
-	/**
-	 * @param array $old_state One state's array from the old schema.
-	 * @param array $new_state Same state id's array from the new schema.
-	 * @return array
-	 */
-	private static function diff_state( array $old_state, array $new_state ): array {
-		$old_nodes = isset( $old_state['nodes'] ) && is_array( $old_state['nodes'] ) ? $old_state['nodes'] : array();
-		$new_nodes = isset( $new_state['nodes'] ) && is_array( $new_state['nodes'] ) ? $new_state['nodes'] : array();
-
-		$result = array();
 
 		$added   = array_values( array_diff( array_keys( $new_nodes ), array_keys( $old_nodes ) ) );
 		$removed = array_values( array_diff( array_keys( $old_nodes ), array_keys( $new_nodes ) ) );
 
 		if ( $added ) {
-			$result['nodes_added'] = $added;
+			$diff['nodes_added'] = $added;
 		}
 		if ( $removed ) {
-			$result['nodes_removed'] = $removed;
+			$diff['nodes_removed'] = $removed;
 		}
 
 		$nodes_changed = array();
@@ -104,21 +50,25 @@ class RYV_Schema_Diff {
 			}
 		}
 		if ( $nodes_changed ) {
-			$result['nodes_changed'] = $nodes_changed;
+			$diff['nodes_changed'] = $nodes_changed;
 		}
 
-		foreach ( array( 'label', 'entry_node' ) as $key ) {
-			$old_val = $old_state[ $key ] ?? null;
-			$new_val = $new_state[ $key ] ?? null;
+		$settings_changed = array();
+		foreach ( array( 'title', 'description', 'entry_node' ) as $key ) {
+			$old_val = $old[ $key ] ?? null;
+			$new_val = $new[ $key ] ?? null;
 			if ( $old_val !== $new_val ) {
-				$result[ $key ] = array(
+				$settings_changed[ $key ] = array(
 					'old' => $old_val,
 					'new' => $new_val,
 				);
 			}
 		}
+		if ( $settings_changed ) {
+			$diff['form_settings_changed'] = $settings_changed;
+		}
 
-		return $result;
+		return $diff;
 	}
 
 	/**

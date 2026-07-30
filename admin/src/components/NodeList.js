@@ -1,5 +1,6 @@
+import { useState } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
-import { Button, SelectControl } from '@wordpress/components';
+import { Button, SelectControl, TextControl } from '@wordpress/components';
 import ConfirmButton from './ConfirmButton';
 
 const TYPE_LABELS = {
@@ -22,14 +23,28 @@ function nextUniqueId(nodes, base) {
 }
 
 /**
- * @param {object} state RYV state object ({ entry_node, nodes }).
- * @param {(updater: (state: object) => object) => void} onChange Applies an update to the active state.
+ * @param {object} graph RYV decision graph ({ entry_node, nodes }) - the whole form's flat node map, not scoped to any one branch.
+ * @param {(updater: (graph: object) => object) => void} onChange Applies an update to the graph.
  */
-export default function NodeList({ state, selectedNodeId, onSelect, onChange }) {
-  const nodeIds = Object.keys(state.nodes || {});
+export default function NodeList({ graph, selectedNodeId, onSelect, onChange }) {
+  const [filter, setFilter] = useState('');
+
+  const nodeIds = Object.keys(graph.nodes || {});
+
+  // A flat DAG can easily hold hundreds of nodes (a real multi-branch form
+  // flattens every branch's questions into this one list, with no grouping
+  // left to browse by) - a plain unfiltered list of that size is close to
+  // unusable, so filter by id or title substring.
+  const query = filter.trim().toLowerCase();
+  const visibleIds = query
+    ? nodeIds.filter((id) => {
+        const node = graph.nodes[id];
+        return id.toLowerCase().includes(query) || (node.title || '').toLowerCase().includes(query);
+      })
+    : nodeIds;
 
   const handleAdd = () => {
-    const id = nextUniqueId(state.nodes || {}, 'new_question');
+    const id = nextUniqueId(graph.nodes || {}, 'new_question');
     onChange((prev) => ({
       ...prev,
       nodes: {
@@ -58,7 +73,7 @@ export default function NodeList({ state, selectedNodeId, onSelect, onChange }) 
     <div className="ryv-builder-nodes">
       <SelectControl
         label={__('Entry node (first question)', 'ryv-eligibility-tool')}
-        value={state.entry_node || ''}
+        value={graph.entry_node || ''}
         options={[
           { label: __('— none —', 'ryv-eligibility-tool'), value: '' },
           ...nodeIds.map((id) => ({ label: id, value: id })),
@@ -66,9 +81,16 @@ export default function NodeList({ state, selectedNodeId, onSelect, onChange }) 
         onChange={(value) => onChange((prev) => ({ ...prev, entry_node: value || null }))}
       />
 
+      <TextControl
+        label={__('Filter questions', 'ryv-eligibility-tool')}
+        placeholder={__('Search by id or title…', 'ryv-eligibility-tool')}
+        value={filter}
+        onChange={setFilter}
+      />
+
       <ul className="ryv-builder-node-list">
-        {nodeIds.map((id) => {
-          const node = state.nodes[id];
+        {visibleIds.map((id) => {
+          const node = graph.nodes[id];
           return (
             <li key={id} className={id === selectedNodeId ? 'is-active' : ''}>
               <button type="button" onClick={() => onSelect(id)}>
@@ -86,6 +108,10 @@ export default function NodeList({ state, selectedNodeId, onSelect, onChange }) 
           );
         })}
       </ul>
+
+      {query && visibleIds.length === 0 && (
+        <p className="ryv-builder-node-list-empty">{__('No questions match.', 'ryv-eligibility-tool')}</p>
+      )}
 
       <Button variant="secondary" onClick={handleAdd}>
         {__('+ Add Question', 'ryv-eligibility-tool')}

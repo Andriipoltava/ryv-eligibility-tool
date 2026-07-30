@@ -22,6 +22,8 @@ composer install          # Symfony Yaml (used by the YAML importer/parser)
 npm install                # Tailwind CLI
 npm run build              # compile assets/src/input.css -> assets/css/app.css (minified, one-shot)
 npm run watch               # same, watching for changes during CSS work
+npm run admin:build         # build the admin builder SPA -> admin/build/
+npm run admin:start         # same, watching for changes
 php -l path/to/file.php    # syntax-check a PHP file - there is no PHPCS/PHPUnit config in this repo yet
 ```
 
@@ -32,110 +34,173 @@ ES modules, imported by relative path exactly as shipped).
 
 `vendor/` (Composer) is committed - WordPress plugins don't get a build step
 at deploy time. `node_modules/` is gitignored - only the *compiled*
-`assets/css/app.css` needs to ship, and it's committed.
+`assets/css/app.css` and `admin/build/` need to ship, and both are committed.
+
+**`RYV_VERSION` (`ryv-eligibility-tool.php`) must be bumped on any JS/CSS
+change.** It's the cache-busting query string on every enqueued asset - without
+a bump, browsers that already loaded the plugin keep serving the old file
+indefinitely. This has bitten real testing sessions more than once.
 
 ## Architecture
 
-### Data model: one JSON graph per form, keyed by state
+### Data model: one flat decision graph per form
 
 A `ryv_forms` CPT post (see `includes/class-ryv-cpt.php`) holds its entire
 decision tree in a single postmeta value, `_ryv_form_schema`:
 
 ```json
 {
-  "states": {
-    "alabama": {
-      "state_id": "alabama",
-      "label": "Alabama",
-      "entry_node": "al_felony_conviction",
-      "nodes": {
-        "al_felony_conviction": {
-          "type": "radio",
-          "title": "Have you been convicted of a felony?",
-          "content": "",
-          "options": [
-            { "value": "Yes", "label": "Yes", "next_node": "al_mt_list" },
-            { "value": "No",  "label": "No",  "next_node": "al_votes" }
-          ]
-        }
-      }
+  "title": "Voting Rights",
+  "description": "",
+  "entry_node": "select_state",
+  "nodes": {
+    "select_state": {
+      "type": "radio",
+      "title": "Select your state",
+      "display_style": "buttons",
+      "options": [
+        { "value": "alabama", "label": "Alabama", "next_node": "al_felony_conviction" }
+      ]
+    },
+    "al_felony_conviction": {
+      "type": "radio",
+      "title": "Have you been convicted of a felony?",
+      "content": "",
+      "options": [
+        { "value": "Yes", "label": "Yes", "next_node": "al_mt_list" },
+        { "value": "No",  "label": "No",  "next_node": "al_votes" }
+      ]
     }
   }
 }
 ```
 
-One `ryv_forms` post can hold many states (this is why the REST API is
-`/form/{id}/state/{state_id}`, not just `/form/{id}`). Node types:
-`radio`, `checkbox`, `text`, `textarea`, `markup`, `unsupported` (an unmapped
-Drupal element type, imported rather than dropped, flagged for manual fixup).
-Choice types (`radio`/`checkbox`) route via `options[].next_node`; the rest
-route via a node-level `next_node`. `content` (not `title`) holds the body of
-`markup` nodes - it's trusted HTML, written only by `manage_options` users
-(YAML import or, eventually, the form builder), rendered via `innerHTML` on
-the same trust basis as WP post content.
+**There is no per-state partition in the schema.** "Select your state" is an
+ordinary `radio` node like any other question - its `options[].next_node`
+routes straight to each state's original first question, exactly the same
+mechanism any other branching question uses. This is a deliberate, explicit
+architectural choice (a prior attempt at exactly this flat model was reverted
+once earlier in this project's history before being redone properly - see git
+log/PR history around that if touching this area). Node types: `radio`,
+`checkbox`, `text`, `textarea`, `markup`, `unsupported` (an unmapped Drupal
+element type, imported rather than dropped, flagged for manual fixup). Choice
+types (`radio`/`checkbox`) route via `options[].next_node`; the rest route via
+a node-level `next_node`. `content` (not `title`) holds the body of `markup`
+nodes - it's trusted HTML, written only by `manage_options` users (YAML import
+or the form builder), rendered via `innerHTML` on the same trust basis as WP
+post content.
+
+`RYV_CPT::get_schema( $post_id )` / `RYV_CPT::save_schema( $post_id, $schema )`
+are the **one canonical read/write path** for this postmeta - every other
+class (REST API, admin API, import page) goes through them rather than
+hand-rolling `get_post_meta()`/`json_decode()`/`wp_slash(wp_json_encode())`.
+`get_schema()` also transparently migrates a legacy per-state schema
+(`{states: {...}}`, from before this flat-DAG rewrite) via
+`RYV_Schema_Migrator::migrate()` the first time it's read, persisting the
+migrated result immediately so it only ever runs once per post - the migrator
+folds every old state's nodes into one map (prefixing ids `{state_id}__{id}`
+so cross-state id collisions are structurally impossible) and synthesizes a
+`select_state`-style picker node whose options route to each state's original
+entry node, sorted alphabetically by label to match the old picker's order.
 
 ### YAML importer/parser (`includes/class-ryv-yaml-parser.php`)
 
 Real RYV exports (`assets/yaml/webform.webform.voting_rights*.yml` are actual
 production Drupal Webform files, not fixtures) bundle **every state into one
-file**: a single state-select element followed by ~50 sibling `container`
-elements, each gated by `#states.visible` (or `visible-slide`, treated
-identically) referencing that selector with a specific value. `parse()`
-auto-detects this shape - `find_state_selector()` finds the first
-select/radios element with `#options`, then every gated sibling container
-becomes one state's subtree via `build_subtree()`. State id/label are derived
-from the *selector's own* `#options` (label text), not guessed from the
-condition value, because real data mixes full names and abbreviations
-(`DC`, `NH`, `Alabama`, ...).
+file**: a state-select element followed by ~50 sibling `container` elements,
+each gated by `#states.visible` (or `visible-slide`, treated identically)
+referencing that selector with a specific value. `parse()` does **not**
+special-case the selector at all - the whole document, selector included, is
+flattened into one graph by `build_subtree()`/`flatten()` in a single pass.
 
 Drupal webforms are implicitly linear (elements render in document order);
-branching is reconstructed by `build_subtree()`: each option defaults to
-"next element in document order," overridden when a downstream sibling is
-gated on that specific option value. `find_default_next()` is the key trick -
-when computing an option's *default* target, it skips over any sibling
-that's exclusively reached via one of this node's own gates, so the
-non-matching options still rejoin the flow correctly instead of dead-ending.
+branching is reconstructed by `build_subtree()`: each option defaults to "next
+element in document order," overridden when a downstream sibling is gated on
+that specific option value. `find_default_next()` is the key trick - when
+computing an option's *default* target, it skips over any sibling that's
+exclusively reached via a gate, so non-matching options still rejoin the flow
+correctly instead of dead-ending or (the specific bug this flattening
+introduced and fixes) spilling into a *different* state's content once every
+state shares one document.
 
-Also note the double-YAML-encoding: Drupal's config export stores the
-element tree as a YAML string *inside* the outer YAML (`elements: |...`), not
-as nested YAML - `resolve_elements_root()` unwraps that.
+A per-state **container**'s own `#states.visible` gate (e.g. "this whole block
+is only visible when the state selector equals X") can't attach to the
+container itself - containers never become nodes - so `flatten()` carries it
+down onto the first real leaf that container produces, via a side-channel
+accumulator (`$container_gates`, keyed `"source_id|value" => target node id`)
+rather than by mutating that leaf's own `#states`. This matters: empirically,
+across both real export files, a state's first child very often *already*
+carries its own `#states` (a redundant restatement of the same condition, or
+sometimes an unrelated/unsupported one) - writing over it would be unsafe, and
+a naive "only inject a gate if the leaf has none" check silently misroutes
+every state whose first child doesn't restate the condition (confirmed several
+real states do exactly this). `build_subtree()` overlays `$container_gates` on
+top of the leaf-derived gate map after building it, so container-established
+routing always wins for its source/value slot.
+
+**Also load-bearing**: every node additionally carries the id of whichever
+top-level source element it descended from (`flatten()`'s `$group`, one per
+state's container, inherited by everything nested inside it however deep).
+`find_default_next()` refuses to return a default target from a *different*
+group - without this, a node whose own branches are exhausted (the true end of
+one state's content) would otherwise keep walking forward in document order
+and land on the *next* state's gated entry point instead of terminating (e.g.
+a "you can vote!" result silently auto-advancing into an unrelated state's
+first question). This reproduces, via an explicit group tag, exactly the
+isolation the old per-state `build_subtree()` call used to get for free by
+only ever being invoked on one state's own elements.
+
+Also note the double-YAML-encoding: Drupal's config export stores the element
+tree as a YAML string *inside* the outer YAML (`elements: |...`), not as
+nested YAML - `resolve_elements_root()` unwraps that. The root YAML's own
+`title:`/`description:` keys (siblings of `elements:`) are read directly by
+`parse()` and applied to the target post's `post_title`/`post_excerpt` on
+import (see `RYV_Import_Page::apply_title_and_description()`).
 
 Anything the parser can't confidently translate (compound `#states`
-conditions, elements outside any detected state container, unmapped
-`#type`s) is never silently dropped - it's imported as-is and reported in
-`warnings`/`unassigned`, surfaced to the admin in `admin/views/import-page.php`.
+conditions, unmapped `#type`s, optgroups) is never silently dropped - it's
+imported as-is and reported in `warnings`, surfaced to the admin in
+`admin/views/import-page.php`.
 
-If a file has no auto-detectable state-selector/container shape (e.g. a
-hand-trimmed single-state file), pass a `$fallback_state_id` override -
-`admin/class-ryv-import-page.php`'s "State Override" field does this.
-Re-importing a file only touches the states present in it; others already
-stored on the target post are preserved (`merge_states_into_post()`).
+Since one file now represents the *entire* flat graph, importing into a form
+that already has content **replaces its whole schema** rather than merging one
+state's worth of nodes - `admin/class-ryv-import-page.php` requires an
+explicit confirmation checkbox before allowing that.
 
-### REST + frontend: lazy per-state loading, no server-rendered form
+### REST + frontend: one fetch, no server-rendered form
 
-`includes/class-ryv-api.php` exposes two read-only routes:
-- `GET /ryv/v1/form/{post_id}` - which states exist on this form (populates the initial picker)
-- `GET /ryv/v1/form/{post_id}/state/{state_id}` - that state's full node graph, fetched only after a state is chosen
+`includes/class-ryv-api.php` exposes one read-only route -
+`GET /ryv/v1/form/{post_id}` returns the entire `{entry_node, nodes}` graph in
+one response, plus the form's `title`/`description` - and one write route,
+`POST /ryv/v1/form/{post_id}/log`, for anonymous progress logging (see below).
+There is no more per-state lazy-loading route; with a single universal DAG
+there's no natural boundary left to preserve one.
 
 Draft forms are visible only to users who can `edit_post` that form (lets
 editors preview via the widget before publishing).
 
-The Elementor widget (`widgets/class-ryv-widget.php`) renders nothing but an
-empty mount point: `<div class="ryv-app-wrapper" data-form-id="123">`.
-`assets/js/decision-engine.js` finds every such wrapper and boots a
-`RYVDecisionEngine` (`assets/js/src/engine.js`) on it.
+The Elementor widget (`widgets/class-ryv-widget.php`) renders an optional
+server-side title/description (`show_title`/`show_description` Content-tab
+switches, reading the post's own `post_title`/`post_excerpt` directly - no
+REST round trip needed for this part) followed by an empty mount point:
+`<div class="ryv-app-wrapper" data-form-id="123">`. `assets/js/decision-engine.js`
+finds every such wrapper and boots a `RYVDecisionEngine`
+(`assets/js/src/engine.js`) on it, which fetches the whole graph once and
+walks it with `renderFrom()`/`computeNext()`.
 
 **UX model - read this before changing engine.js**: this is *not* a
-step-wizard with Back/Continue. The whole questionnaire renders as one
-growing vertical list of cards (state picker, then every question reached),
-and every card stays live and clickable indefinitely. Changing any answer -
-including re-picking the state - calls `onAnswerChange()`, which truncates
-every rendered card after that one and recomputes forward
-(`renderFrom()`/`computeNext()`) from the new answer. There is deliberately
-no separate "confirm"/"continue" step: radio advances on click, checkbox
-recomputes on every toggle, markup auto-advances with no click at all
-(showing "Start Over" only when it's a true terminal, i.e. no `next_node`),
-and text/textarea commit on blur or Enter.
+step-wizard with Back/Continue. The whole questionnaire renders as one growing
+vertical list of cards (state picker as the first ordinary node, then every
+question reached), and every card stays live and clickable indefinitely.
+Changing any answer - including re-picking the state - calls
+`onAnswerChange()`, which truncates every rendered card after that one and
+recomputes forward (`renderFrom()`/`computeNext()`) from the new answer. There
+is deliberately no separate "confirm"/"continue" step: radio advances on
+click, checkbox recomputes on every toggle, markup auto-advances with no click
+at all (showing "Start Over" only when it's a true terminal, i.e. no
+`next_node`), and text/textarea commit on blur or Enter. `restart()` just
+re-walks the same graph from `entry_node` - no special "back to the picker"
+case, since the picker is just the first node.
 
 Watch out for the blur-on-removal trap in `renderInputCard`
 (`assets/js/src/renderer.js`): committing an answer rebuilds/removes that
@@ -144,45 +209,98 @@ it - which would otherwise re-fire the commit handler a second time with the
 same value. The `lastCommitted` guard exists specifically for this; don't
 remove it without re-solving that race.
 
+**Elementor editor preview**: the widget's DOM doesn't exist yet at the exact
+moment `decision-engine.js`'s deferred module script runs inside Elementor's
+editor iframe (Elementor renders widget markup on its own schedule), and
+`elementorFrontend` itself isn't guaranteed to exist that early either, so a
+`frontend/element_ready` hook listener can miss it too. `decision-engine.js`
+instead uses a `MutationObserver`, scoped to the editor only via the native
+`window.frameElement.id === 'elementor-preview-iframe'` check (no dependency
+on any Elementor JS being loaded yet) - real frontend visitors never pay for
+the observer.
+
+### Visitor + admin activity logging
+
+Two custom tables (`includes/class-ryv-db.php`, created/upgraded via
+`RYV_DB::maybe_upgrade()` on every request - cheap no-op once current, same
+pattern as the schema migration above):
+- `wp_ryv_submissions` (`includes/class-ryv-submission-log.php`) - one row per
+  `(form_id, session_id)`, upserted by the frontend as a visitor answers
+  (`POST /ryv/v1/form/{id}/log`), so a browse-away mid-questionnaire still
+  leaves a partial trail. Deliberately anonymous - no IP or other identifying
+  field exists in the schema.
+- `wp_ryv_edit_log` (`includes/class-ryv-edit-log.php`) - one row per builder
+  Save, who/when plus a structural diff (`includes/class-ryv-schema-diff.php`'s
+  `RYV_Schema_Diff::compute()` - nodes added/removed/changed, not a
+  line-level diff of nested arrays like `options`).
+
+Both are surfaced, paginated, on the "Activity Log" admin page
+(`admin/class-ryv-logs-page.php` / `admin/views/logs-page.php`).
+
 ### Tailwind scoping
 
 `tailwind.config.js` uses `prefix: 'ryv-'` and `important: '.ryv-app-wrapper'`,
-and disables `corePlugins.preflight`. This is deliberate and load-bearing:
-the widget can land inside an arbitrary theme's page, so it must not reset
-global elements (`h1`, `button`, ...) or lose CSS specificity fights against
-the theme. Colors (`ryv-primary`/`ryv-secondary`/`ryv-text`) resolve through
-CSS custom properties (`--ryv-primary-color` etc.) so the Elementor widget's
-Style tab can set them per-instance via `selectors` - see
-`register_color_controls()` in `widgets/class-ryv-widget.php`.
+and disables `corePlugins.preflight`. This is deliberate and load-bearing: the
+widget can land inside an arbitrary theme's page, so it must not reset global
+elements (`h1`, `button`, ...) or lose CSS specificity fights against the
+theme. Colors (`ryv-primary`/`ryv-secondary`/`ryv-text`) resolve through CSS
+custom properties (`--ryv-primary-color` etc.) so the Elementor widget's Style
+tab can set them per-instance via `selectors` - see `register_color_controls()`
+in `widgets/class-ryv-widget.php`. **`content` must include every PHP file
+that can introduce a new class name, including `widgets/**/*.php`** - it was
+missing for a while and every Style-tab class added during that time only
+survived Tailwind's purge because it *also* happened to be referenced in a
+scanned JS file (`renderer.js` builds class names as strings); a class used
+purely server-side (like the header title/description below) gets silently
+stripped from the compiled CSS if its PHP file isn't in this list.
 
-`includes/class-ryv-assets.php` registers (but does not enqueue) the
-compiled CSS/JS on `wp_enqueue_scripts` at **priority 5**, deliberately
-before Elementor's own dependency-enqueuing on the same hook - the widget
-declares them via `get_script_depends()`/`get_style_depends()`, which only
-works if registration already happened.
+Not every Style control is CSS-var-bridged the same way: most non-typography
+properties write a custom property onto `{{WRAPPER}} .ryv-app-wrapper` (read
+in `input.css` with a `var(--x, <default>)` fallback), but the header
+title/description controls (`register_header_style_controls()`) write theirs
+onto `{{WRAPPER}}` alone, since that markup renders as `.ryv-app-wrapper`'s
+*preceding sibling*, not a descendant - a custom property set on
+`.ryv-app-wrapper` would be invisible to it (custom properties only cascade to
+descendants).
+
+`includes/class-ryv-assets.php` registers (but does not enqueue) the compiled
+CSS/JS on `wp_enqueue_scripts` at **priority 5**, deliberately before
+Elementor's own dependency-enqueuing on the same hook - the widget declares
+them via `get_script_depends()`/`get_style_depends()`, which only works if
+registration already happened.
 
 ### Admin builder SPA (`admin/src/`)
 
-React (via `@wordpress/scripts`) app that replaces the default post editor
-for `ryv_forms`. `admin/class-ryv-builder-page.php` filters
-`get_edit_post_link` and hooks `load-post.php`/`load-post-new.php` so every
-entry point (list table, admin bar, direct URL, "Add New") lands on the
-builder instead of Gutenberg/classic. It's a list/detail editor, not a
-drag-and-drop graph canvas - a node list per state plus a detail panel where
-each option's/node's `next_node` is a `<select>` populated from the current
-state's actual node ids (so it's impossible to route to a nonexistent node
-from the UI). Renaming a node id (`App.js`'s `renameNode()`) rewrites every
-reference to it - `entry_node` and any option/node `next_node` - across the
-whole state, not just the node being renamed.
+React (via `@wordpress/scripts`) app that replaces the default post editor for
+`ryv_forms`. `admin/class-ryv-builder-page.php` filters `get_edit_post_link`
+and hooks `load-post.php`/`load-post-new.php` so every entry point (list
+table, admin bar, direct URL, "Add New") lands on the builder instead of
+Gutenberg/classic - **but only for the default `edit` action**; Trash/Restore/
+Delete Permanently are also `post.php?action=...` requests through the same
+hook, and redirecting those too (as this once did) silently breaks deletion
+entirely, since WordPress's own handler for them never runs.
+
+It's a flat list/detail editor, not a drag-and-drop graph canvas - a single
+node list across the *whole* form (no more per-state grouping, since there's
+no more structural state partition) plus a detail panel where each option's/
+node's `next_node` is a `<select>` populated from the current graph's actual
+node ids (so it's impossible to route to a nonexistent node from the UI). A
+real multi-branch form can flatten to 400+ nodes with no grouping left to
+browse by, so `NodeList.js` has a client-side id/title filter - necessary, not
+optional, at that scale. Renaming a node id (`App.js`'s `renameNode()`)
+rewrites every reference to it - `entry_node` and any option/node `next_node` -
+across the whole graph, not just the node being renamed.
 
 The builder round-trips the **entire** schema on save (`includes/class-ryv-admin-api.php`,
-`GET`/`POST /ryv/v1/admin/form/{post_id}`) rather than merging partial
-updates server-side - it loads everything into memory once, edits happen
-client-side, "Save" PUTs the whole thing back. Auth-gated by
-`current_user_can('edit_post', $post_id)`, distinct from the public,
-read-only `RYV_API`. New-post creation reuses core's already-REST-enabled
-`ryv_forms` endpoint (`POST /wp/v2/ryv_forms`) rather than adding a bespoke
-one - only the schema blob is genuinely custom.
+`GET`/`POST /ryv/v1/admin/form/{post_id}`) rather than merging partial updates
+server-side - it loads everything into memory once, edits happen client-side,
+"Save" PUTs the whole thing back. Auth-gated by
+`current_user_can('edit_post', $post_id)`, distinct from the public, read-only
+`RYV_API`. New-post creation reuses core's already-REST-enabled `ryv_forms`
+endpoint (`POST /wp/v2/ryv_forms`) rather than adding a bespoke one; status
+changes (draft/publish) similarly ride on core's `PATCH /wp/v2/ryv_forms/{id}`
+- the builder fully replaces the normal post editor, so without this there
+would be no way to ever publish a form.
 
 Build it with `npm run admin:build` (or `admin:start` to watch). Output goes
 to `admin/build/` and **is committed**, same as `assets/css/app.css` - no
@@ -193,10 +311,10 @@ depends on that exact name.
 
 ## Status
 
-Implemented: CPT + postmeta schema, YAML importer/parser, REST API, frontend
-decision engine, Elementor widget (content + style controls), admin builder
-SPA. All phases from the original plan are built. Elementor widget rendering
-and the builder's REST-backed save/load have been verified by code review
-and manual testing in a dev harness, but not yet inside a live Elementor
-editor session (Elementor was downloaded locally but left deliberately
-inactive - see git history around the Phase 4/5 boundary).
+Implemented: CPT + postmeta schema (flat DAG), YAML importer/parser, REST
+API, frontend decision engine, Elementor widget (content + style controls,
+including title/description), admin builder SPA, visitor/admin activity
+logging. All phases from the original plan are built, plus the later flat-DAG
+rewrite (states-keyed → single universal graph) and its lazy migration path
+for existing forms. Verified against both real production YAML exports and
+live browser testing (Elementor editor included, not just code review).

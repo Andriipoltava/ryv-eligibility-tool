@@ -37,10 +37,6 @@ export function fetchForm(formId) {
   return request(`/form/${encodeURIComponent(formId)}`);
 }
 
-export function fetchFormState(formId, stateId) {
-  return request(`/form/${encodeURIComponent(formId)}/state/${encodeURIComponent(stateId)}`);
-}
-
 /**
  * Fire-and-forget progress log (see RYV_Submission_Log on the PHP side) -
  * failures are swallowed rather than surfaced, since a dropped log write

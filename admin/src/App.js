@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
 import { Button, TextControl, SelectControl, Notice, Spinner } from '@wordpress/components';
-import StateSidebar from './components/StateSidebar';
 import NodeList from './components/NodeList';
 import NodeEditor from './components/NodeEditor';
 import { fetchForm, saveForm, createForm, updateFormStatus } from './api';
@@ -14,7 +13,7 @@ const STATUS_OPTIONS = [
 const settings = window.RYVBuilderSettings || {};
 
 function emptySchema() {
-  return { states: {} };
+  return { entry_node: null, nodes: {} };
 }
 
 export default function App() {
@@ -23,7 +22,6 @@ export default function App() {
   const [status, setStatus] = useState('draft');
   const [statusSaving, setStatusSaving] = useState(false);
   const [schema, setSchema] = useState(emptySchema());
-  const [activeStateId, setActiveStateId] = useState(null);
   const [selectedNodeId, setSelectedNodeId] = useState(null);
   const [loading, setLoading] = useState(!!postId);
   const [saving, setSaving] = useState(false);
@@ -40,8 +38,8 @@ export default function App() {
       .then((data) => {
         setTitle(data.title);
         setStatus(data.status || 'draft');
-        setSchema(data.schema && data.schema.states ? data.schema : emptySchema());
-        setActiveStateId(Object.keys(data.schema?.states || {})[0] || null);
+        setSchema(data.schema && data.schema.nodes ? data.schema : emptySchema());
+        setSelectedNodeId(null);
         setError(null);
       })
       .catch((err) => setError(err.message))
@@ -79,23 +77,10 @@ export default function App() {
       });
   };
 
-  const updateSchema = useCallback((updater) => {
+  const updateGraph = useCallback((updater) => {
     setSchema((prev) => updater(prev));
     setDirty(true);
   }, []);
-
-  const updateActiveState = useCallback(
-    (updater) => {
-      updateSchema((prev) => ({
-        ...prev,
-        states: {
-          ...prev.states,
-          [activeStateId]: updater(prev.states[activeStateId]),
-        },
-      }));
-    },
-    [activeStateId, updateSchema]
-  );
 
   const handleSave = () => {
     setSaving(true);
@@ -109,37 +94,13 @@ export default function App() {
       .finally(() => setSaving(false));
   };
 
-  const addState = (stateId, label) => {
-    updateSchema((prev) => ({
-      ...prev,
-      states: {
-        ...prev.states,
-        [stateId]: { state_id: stateId, label, entry_node: null, nodes: {} },
-      },
-    }));
-    setActiveStateId(stateId);
-    setSelectedNodeId(null);
-  };
-
-  const removeState = (stateId) => {
-    updateSchema((prev) => {
-      const states = { ...prev.states };
-      delete states[stateId];
-      return { ...prev, states };
-    });
-    if (activeStateId === stateId) {
-      setActiveStateId(null);
-      setSelectedNodeId(null);
-    }
-  };
-
-  /** Renaming a node id has to fix up every reference to it in the same state. */
+  /** Renaming a node id has to fix up every reference to it across the whole graph. */
   const renameNode = (oldId, newId) => {
-    updateActiveState((state) => {
-      if (state.nodes[newId]) return state; // collision guard (NodeEditor already checks, this is a second line of defense)
+    updateGraph((prev) => {
+      if (prev.nodes[newId]) return prev; // collision guard (NodeEditor already checks, this is a second line of defense)
 
       const nodes = {};
-      Object.entries(state.nodes).forEach(([id, node]) => {
+      Object.entries(prev.nodes).forEach(([id, node]) => {
         const fixed = { ...node };
         if (Array.isArray(fixed.options) && fixed.options.length) {
           fixed.options = fixed.options.map((opt) => ({
@@ -153,9 +114,9 @@ export default function App() {
       });
 
       return {
-        ...state,
+        ...prev,
         nodes,
-        entry_node: state.entry_node === oldId ? newId : state.entry_node,
+        entry_node: prev.entry_node === oldId ? newId : prev.entry_node,
       };
     });
     setSelectedNodeId(newId);
@@ -181,8 +142,6 @@ export default function App() {
   if (loading) {
     return <Spinner />;
   }
-
-  const activeState = activeStateId ? schema.states[activeStateId] : null;
 
   return (
     <div className="ryv-builder">
@@ -215,50 +174,24 @@ export default function App() {
         </div>
       </div>
 
-      <StateSidebar
-        states={schema.states}
-        activeStateId={activeStateId}
-        onSelect={(id) => {
-          setActiveStateId(id);
-          setSelectedNodeId(null);
-        }}
-        onAdd={addState}
-        onRemove={removeState}
-        stateDisplayStyle={schema.state_display_style}
-        onStateDisplayStyleChange={(state_display_style) =>
-          updateSchema((prev) => ({ ...prev, state_display_style }))
-        }
-        statePickerLabel={schema.state_picker_label}
-        onStatePickerLabelChange={(state_picker_label) =>
-          updateSchema((prev) => ({ ...prev, state_picker_label }))
-        }
-      />
+      <div className="ryv-builder-body">
+        <NodeList graph={schema} selectedNodeId={selectedNodeId} onSelect={setSelectedNodeId} onChange={updateGraph} />
 
-      {activeState && (
-        <div className="ryv-builder-body">
-          <NodeList
-            state={activeState}
-            selectedNodeId={selectedNodeId}
-            onSelect={setSelectedNodeId}
-            onChange={updateActiveState}
+        {selectedNodeId && schema.nodes[selectedNodeId] && (
+          <NodeEditor
+            node={schema.nodes[selectedNodeId]}
+            nodeId={selectedNodeId}
+            allNodeIds={Object.keys(schema.nodes)}
+            onRename={renameNode}
+            onChange={(updatedNode) =>
+              updateGraph((prev) => ({
+                ...prev,
+                nodes: { ...prev.nodes, [selectedNodeId]: updatedNode },
+              }))
+            }
           />
-
-          {selectedNodeId && activeState.nodes[selectedNodeId] && (
-            <NodeEditor
-              node={activeState.nodes[selectedNodeId]}
-              nodeId={selectedNodeId}
-              allNodeIds={Object.keys(activeState.nodes)}
-              onRename={renameNode}
-              onChange={(updatedNode) =>
-                updateActiveState((state) => ({
-                  ...state,
-                  nodes: { ...state.nodes, [selectedNodeId]: updatedNode },
-                }))
-              }
-            />
-          )}
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

@@ -16,6 +16,15 @@ module.exports = {
     './public/**/*.php',
     './public/js/src/**/*.js',
     './assets/js/**/*.js',
+    // `widgets/class-ryv-widget.php` was missing here entirely - every
+    // *other* Style-tab class has survived Tailwind's content-based
+    // purging only because it's also referenced in a scanned JS file
+    // (renderer.js builds class names as strings), never because PHP was
+    // actually covered. The header title/description classes are the
+    // first ones rendered purely server-side with no JS-side reference at
+    // all, which is what surfaced this gap - see .ryv-header-title/
+    // .ryv-header-description in input.css.
+    './widgets/**/*.php',
   ],
   theme: {
     extend: {

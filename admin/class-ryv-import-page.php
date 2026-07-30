@@ -1,8 +1,8 @@
 <?php
 /**
  * "Import YAML" admin submenu page: uploads a Drupal Webform YAML export,
- * runs it through RYV_YAML_Parser, and merges the result into a `ryv_forms`
- * post's `_ryv_form_schema` under a given state.
+ * runs it through RYV_YAML_Parser, and stores the resulting flat graph as
+ * a `ryv_forms` post's `_ryv_form_schema`.
  *
  * @package RYV_Eligibility_Tool
  */
@@ -75,33 +75,42 @@ class RYV_Import_Page {
 		check_admin_referer( self::NONCE_ACTION, 'ryv_import_nonce' );
 
 		try {
-			$post_id         = $this->resolve_target_post();
-			$state_override  = $this->resolve_state_override();
-			$file_path       = $this->validate_and_get_uploaded_file();
+			$file_path = $this->validate_and_get_uploaded_file();
 
 			$raw    = RYV_YAML_Parser::parse_file( $file_path );
 			$parser = new RYV_YAML_Parser();
-			$result = $parser->parse( $raw, $state_override );
+			$result = $parser->parse( $raw );
 
-			$this->merge_states_into_post( $post_id, $result['states'] );
+			$is_new  = false;
+			$post_id = $this->resolve_target_post( $result['title'], $is_new );
+
+			// A single YAML file now represents the *entire* flat graph (there's
+			// no more "one file = one state's worth of nodes" partial import
+			// once everything is flattened) - importing into a form that
+			// already has content necessarily replaces its whole schema, not
+			// just adds to it. Require an explicit acknowledgement of that
+			// before doing anything destructive.
+			$this->assert_replace_confirmed( $post_id );
+
+			RYV_CPT::save_schema(
+				$post_id,
+				array(
+					'entry_node' => $result['entry_node'],
+					'nodes'      => $result['nodes'],
+				)
+			);
+
+			$this->apply_title_and_description( $post_id, $result, $is_new );
 
 			$this->store_result(
 				array(
 					'success'     => true,
 					'post_id'     => $post_id,
-					'states'      => array_map(
-						static function ( $state ) {
-							return array(
-								'id'    => $state['state_id'],
-								'label' => $state['label'],
-								'nodes' => count( $state['nodes'] ),
-							);
-						},
-						array_values( $result['states'] )
-					),
+					'node_count'  => count( $result['nodes'] ),
+					'title'       => $result['title'],
+					'description' => $result['description'],
 					'warnings'    => $result['warnings'],
 					'skipped'     => $result['skipped'],
-					'unassigned'  => $result['unassigned'],
 				)
 			);
 		} catch ( \Throwable $e ) {
@@ -120,17 +129,26 @@ class RYV_Import_Page {
 	/**
 	 * Resolve (or create) the target `ryv_forms` post from $_POST.
 	 *
+	 * @param string|null $yaml_title The uploaded file's own root `title:`, if any.
+	 * @param bool        $is_new     Set to true if a new post was created.
 	 * @return int Post ID.
 	 * @throws RuntimeException On invalid input.
 	 */
-	private function resolve_target_post(): int {
+	private function resolve_target_post( ?string $yaml_title, bool &$is_new ): int {
+		$is_new = false;
 		$target = isset( $_POST['ryv_target_form'] ) ? sanitize_text_field( wp_unslash( $_POST['ryv_target_form'] ) ) : '';
 
 		if ( '__new__' === $target ) {
-			$title = isset( $_POST['ryv_new_form_title'] ) ? sanitize_text_field( wp_unslash( $_POST['ryv_new_form_title'] ) ) : '';
+			$is_new = true;
+
+			$typed_title = isset( $_POST['ryv_new_form_title'] ) ? sanitize_text_field( wp_unslash( $_POST['ryv_new_form_title'] ) ) : '';
+			// The admin's own typed title wins if they bothered to type one;
+			// otherwise fall back to the YAML file's own title so leaving the
+			// field blank isn't a dead end when the file already names itself.
+			$title = '' !== trim( $typed_title ) ? $typed_title : (string) $yaml_title;
 
 			if ( '' === trim( $title ) ) {
-				throw new RuntimeException( __( 'A title is required to create a new form.', 'ryv-eligibility-tool' ) );
+				throw new RuntimeException( __( 'A title is required - type one, or use a file that has its own title.', 'ryv-eligibility-tool' ) );
 			}
 
 			$post_id = wp_insert_post(
@@ -160,19 +178,54 @@ class RYV_Import_Page {
 	}
 
 	/**
-	 * Resolve the optional state override from $_POST. Most RYV exports
-	 * bundle every state into one file (a state-select element followed by
-	 * per-state gated containers) which the parser auto-splits on its own;
-	 * this override only matters when auto-detection finds nothing, e.g. a
-	 * hand-trimmed file containing just one state's elements.
+	 * A single YAML import now replaces a target form's entire schema, so
+	 * require an explicit checkbox whenever that target already has content
+	 * - a brand-new post never needs this (nothing to lose).
 	 *
-	 * @return string|null
+	 * @param int $post_id Target post ID.
+	 * @throws RuntimeException If the target has existing content and the confirmation checkbox wasn't checked.
 	 */
-	private function resolve_state_override(): ?string {
-		$raw  = isset( $_POST['ryv_state_override'] ) ? wp_unslash( $_POST['ryv_state_override'] ) : '';
-		$slug = sanitize_title( $raw );
+	private function assert_replace_confirmed( int $post_id ) {
+		$existing = RYV_CPT::get_schema( $post_id );
 
-		return '' === $slug ? null : $slug;
+		if ( empty( $existing['nodes'] ) ) {
+			return;
+		}
+
+		if ( empty( $_POST['ryv_confirm_replace'] ) ) {
+			throw new RuntimeException(
+				__( 'This form already has content. Check "I understand this replaces this form\'s entire existing content" to continue.', 'ryv-eligibility-tool' )
+			);
+		}
+	}
+
+	/**
+	 * Apply the YAML's own title/description to the target post. For a
+	 * freshly-created post, the title was already set correctly (with the
+	 * right admin-typed-vs-YAML precedence) in resolve_target_post() - don't
+	 * re-touch it here, only the description (a brand-new post never has one
+	 * to conflict with). For an existing post being replaced, the YAML title
+	 * wins unconditionally when present - low-stakes next to the schema
+	 * replace itself.
+	 *
+	 * @param int    $post_id Target post ID.
+	 * @param array  $result  Parser result ({title, description, ...}).
+	 * @param bool   $is_new  Whether $post_id was just created by this request.
+	 */
+	private function apply_title_and_description( int $post_id, array $result, bool $is_new ) {
+		$update = array( 'ID' => $post_id );
+
+		if ( ! $is_new && ! empty( $result['title'] ) ) {
+			$update['post_title'] = $result['title'];
+		}
+
+		if ( ! empty( $result['description'] ) ) {
+			$update['post_excerpt'] = $result['description'];
+		}
+
+		if ( count( $update ) > 1 ) {
+			wp_update_post( $update );
+		}
 	}
 
 	/**
@@ -207,40 +260,6 @@ class RYV_Import_Page {
 		}
 
 		return $file['tmp_name'];
-	}
-
-	/**
-	 * Merge one or more freshly-parsed state graphs into a form post's
-	 * schema meta, preserving any other states already stored there (so
-	 * re-importing, e.g. an updated voting_rights.yml, only touches the
-	 * states present in that file).
-	 *
-	 * @param int   $post_id Target `ryv_forms` post ID.
-	 * @param array $states  state_id => { state_id, label, entry_node, nodes }, from RYV_YAML_Parser::parse().
-	 */
-	private function merge_states_into_post( int $post_id, array $states ) {
-		$existing_json = get_post_meta( $post_id, RYV_CPT::SCHEMA_META_KEY, true );
-		$schema        = json_decode( (string) $existing_json, true );
-
-		if ( ! is_array( $schema ) || ! isset( $schema['states'] ) || ! is_array( $schema['states'] ) ) {
-			$schema = array( 'states' => array() );
-		}
-
-		foreach ( $states as $state_id => $state ) {
-			$schema['states'][ $state_id ] = $state;
-		}
-
-		// update_post_meta() runs the value through wp_unslash() before storing
-		// it (WP's meta API assumes callers pass slashed data, mirroring the
-		// old magic_quotes convention for $_POST). Without wp_slash() here,
-		// every backslash-escape in the JSON (\" around quoted text, \uXXXX
-		// for any non-ASCII character) gets silently stripped, corrupting the
-		// stored value into invalid JSON.
-		update_post_meta(
-			$post_id,
-			RYV_CPT::SCHEMA_META_KEY,
-			wp_slash( wp_json_encode( $schema, JSON_UNESCAPED_SLASHES ) )
-		);
 	}
 
 	/**
@@ -288,6 +307,14 @@ class RYV_Import_Page {
 				'order'          => 'ASC',
 			)
 		);
+
+		// So the picker can warn "this form already has 455 nodes" before the
+		// admin picks it as a target - see assert_replace_confirmed().
+		$form_node_counts = array();
+		foreach ( $forms as $form ) {
+			$schema                          = RYV_CPT::get_schema( $form->ID );
+			$form_node_counts[ $form->ID ] = count( $schema['nodes'] );
+		}
 
 		require RYV_PLUGIN_DIR . 'admin/views/import-page.php';
 	}

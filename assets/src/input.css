@@ -30,6 +30,27 @@
   }
 
   /*
+   * The form's own title/description (see show_title/show_description in
+   * class-ryv-widget.php) - rendered as .ryv-app-wrapper's preceding
+   * siblings, not descendants, so their Color/Margin vars are read off
+   * {{WRAPPER}} itself rather than `.ryv-app-wrapper` (see
+   * register_header_style_controls()'s docblock for why). Matches
+   * .ryv-app-wrapper's own max-width/centering so an untouched widget's
+   * title/description line up with the questionnaire below them.
+   */
+  .ryv-header-title {
+    @apply ryv-max-w-xl ryv-mx-auto ryv-text-xl ryv-font-bold;
+    color: var(--ryv-header-title-color, var(--ryv-text-color, #1f2937));
+    margin-bottom: var(--ryv-header-title-margin-bottom, 1rem);
+  }
+
+  .ryv-header-description {
+    @apply ryv-max-w-xl ryv-mx-auto ryv-leading-relaxed;
+    color: var(--ryv-header-description-color, var(--ryv-text-color, #1f2937));
+    margin-bottom: var(--ryv-header-description-margin-bottom, 1.5rem);
+  }
+
+  /*
    * Every property below that isn't already colour/typography (which the
    * Elementor widget already exposes via Tailwind's ryv-primary/-secondary/
    * -text CSS-var-backed colours and Group_Control_Typography) is bridged

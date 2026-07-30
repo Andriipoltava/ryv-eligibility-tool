@@ -86,7 +86,7 @@ class RYV_Admin_API {
 				'post_id' => $post_id,
 				'title'   => $post->post_title,
 				'status'  => $post->post_status,
-				'schema'  => $this->decode_schema( $post_id ),
+				'schema'  => RYV_CPT::get_schema( $post_id ),
 			),
 			200
 		);
@@ -95,7 +95,7 @@ class RYV_Admin_API {
 	/**
 	 * POST /admin/form/{post_id} - replace the whole schema.
 	 *
-	 * Only checks top-level shape ({"states": {...}}); the builder UI itself
+	 * Only checks top-level shape ({"nodes": {...}}); the builder UI itself
 	 * is what keeps node references sane (next_node dropdowns are only ever
 	 * populated from real node ids), so there's no separate semantic
 	 * validation to duplicate here.
@@ -113,27 +113,19 @@ class RYV_Admin_API {
 
 		$schema = $request->get_param( 'schema' );
 
-		if ( ! is_array( $schema ) || ! isset( $schema['states'] ) || ! is_array( $schema['states'] ) ) {
+		if ( ! is_array( $schema ) || ! isset( $schema['nodes'] ) || ! is_array( $schema['nodes'] ) ) {
 			return new WP_Error(
 				'ryv_invalid_schema',
-				__( 'Schema must be an object with a "states" object.', 'ryv-eligibility-tool' ),
+				__( 'Schema must be an object with a "nodes" object.', 'ryv-eligibility-tool' ),
 				array( 'status' => 400 )
 			);
 		}
 
 		// Captured before the write below, so the diff reflects what this save
 		// actually changed rather than comparing the new schema to itself.
-		$old_schema = $this->decode_schema( $post_id );
+		$old_schema = RYV_CPT::get_schema( $post_id );
 
-		// wp_slash() is required here: update_post_meta() unslashes its input
-		// before storing (WP's meta API assumes slashed data), so an
-		// un-slashed JSON string loses every "\"" and "\uXXXX" escape on the
-		// way into the DB, corrupting it into invalid JSON on the next read.
-		update_post_meta(
-			$post_id,
-			RYV_CPT::SCHEMA_META_KEY,
-			wp_slash( wp_json_encode( $schema, JSON_UNESCAPED_SLASHES ) )
-		);
+		RYV_CPT::save_schema( $post_id, $schema );
 
 		RYV_Edit_Log::record( $post_id, get_current_user_id(), RYV_Schema_Diff::compute( $old_schema, $schema ) );
 
@@ -158,21 +150,6 @@ class RYV_Admin_API {
 		}
 
 		return $post;
-	}
-
-	/**
-	 * @param int $post_id Post ID.
-	 * @return array{states: array}
-	 */
-	private function decode_schema( int $post_id ): array {
-		$json   = get_post_meta( $post_id, RYV_CPT::SCHEMA_META_KEY, true );
-		$schema = json_decode( (string) $json, true );
-
-		if ( ! is_array( $schema ) || ! isset( $schema['states'] ) || ! is_array( $schema['states'] ) ) {
-			return array( 'states' => array() );
-		}
-
-		return $schema;
 	}
 
 	/**

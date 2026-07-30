@@ -12,10 +12,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Class RYV_API
  *
- * Two read-only routes, plus one write route for anonymous progress logging:
- *  - GET  /ryv/v1/form/{post_id}            -> which states have logic on this form (populates the initial state picker)
- *  - GET  /ryv/v1/form/{post_id}/state/{id} -> that state's node graph (fetched lazily, only after a state is chosen)
- *  - POST /ryv/v1/form/{post_id}/log        -> upsert this visitor's answer trail so far (see RYV_Submission_Log)
+ * One read-only route, plus one write route for anonymous progress logging:
+ *  - GET  /ryv/v1/form/{post_id} -> the whole flat decision graph in one shot
+ *  - POST /ryv/v1/form/{post_id}/log -> upsert this visitor's answer trail so far (see RYV_Submission_Log)
  */
 class RYV_API {
 
@@ -68,32 +67,13 @@ class RYV_API {
 				),
 			)
 		);
-
-		register_rest_route(
-			self::NAMESPACE,
-			'/form/(?P<post_id>\d+)/state/(?P<state_id>[a-z0-9-]+)',
-			array(
-				'methods'             => WP_REST_Server::READABLE,
-				'callback'            => array( $this, 'get_form_state' ),
-				'permission_callback' => '__return_true',
-				'args'                => array(
-					'post_id'  => array(
-						'validate_callback' => static function ( $value ) {
-							return is_numeric( $value );
-						},
-					),
-					'state_id' => array(
-						'validate_callback' => static function ( $value ) {
-							return is_string( $value ) && '' !== $value;
-						},
-					),
-				),
-			)
-		);
 	}
 
 	/**
-	 * GET /form/{post_id} - list of states with logic on this form.
+	 * GET /form/{post_id} - the whole flat decision graph in one response.
+	 * No more lazy per-state fetch: with a single universal DAG, there is
+	 * no natural "fetch just the picker, then fetch the rest" boundary
+	 * left to preserve.
 	 *
 	 * @param WP_REST_Request $request Request.
 	 * @return WP_REST_Response|WP_Error
@@ -106,64 +86,18 @@ class RYV_API {
 			return $this->not_found_error();
 		}
 
-		$states = $this->get_states_meta( $post_id );
-
-		$out = array();
-		foreach ( $states as $state_id => $state_data ) {
-			$label = ! empty( $state_data['label'] ) ? (string) $state_data['label'] : RYV_US_States::label( $state_id );
-
-			$out[] = array(
-				'id'    => $state_id,
-				'label' => $label,
-			);
-		}
-
-		usort(
-			$out,
-			static function ( $a, $b ) {
-				return strcmp( $a['label'], $b['label'] );
-			}
-		);
+		$schema = RYV_CPT::get_schema( $post_id );
 
 		return new WP_REST_Response(
 			array(
-				'form_id'             => $post_id,
-				'title'               => $post->post_title,
-				'states'              => $out,
-				'state_display_style' => $this->get_state_display_style( $post_id ),
-				'state_picker_label'  => $this->get_state_picker_label( $post_id ),
+				'form_id'     => $post_id,
+				'title'       => $post->post_title,
+				'description' => $post->post_excerpt,
+				'entry_node'  => $schema['entry_node'],
+				'nodes'       => $schema['nodes'],
 			),
 			200
 		);
-	}
-
-	/**
-	 * GET /form/{post_id}/state/{state_id} - the node graph for one state.
-	 *
-	 * @param WP_REST_Request $request Request.
-	 * @return WP_REST_Response|WP_Error
-	 */
-	public function get_form_state( WP_REST_Request $request ) {
-		$post_id  = (int) $request['post_id'];
-		$state_id = sanitize_title( (string) $request['state_id'] );
-
-		$post = $this->get_viewable_form( $post_id );
-
-		if ( ! $post ) {
-			return $this->not_found_error();
-		}
-
-		$states = $this->get_states_meta( $post_id );
-
-		if ( ! isset( $states[ $state_id ] ) ) {
-			return new WP_Error(
-				'ryv_state_not_found',
-				__( 'No questionnaire is configured for this state.', 'ryv-eligibility-tool' ),
-				array( 'status' => 404 )
-			);
-		}
-
-		return new WP_REST_Response( $states[ $state_id ], 200 );
 	}
 
 	/**
@@ -231,61 +165,6 @@ class RYV_API {
 		}
 
 		return $post;
-	}
-
-	/**
-	 * Decode the `states` map out of a form's schema postmeta.
-	 *
-	 * @param int $post_id Post ID.
-	 * @return array state_id => state graph.
-	 */
-	private function get_states_meta( int $post_id ): array {
-		$json   = get_post_meta( $post_id, RYV_CPT::SCHEMA_META_KEY, true );
-		$schema = json_decode( (string) $json, true );
-
-		if ( ! is_array( $schema ) || empty( $schema['states'] ) || ! is_array( $schema['states'] ) ) {
-			return array();
-		}
-
-		return $schema['states'];
-	}
-
-	/**
-	 * How the state picker should render its options: 'buttons' (default,
-	 * unchanged look), 'radio', or 'dropdown'. Lives as a schema-level
-	 * sibling of `states` rather than per-state, since it's one picker
-	 * shared across every state on the form.
-	 *
-	 * @param int $post_id Post ID.
-	 * @return string
-	 */
-	private function get_state_display_style( int $post_id ): string {
-		$json   = get_post_meta( $post_id, RYV_CPT::SCHEMA_META_KEY, true );
-		$schema = json_decode( (string) $json, true );
-
-		$allowed = array( 'buttons', 'radio', 'dropdown' );
-		$style   = is_array( $schema ) && ! empty( $schema['state_display_style'] ) ? $schema['state_display_style'] : 'buttons';
-
-		return in_array( $style, $allowed, true ) ? $style : 'buttons';
-	}
-
-	/**
-	 * The state picker's title, e.g. "Select your state" - editable per-form
-	 * in the builder (schema-level, sibling of `states`) so a form whose
-	 * first choice isn't really "a state" isn't stuck with that wording.
-	 *
-	 * @param int $post_id Post ID.
-	 * @return string
-	 */
-	private function get_state_picker_label( int $post_id ): string {
-		$json   = get_post_meta( $post_id, RYV_CPT::SCHEMA_META_KEY, true );
-		$schema = json_decode( (string) $json, true );
-
-		$label = is_array( $schema ) && ! empty( $schema['state_picker_label'] ) && is_string( $schema['state_picker_label'] )
-			? $schema['state_picker_label']
-			: __( 'Select your state', 'ryv-eligibility-tool' );
-
-		return $label;
 	}
 
 	/**
