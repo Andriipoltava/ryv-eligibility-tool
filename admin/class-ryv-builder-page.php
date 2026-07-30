@@ -153,6 +153,11 @@ class RYV_Builder_Page {
 			return;
 		}
 
+		// Loads TinyMCE + Quicktags (and their CSS) so the React app's markup
+		// node editor can mount a classic Visual/Text editor via
+		// wp.editor.initialize() - see components/ClassicEditor.js.
+		wp_enqueue_editor();
+
 		$asset_file = RYV_PLUGIN_DIR . 'admin/build/index.asset.php';
 
 		if ( ! file_exists( $asset_file ) ) {
@@ -164,7 +169,7 @@ class RYV_Builder_Page {
 		wp_enqueue_script(
 			'ryv-form-builder',
 			RYV_PLUGIN_URL . 'admin/build/index.js',
-			$asset['dependencies'],
+			array_merge( $asset['dependencies'], array( 'editor' ) ),
 			$asset['version'],
 			true
 		);

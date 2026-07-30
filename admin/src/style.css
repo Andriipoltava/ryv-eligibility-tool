@@ -130,3 +130,19 @@
 .ryv-builder-new {
   max-width: 480px;
 }
+
+.ryv-builder-field {
+  margin-bottom: 1.5rem;
+}
+
+.ryv-builder-field .components-base-control__label {
+  display: block;
+  margin-bottom: 0.5rem;
+}
+
+/* wp.editor.initialize() renders its own TinyMCE/Quicktags chrome around
+   this textarea - just make sure the wrapping mce container isn't
+   squeezed by the builder's own layout. */
+.ryv-builder-classic-editor {
+  width: 100%;
+}

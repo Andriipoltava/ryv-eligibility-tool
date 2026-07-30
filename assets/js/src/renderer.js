@@ -30,6 +30,20 @@ export function createList() {
 }
 
 /**
+ * A node's `title` is trusted HTML, same trust boundary as `content` (see
+ * renderMarkupCard) - it only ever comes from a YAML import or the builder,
+ * both gated to `manage_options`/`edit_post`. Rendered via innerHTML rather
+ * than textContent so inline tags (<em>, <strong>, ...) actually format
+ * instead of showing as literal text.
+ */
+function titleEl(title) {
+  const h2 = document.createElement('h2');
+  h2.className = 'ryv-question-title';
+  h2.innerHTML = title || '';
+  return h2;
+}
+
+/**
  * Append `card` to `container`. New cards fade/slide in; cards being
  * rebuilt in place (an edited answer) skip the animation so the page
  * doesn't jump while you're still looking at what you just clicked.
@@ -70,7 +84,7 @@ export function renderErrorCard(message, onRetry) {
 
 export function renderStateCard(states, selectedStateId, onSelect, displayStyle = 'buttons') {
   const wrap = el('div');
-  wrap.appendChild(el('h2', { className: 'ryv-question-title', text: 'Select your state' }));
+  wrap.appendChild(titleEl('Select your state'));
 
   if (!states || states.length === 0) {
     wrap.appendChild(el('p', { className: 'ryv-loading', text: 'No states are configured for this form yet.' }));
@@ -155,7 +169,7 @@ function renderSingleChoiceOptions(wrap, options, selectedValue, onSelect, displ
  */
 export function renderQuestionCard(node, selectedValues, onChange, nodeId) {
   const wrap = el('div');
-  wrap.appendChild(el('h2', { className: 'ryv-question-title', text: node.title }));
+  wrap.appendChild(titleEl(node.title));
 
   const isMulti = node.type === 'checkbox';
   const selected = new Set(selectedValues || []);
@@ -212,7 +226,7 @@ export function renderQuestionCard(node, selectedValues, onChange, nodeId) {
 
 export function renderInputCard(node, previousValue, onChange) {
   const wrap = el('div');
-  wrap.appendChild(el('h2', { className: 'ryv-question-title', text: node.title }));
+  wrap.appendChild(titleEl(node.title));
 
   const tag = node.type === 'textarea' ? 'textarea' : 'input';
   const input = el(tag, {
@@ -255,7 +269,7 @@ export function renderInputCard(node, previousValue, onChange) {
 export function renderMarkupCard(node, isTerminal, onRestart) {
   const wrap = el('div');
   if (node.title) {
-    wrap.appendChild(el('h2', { className: 'ryv-question-title', text: node.title }));
+    wrap.appendChild(titleEl(node.title));
   }
 
   const content = el('div', { className: 'ryv-content' });

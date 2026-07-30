@@ -1,7 +1,8 @@
 import { useState, useEffect } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
-import { TextControl, TextareaControl, SelectControl } from '@wordpress/components';
+import { TextControl, SelectControl } from '@wordpress/components';
 import OptionsEditor from './OptionsEditor';
+import ClassicEditor from './ClassicEditor';
 
 const TYPE_OPTIONS = [
   { label: __('Radio (single choice)', 'ryv-eligibility-tool'), value: 'radio' },
@@ -81,15 +82,22 @@ export default function NodeEditor({ node, nodeId, allNodeIds, onChange, onRenam
         label={__('Title', 'ryv-eligibility-tool')}
         value={node.title || ''}
         onChange={(title) => onChange({ ...node, title })}
+        help={__(
+          'Rendered as HTML on the frontend - inline tags like <em>word</em> or <strong>word</strong> work.',
+          'ryv-eligibility-tool'
+        )}
       />
 
       {node.type === 'markup' && (
-        <TextareaControl
-          label={__('Content (HTML)', 'ryv-eligibility-tool')}
-          value={node.content || ''}
-          onChange={(content) => onChange({ ...node, content })}
-          rows={6}
-        />
+        <div className="ryv-builder-field">
+          <label className="components-base-control__label">{__('Content (HTML)', 'ryv-eligibility-tool')}</label>
+          <ClassicEditor
+            key={nodeId}
+            id={`ryv-node-content-${nodeId}`}
+            value={node.content || ''}
+            onChange={(content) => onChange({ ...node, content })}
+          />
+        </div>
       )}
 
       {node.type === 'radio' && (
