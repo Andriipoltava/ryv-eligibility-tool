@@ -91,6 +91,11 @@ class RYV_Widget extends \Elementor\Widget_Base {
 
 		$this->register_color_controls();
 		$this->register_typography_controls();
+		$this->register_button_style_controls();
+		$this->register_continue_button_style_controls();
+		$this->register_dropdown_style_controls();
+		$this->register_input_style_controls();
+		$this->register_radio_style_controls();
 	}
 
 	/**
@@ -198,18 +203,639 @@ class RYV_Widget extends \Elementor\Widget_Base {
 		$this->add_group_control(
 			\Elementor\Group_Control_Typography::get_type(),
 			array(
-				'name'     => 'button_typography',
-				'label'    => __( 'Buttons', 'ryv-eligibility-tool' ),
-				'selector' => '{{WRAPPER}} .ryv-option-btn, {{WRAPPER}} .ryv-continue-btn',
+				'name'     => 'results_typography',
+				'label'    => __( 'Results', 'ryv-eligibility-tool' ),
+				'selector' => '{{WRAPPER}} .ryv-content',
+			)
+		);
+
+		$this->end_controls_section();
+	}
+
+	/**
+	 * Choice buttons (.ryv-option-btn) - the radio/checkbox/state-picker
+	 * 'buttons' display style. Every non-typography property here is bridged
+	 * through a CSS custom property on .ryv-app-wrapper (see
+	 * assets/src/input.css) rather than targeting `.ryv-option-btn` directly,
+	 * so it can't lose a specificity fight with anything else on the page -
+	 * same technique the existing color controls already use.
+	 */
+	private function register_button_style_controls() {
+		$this->start_controls_section(
+			'button_style_section',
+			array(
+				'label' => __( 'Choice Buttons', 'ryv-eligibility-tool' ),
+				'tab'   => \Elementor\Controls_Manager::TAB_STYLE,
 			)
 		);
 
 		$this->add_group_control(
 			\Elementor\Group_Control_Typography::get_type(),
 			array(
-				'name'     => 'results_typography',
-				'label'    => __( 'Results', 'ryv-eligibility-tool' ),
-				'selector' => '{{WRAPPER}} .ryv-content',
+				'name'     => 'button_typography',
+				'label'    => __( 'Typography', 'ryv-eligibility-tool' ),
+				'selector' => '{{WRAPPER}} .ryv-option-btn',
+			)
+		);
+
+		$this->add_responsive_control(
+			'button_padding',
+			array(
+				'label'      => __( 'Padding', 'ryv-eligibility-tool' ),
+				'type'       => \Elementor\Controls_Manager::DIMENSIONS,
+				'size_units' => array( 'px', 'em', 'rem', '%' ),
+				'selectors'  => array(
+					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-btn-padding: {{TOP}}{{UNIT}} {{RIGHT}}{{UNIT}} {{BOTTOM}}{{UNIT}} {{LEFT}}{{UNIT}};',
+				),
+			)
+		);
+
+		$this->add_control(
+			'button_border_radius',
+			array(
+				'label'      => __( 'Border Radius', 'ryv-eligibility-tool' ),
+				'type'       => \Elementor\Controls_Manager::DIMENSIONS,
+				'size_units' => array( 'px', 'em', 'rem', '%' ),
+				'selectors'  => array(
+					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-btn-border-radius: {{TOP}}{{UNIT}} {{RIGHT}}{{UNIT}} {{BOTTOM}}{{UNIT}} {{LEFT}}{{UNIT}};',
+				),
+			)
+		);
+
+		$this->add_control(
+			'button_border_width',
+			array(
+				'label'      => __( 'Border Width', 'ryv-eligibility-tool' ),
+				'type'       => \Elementor\Controls_Manager::SLIDER,
+				'size_units' => array( 'px' ),
+				'range'      => array(
+					'px' => array(
+						'min' => 0,
+						'max' => 10,
+					),
+				),
+				'selectors'  => array(
+					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-btn-border-width: {{SIZE}}{{UNIT}};',
+				),
+			)
+		);
+
+		$this->start_controls_tabs( 'tabs_button_style' );
+
+		$this->start_controls_tab(
+			'tab_button_normal',
+			array( 'label' => __( 'Normal', 'ryv-eligibility-tool' ) )
+		);
+
+		$this->add_control(
+			'button_text_color',
+			array(
+				'label'     => __( 'Text Color', 'ryv-eligibility-tool' ),
+				'type'      => \Elementor\Controls_Manager::COLOR,
+				'selectors' => array(
+					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-btn-text-color: {{VALUE}};',
+				),
+			)
+		);
+
+		$this->add_control(
+			'button_bg_color',
+			array(
+				'label'     => __( 'Background Color', 'ryv-eligibility-tool' ),
+				'type'      => \Elementor\Controls_Manager::COLOR,
+				'default'   => '#ffffff',
+				'selectors' => array(
+					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-btn-bg: {{VALUE}};',
+				),
+			)
+		);
+
+		$this->add_control(
+			'button_border_color',
+			array(
+				'label'     => __( 'Border Color', 'ryv-eligibility-tool' ),
+				'type'      => \Elementor\Controls_Manager::COLOR,
+				'default'   => '#d1d5db',
+				'selectors' => array(
+					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-btn-border-color: {{VALUE}};',
+				),
+			)
+		);
+
+		$this->end_controls_tab();
+
+		$this->start_controls_tab(
+			'tab_button_hover',
+			array( 'label' => __( 'Hover', 'ryv-eligibility-tool' ) )
+		);
+
+		$this->add_control(
+			'button_bg_color_hover',
+			array(
+				'label'     => __( 'Background Color', 'ryv-eligibility-tool' ),
+				'type'      => \Elementor\Controls_Manager::COLOR,
+				'selectors' => array(
+					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-btn-bg-hover: {{VALUE}};',
+				),
+			)
+		);
+
+		$this->add_control(
+			'button_border_color_hover',
+			array(
+				'label'     => __( 'Border Color', 'ryv-eligibility-tool' ),
+				'type'      => \Elementor\Controls_Manager::COLOR,
+				'selectors' => array(
+					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-btn-border-color-hover: {{VALUE}};',
+				),
+			)
+		);
+
+		$this->end_controls_tab();
+
+		$this->start_controls_tab(
+			'tab_button_selected',
+			array( 'label' => __( 'Selected', 'ryv-eligibility-tool' ) )
+		);
+
+		$this->add_control(
+			'button_bg_color_selected',
+			array(
+				'label'     => __( 'Background Color', 'ryv-eligibility-tool' ),
+				'type'      => \Elementor\Controls_Manager::COLOR,
+				'selectors' => array(
+					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-btn-bg-selected: {{VALUE}};',
+				),
+			)
+		);
+
+		$this->add_control(
+			'button_border_color_selected',
+			array(
+				'label'     => __( 'Border Color', 'ryv-eligibility-tool' ),
+				'type'      => \Elementor\Controls_Manager::COLOR,
+				'selectors' => array(
+					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-btn-border-color-selected: {{VALUE}};',
+				),
+			)
+		);
+
+		$this->end_controls_tab();
+
+		$this->end_controls_tabs();
+
+		$this->end_controls_section();
+	}
+
+	/**
+	 * The "Start Over" / continue-style call-to-action button (.ryv-continue-btn).
+	 */
+	private function register_continue_button_style_controls() {
+		$this->start_controls_section(
+			'continue_button_style_section',
+			array(
+				'label' => __( 'Continue Button', 'ryv-eligibility-tool' ),
+				'tab'   => \Elementor\Controls_Manager::TAB_STYLE,
+			)
+		);
+
+		$this->add_group_control(
+			\Elementor\Group_Control_Typography::get_type(),
+			array(
+				'name'     => 'continue_button_typography',
+				'label'    => __( 'Typography', 'ryv-eligibility-tool' ),
+				'selector' => '{{WRAPPER}} .ryv-continue-btn',
+			)
+		);
+
+		$this->add_responsive_control(
+			'continue_button_padding',
+			array(
+				'label'      => __( 'Padding', 'ryv-eligibility-tool' ),
+				'type'       => \Elementor\Controls_Manager::DIMENSIONS,
+				'size_units' => array( 'px', 'em', 'rem', '%' ),
+				'selectors'  => array(
+					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-continue-btn-padding: {{TOP}}{{UNIT}} {{RIGHT}}{{UNIT}} {{BOTTOM}}{{UNIT}} {{LEFT}}{{UNIT}};',
+				),
+			)
+		);
+
+		$this->add_control(
+			'continue_button_border_radius',
+			array(
+				'label'      => __( 'Border Radius', 'ryv-eligibility-tool' ),
+				'type'       => \Elementor\Controls_Manager::DIMENSIONS,
+				'size_units' => array( 'px', 'em', 'rem', '%' ),
+				'selectors'  => array(
+					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-continue-btn-border-radius: {{TOP}}{{UNIT}} {{RIGHT}}{{UNIT}} {{BOTTOM}}{{UNIT}} {{LEFT}}{{UNIT}};',
+				),
+			)
+		);
+
+		$this->add_control(
+			'continue_button_border_width',
+			array(
+				'label'      => __( 'Border Width', 'ryv-eligibility-tool' ),
+				'type'       => \Elementor\Controls_Manager::SLIDER,
+				'size_units' => array( 'px' ),
+				'range'      => array(
+					'px' => array(
+						'min' => 0,
+						'max' => 10,
+					),
+				),
+				'selectors'  => array(
+					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-continue-btn-border-width: {{SIZE}}{{UNIT}};',
+				),
+			)
+		);
+
+		$this->add_control(
+			'continue_button_border_color',
+			array(
+				'label'     => __( 'Border Color', 'ryv-eligibility-tool' ),
+				'type'      => \Elementor\Controls_Manager::COLOR,
+				'selectors' => array(
+					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-continue-btn-border-color: {{VALUE}};',
+				),
+			)
+		);
+
+		$this->start_controls_tabs( 'tabs_continue_button_style' );
+
+		$this->start_controls_tab(
+			'tab_continue_button_normal',
+			array( 'label' => __( 'Normal', 'ryv-eligibility-tool' ) )
+		);
+
+		$this->add_control(
+			'continue_button_text_color',
+			array(
+				'label'     => __( 'Text Color', 'ryv-eligibility-tool' ),
+				'type'      => \Elementor\Controls_Manager::COLOR,
+				'default'   => '#ffffff',
+				'selectors' => array(
+					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-continue-btn-text-color: {{VALUE}};',
+				),
+			)
+		);
+
+		$this->add_control(
+			'continue_button_bg_color',
+			array(
+				'label'     => __( 'Background Color', 'ryv-eligibility-tool' ),
+				'type'      => \Elementor\Controls_Manager::COLOR,
+				'selectors' => array(
+					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-continue-btn-bg: {{VALUE}};',
+				),
+			)
+		);
+
+		$this->end_controls_tab();
+
+		$this->start_controls_tab(
+			'tab_continue_button_hover',
+			array( 'label' => __( 'Hover', 'ryv-eligibility-tool' ) )
+		);
+
+		$this->add_control(
+			'continue_button_bg_color_hover',
+			array(
+				'label'     => __( 'Background Color', 'ryv-eligibility-tool' ),
+				'type'      => \Elementor\Controls_Manager::COLOR,
+				'selectors' => array(
+					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-continue-btn-bg-hover: {{VALUE}};',
+				),
+			)
+		);
+
+		$this->end_controls_tab();
+
+		$this->end_controls_tabs();
+
+		$this->end_controls_section();
+	}
+
+	/**
+	 * Native <select> used by display_style: 'dropdown' (.ryv-select).
+	 */
+	private function register_dropdown_style_controls() {
+		$this->start_controls_section(
+			'dropdown_style_section',
+			array(
+				'label' => __( 'Dropdown', 'ryv-eligibility-tool' ),
+				'tab'   => \Elementor\Controls_Manager::TAB_STYLE,
+			)
+		);
+
+		$this->add_group_control(
+			\Elementor\Group_Control_Typography::get_type(),
+			array(
+				'name'     => 'dropdown_typography',
+				'label'    => __( 'Typography', 'ryv-eligibility-tool' ),
+				'selector' => '{{WRAPPER}} .ryv-select',
+			)
+		);
+
+		$this->add_responsive_control(
+			'dropdown_padding',
+			array(
+				'label'      => __( 'Padding', 'ryv-eligibility-tool' ),
+				'type'       => \Elementor\Controls_Manager::DIMENSIONS,
+				'size_units' => array( 'px', 'em', 'rem', '%' ),
+				'selectors'  => array(
+					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-select-padding: {{TOP}}{{UNIT}} {{RIGHT}}{{UNIT}} {{BOTTOM}}{{UNIT}} {{LEFT}}{{UNIT}};',
+				),
+			)
+		);
+
+		$this->add_control(
+			'dropdown_border_radius',
+			array(
+				'label'      => __( 'Border Radius', 'ryv-eligibility-tool' ),
+				'type'       => \Elementor\Controls_Manager::DIMENSIONS,
+				'size_units' => array( 'px', 'em', 'rem', '%' ),
+				'selectors'  => array(
+					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-select-border-radius: {{TOP}}{{UNIT}} {{RIGHT}}{{UNIT}} {{BOTTOM}}{{UNIT}} {{LEFT}}{{UNIT}};',
+				),
+			)
+		);
+
+		$this->add_control(
+			'dropdown_border_width',
+			array(
+				'label'      => __( 'Border Width', 'ryv-eligibility-tool' ),
+				'type'       => \Elementor\Controls_Manager::SLIDER,
+				'size_units' => array( 'px' ),
+				'range'      => array(
+					'px' => array(
+						'min' => 0,
+						'max' => 10,
+					),
+				),
+				'selectors'  => array(
+					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-select-border-width: {{SIZE}}{{UNIT}};',
+				),
+			)
+		);
+
+		$this->start_controls_tabs( 'tabs_dropdown_style' );
+
+		$this->start_controls_tab(
+			'tab_dropdown_normal',
+			array( 'label' => __( 'Normal', 'ryv-eligibility-tool' ) )
+		);
+
+		$this->add_control(
+			'dropdown_text_color',
+			array(
+				'label'     => __( 'Text Color', 'ryv-eligibility-tool' ),
+				'type'      => \Elementor\Controls_Manager::COLOR,
+				'selectors' => array(
+					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-select-text-color: {{VALUE}};',
+				),
+			)
+		);
+
+		$this->add_control(
+			'dropdown_bg_color',
+			array(
+				'label'     => __( 'Background Color', 'ryv-eligibility-tool' ),
+				'type'      => \Elementor\Controls_Manager::COLOR,
+				'default'   => '#ffffff',
+				'selectors' => array(
+					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-select-bg: {{VALUE}};',
+				),
+			)
+		);
+
+		$this->add_control(
+			'dropdown_border_color',
+			array(
+				'label'     => __( 'Border Color', 'ryv-eligibility-tool' ),
+				'type'      => \Elementor\Controls_Manager::COLOR,
+				'default'   => '#d1d5db',
+				'selectors' => array(
+					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-select-border-color: {{VALUE}};',
+				),
+			)
+		);
+
+		$this->end_controls_tab();
+
+		$this->start_controls_tab(
+			'tab_dropdown_hover',
+			array( 'label' => __( 'Hover', 'ryv-eligibility-tool' ) )
+		);
+
+		$this->add_control(
+			'dropdown_border_color_hover',
+			array(
+				'label'     => __( 'Border Color', 'ryv-eligibility-tool' ),
+				'type'      => \Elementor\Controls_Manager::COLOR,
+				'selectors' => array(
+					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-select-border-color-hover: {{VALUE}};',
+				),
+			)
+		);
+
+		$this->end_controls_tab();
+
+		$this->end_controls_tabs();
+
+		$this->end_controls_section();
+	}
+
+	/**
+	 * Text/textarea question inputs (.ryv-input).
+	 */
+	private function register_input_style_controls() {
+		$this->start_controls_section(
+			'input_style_section',
+			array(
+				'label' => __( 'Text Input', 'ryv-eligibility-tool' ),
+				'tab'   => \Elementor\Controls_Manager::TAB_STYLE,
+			)
+		);
+
+		$this->add_group_control(
+			\Elementor\Group_Control_Typography::get_type(),
+			array(
+				'name'     => 'input_typography',
+				'label'    => __( 'Typography', 'ryv-eligibility-tool' ),
+				'selector' => '{{WRAPPER}} .ryv-input',
+			)
+		);
+
+		$this->add_responsive_control(
+			'input_padding',
+			array(
+				'label'      => __( 'Padding', 'ryv-eligibility-tool' ),
+				'type'       => \Elementor\Controls_Manager::DIMENSIONS,
+				'size_units' => array( 'px', 'em', 'rem', '%' ),
+				'selectors'  => array(
+					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-input-padding: {{TOP}}{{UNIT}} {{RIGHT}}{{UNIT}} {{BOTTOM}}{{UNIT}} {{LEFT}}{{UNIT}};',
+				),
+			)
+		);
+
+		$this->add_control(
+			'input_border_radius',
+			array(
+				'label'      => __( 'Border Radius', 'ryv-eligibility-tool' ),
+				'type'       => \Elementor\Controls_Manager::DIMENSIONS,
+				'size_units' => array( 'px', 'em', 'rem', '%' ),
+				'selectors'  => array(
+					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-input-border-radius: {{TOP}}{{UNIT}} {{RIGHT}}{{UNIT}} {{BOTTOM}}{{UNIT}} {{LEFT}}{{UNIT}};',
+				),
+			)
+		);
+
+		$this->add_control(
+			'input_border_width',
+			array(
+				'label'      => __( 'Border Width', 'ryv-eligibility-tool' ),
+				'type'       => \Elementor\Controls_Manager::SLIDER,
+				'size_units' => array( 'px' ),
+				'range'      => array(
+					'px' => array(
+						'min' => 0,
+						'max' => 10,
+					),
+				),
+				'selectors'  => array(
+					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-input-border-width: {{SIZE}}{{UNIT}};',
+				),
+			)
+		);
+
+		$this->start_controls_tabs( 'tabs_input_style' );
+
+		$this->start_controls_tab(
+			'tab_input_normal',
+			array( 'label' => __( 'Normal', 'ryv-eligibility-tool' ) )
+		);
+
+		$this->add_control(
+			'input_text_color',
+			array(
+				'label'     => __( 'Text Color', 'ryv-eligibility-tool' ),
+				'type'      => \Elementor\Controls_Manager::COLOR,
+				'selectors' => array(
+					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-input-text-color: {{VALUE}};',
+				),
+			)
+		);
+
+		$this->add_control(
+			'input_bg_color',
+			array(
+				'label'     => __( 'Background Color', 'ryv-eligibility-tool' ),
+				'type'      => \Elementor\Controls_Manager::COLOR,
+				'default'   => '#ffffff',
+				'selectors' => array(
+					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-input-bg: {{VALUE}};',
+				),
+			)
+		);
+
+		$this->add_control(
+			'input_border_color',
+			array(
+				'label'     => __( 'Border Color', 'ryv-eligibility-tool' ),
+				'type'      => \Elementor\Controls_Manager::COLOR,
+				'default'   => '#d1d5db',
+				'selectors' => array(
+					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-input-border-color: {{VALUE}};',
+				),
+			)
+		);
+
+		$this->end_controls_tab();
+
+		$this->start_controls_tab(
+			'tab_input_hover',
+			array( 'label' => __( 'Hover', 'ryv-eligibility-tool' ) )
+		);
+
+		$this->add_control(
+			'input_border_color_hover',
+			array(
+				'label'     => __( 'Border Color', 'ryv-eligibility-tool' ),
+				'type'      => \Elementor\Controls_Manager::COLOR,
+				'selectors' => array(
+					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-input-border-color-hover: {{VALUE}};',
+				),
+			)
+		);
+
+		$this->end_controls_tab();
+
+		$this->end_controls_tabs();
+
+		$this->end_controls_section();
+	}
+
+	/**
+	 * display_style: 'radio' options (.ryv-radio-option label + .ryv-radio-input).
+	 * No Border/Background here - a native radio input's shape/fill is styled
+	 * via `accent-color`, not box properties.
+	 */
+	private function register_radio_style_controls() {
+		$this->start_controls_section(
+			'radio_style_section',
+			array(
+				'label' => __( 'Radio Buttons', 'ryv-eligibility-tool' ),
+				'tab'   => \Elementor\Controls_Manager::TAB_STYLE,
+			)
+		);
+
+		$this->add_group_control(
+			\Elementor\Group_Control_Typography::get_type(),
+			array(
+				'name'     => 'radio_typography',
+				'label'    => __( 'Typography', 'ryv-eligibility-tool' ),
+				'selector' => '{{WRAPPER}} .ryv-radio-option',
+			)
+		);
+
+		$this->add_control(
+			'radio_text_color',
+			array(
+				'label'     => __( 'Text Color', 'ryv-eligibility-tool' ),
+				'type'      => \Elementor\Controls_Manager::COLOR,
+				'selectors' => array(
+					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-radio-text-color: {{VALUE}};',
+				),
+			)
+		);
+
+		$this->add_control(
+			'radio_accent_color',
+			array(
+				'label'     => __( 'Radio Color', 'ryv-eligibility-tool' ),
+				'type'      => \Elementor\Controls_Manager::COLOR,
+				'selectors' => array(
+					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-radio-accent-color: {{VALUE}};',
+				),
+			)
+		);
+
+		$this->add_control(
+			'radio_gap',
+			array(
+				'label'      => __( 'Radio-to-Label Spacing', 'ryv-eligibility-tool' ),
+				'type'       => \Elementor\Controls_Manager::SLIDER,
+				'size_units' => array( 'px' ),
+				'range'      => array(
+					'px' => array(
+						'min' => 0,
+						'max' => 40,
+					),
+				),
+				'selectors'  => array(
+					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-radio-gap: {{SIZE}}{{UNIT}};',
+				),
 			)
 		);
 

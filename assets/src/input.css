@@ -29,31 +29,68 @@
     @apply ryv-underline ryv-text-ryv-primary;
   }
 
+  /*
+   * Every property below that isn't already colour/typography (which the
+   * Elementor widget already exposes via Tailwind's ryv-primary/-secondary/
+   * -text CSS-var-backed colours and Group_Control_Typography) is bridged
+   * the same way: a CSS custom property set on .ryv-app-wrapper by a widget
+   * Style-tab control, read here with a `var(--x, <current default>)`
+   * fallback so an untouched widget instance renders identically to before.
+   */
+
   .ryv-option-btn {
-    @apply ryv-block ryv-w-full ryv-text-left ryv-px-4 ryv-py-3 ryv-mb-2 ryv-rounded-lg ryv-border ryv-border-gray-300 ryv-bg-white ryv-text-ryv-text ryv-transition-colors ryv-duration-150;
+    @apply ryv-block ryv-w-full ryv-text-left ryv-mb-2 ryv-transition-colors ryv-duration-150;
+    color: var(--ryv-btn-text-color, var(--ryv-text-color, #1f2937));
+    background-color: var(--ryv-btn-bg, #fff);
+    border-style: solid;
+    border-width: var(--ryv-btn-border-width, 1px);
+    border-color: var(--ryv-btn-border-color, #d1d5db);
+    border-radius: var(--ryv-btn-border-radius, 0.5rem);
+    padding: var(--ryv-btn-padding, 0.75rem 1rem);
   }
   .ryv-option-btn:hover {
-    @apply ryv-border-ryv-primary;
+    background-color: var(--ryv-btn-bg-hover, var(--ryv-btn-bg, #fff));
+    border-color: var(--ryv-btn-border-color-hover, var(--ryv-primary-color, #1d4ed8));
   }
   .ryv-option-btn:focus-visible {
     @apply ryv-outline-none ryv-ring-2 ryv-ring-ryv-primary;
   }
   .ryv-option-btn[aria-pressed='true'] {
-    @apply ryv-border-2 ryv-border-ryv-primary ryv-bg-gray-50;
+    border-width: 2px;
+    background-color: var(--ryv-btn-bg-selected, #f9fafb);
+    border-color: var(--ryv-btn-border-color-selected, var(--ryv-primary-color, #1d4ed8));
   }
 
   .ryv-continue-btn {
-    @apply ryv-inline-flex ryv-items-center ryv-px-5 ryv-py-2.5 ryv-rounded-lg ryv-bg-ryv-primary ryv-text-white ryv-font-medium ryv-transition-opacity ryv-duration-150;
+    @apply ryv-inline-flex ryv-items-center ryv-font-medium ryv-transition-opacity ryv-duration-150;
+    color: var(--ryv-continue-btn-text-color, #fff);
+    background-color: var(--ryv-continue-btn-bg, var(--ryv-primary-color, #1d4ed8));
+    border-style: solid;
+    border-width: var(--ryv-continue-btn-border-width, 0px);
+    border-color: var(--ryv-continue-btn-border-color, transparent);
+    border-radius: var(--ryv-continue-btn-border-radius, 0.5rem);
+    padding: var(--ryv-continue-btn-padding, 0.625rem 1.25rem);
   }
   .ryv-continue-btn:hover {
-    @apply ryv-opacity-90;
+    background-color: var(--ryv-continue-btn-bg-hover, var(--ryv-continue-btn-bg, var(--ryv-primary-color, #1d4ed8)));
+    opacity: var(--ryv-continue-btn-hover-opacity, 0.9);
   }
   .ryv-continue-btn:disabled {
     @apply ryv-opacity-40 ryv-cursor-not-allowed;
   }
 
   .ryv-input {
-    @apply ryv-w-full ryv-px-4 ryv-py-2.5 ryv-rounded-lg ryv-border ryv-border-gray-300 ryv-mb-4;
+    @apply ryv-w-full ryv-mb-4;
+    color: var(--ryv-input-text-color, var(--ryv-text-color, #1f2937));
+    background-color: var(--ryv-input-bg, #fff);
+    border-style: solid;
+    border-width: var(--ryv-input-border-width, 1px);
+    border-color: var(--ryv-input-border-color, #d1d5db);
+    border-radius: var(--ryv-input-border-radius, 0.5rem);
+    padding: var(--ryv-input-padding, 0.625rem 1rem);
+  }
+  .ryv-input:hover {
+    border-color: var(--ryv-input-border-color-hover, var(--ryv-input-border-color, #d1d5db));
   }
   .ryv-input:focus-visible {
     @apply ryv-outline-none ryv-ring-2 ryv-ring-ryv-primary;
@@ -61,10 +98,13 @@
 
   /* display_style: 'radio' - a plain radio input + label, one per option. */
   .ryv-radio-option {
-    @apply ryv-flex ryv-items-center ryv-gap-2 ryv-mb-2 ryv-text-ryv-text ryv-cursor-pointer;
+    @apply ryv-flex ryv-items-center ryv-mb-2 ryv-cursor-pointer;
+    color: var(--ryv-radio-text-color, var(--ryv-text-color, #1f2937));
+    gap: var(--ryv-radio-gap, 0.5rem);
   }
   .ryv-radio-input {
-    @apply ryv-h-4 ryv-w-4 ryv-border-gray-300 ryv-text-ryv-primary;
+    @apply ryv-h-4 ryv-w-4;
+    accent-color: var(--ryv-radio-accent-color, var(--ryv-primary-color, #1d4ed8));
   }
   .ryv-radio-input:focus-visible {
     @apply ryv-outline-none ryv-ring-2 ryv-ring-ryv-primary;
@@ -72,7 +112,17 @@
 
   /* display_style: 'dropdown' - a single native <select>. */
   .ryv-select {
-    @apply ryv-w-full ryv-px-4 ryv-py-2.5 ryv-rounded-lg ryv-border ryv-border-gray-300 ryv-bg-white ryv-text-ryv-text ryv-mb-4;
+    @apply ryv-w-full ryv-mb-4;
+    color: var(--ryv-select-text-color, var(--ryv-text-color, #1f2937));
+    background-color: var(--ryv-select-bg, #fff);
+    border-style: solid;
+    border-width: var(--ryv-select-border-width, 1px);
+    border-color: var(--ryv-select-border-color, #d1d5db);
+    border-radius: var(--ryv-select-border-radius, 0.5rem);
+    padding: var(--ryv-select-padding, 0.625rem 1rem);
+  }
+  .ryv-select:hover {
+    border-color: var(--ryv-select-border-color-hover, var(--ryv-select-border-color, #d1d5db));
   }
   .ryv-select:focus-visible {
     @apply ryv-outline-none ryv-ring-2 ryv-ring-ryv-primary;
