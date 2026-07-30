@@ -230,10 +230,16 @@ class RYV_Import_Page {
 			$schema['states'][ $state_id ] = $state;
 		}
 
+		// update_post_meta() runs the value through wp_unslash() before storing
+		// it (WP's meta API assumes callers pass slashed data, mirroring the
+		// old magic_quotes convention for $_POST). Without wp_slash() here,
+		// every backslash-escape in the JSON (\" around quoted text, \uXXXX
+		// for any non-ASCII character) gets silently stripped, corrupting the
+		// stored value into invalid JSON.
 		update_post_meta(
 			$post_id,
 			RYV_CPT::SCHEMA_META_KEY,
-			wp_json_encode( $schema, JSON_UNESCAPED_SLASHES )
+			wp_slash( wp_json_encode( $schema, JSON_UNESCAPED_SLASHES ) )
 		);
 	}
 

@@ -120,10 +120,14 @@ class RYV_Admin_API {
 			);
 		}
 
+		// wp_slash() is required here: update_post_meta() unslashes its input
+		// before storing (WP's meta API assumes slashed data), so an
+		// un-slashed JSON string loses every "\"" and "\uXXXX" escape on the
+		// way into the DB, corrupting it into invalid JSON on the next read.
 		update_post_meta(
 			$post_id,
 			RYV_CPT::SCHEMA_META_KEY,
-			wp_json_encode( $schema, JSON_UNESCAPED_SLASHES )
+			wp_slash( wp_json_encode( $schema, JSON_UNESCAPED_SLASHES ) )
 		);
 
 		return new WP_REST_Response(

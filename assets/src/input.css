@@ -17,6 +17,22 @@
   .ryv-card-enter {
     @apply ryv-opacity-0 ryv-translate-y-2;
   }
+  .ryv-card-leave {
+    @apply ryv-opacity-0 -ryv-translate-y-2 ryv-pointer-events-none;
+  }
+
+  .ryv-controls {
+    @apply ryv-mb-2;
+  }
+  .ryv-back-btn {
+    @apply ryv-inline-flex ryv-items-center ryv-px-3 ryv-py-1.5 ryv-rounded-lg ryv-text-sm ryv-font-medium ryv-text-ryv-secondary ryv-transition-opacity ryv-duration-150;
+  }
+  .ryv-back-btn:hover {
+    @apply ryv-text-ryv-primary;
+  }
+  .ryv-back-btn:disabled {
+    @apply ryv-opacity-0 ryv-pointer-events-none;
+  }
 
   .ryv-question-title {
     @apply ryv-text-lg ryv-font-semibold ryv-mb-4 ryv-text-ryv-text;

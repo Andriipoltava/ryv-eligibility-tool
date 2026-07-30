@@ -13,8 +13,11 @@ if ( ! defined( 'ABSPATH' ) ) {
  * Class RYV_CPT
  *
  * Each `ryv_forms` post represents one eligibility questionnaire. The full
- * decision graph (states, questions, options, routing) lives in a single
- * JSON blob in the `_ryv_form_schema` postmeta - not in nested repeaters.
+ * decision graph lives in a single JSON blob in the `_ryv_form_schema`
+ * postmeta - not in nested repeaters. The graph is a flat, agnostic DAG:
+ * `{ start_node, nodes: { node_id => node } }`. Nothing about the schema
+ * or its consumers (REST API, JS engine) is aware of "states" - the first
+ * node just happens to be whatever the form author wants it to branch on.
  */
 class RYV_CPT {
 
