@@ -18,11 +18,16 @@ export class RYVDecisionEngine {
   constructor(root) {
     this.root = root;
     this.formId = root.dataset.formId;
+    // The widget only omits this attribute for placements saved before this
+    // setting existed - default to showing the button, matching how those
+    // placements already behaved.
+    this.showStartOver = root.dataset.showStartOver !== '0';
     this.list = null;
     this.nodes = {};
     this.entryNode = null;
     this.availableStates = [];
     this.stateDisplayStyle = 'buttons';
+    this.statePickerLabel = 'Select your state';
     this.stateId = null;
     this.answers = new Map(); // node id -> string[] (radio/checkbox values) | string (text/textarea)
     this.renderedOrder = []; // ids (real node ids, or the sentinel ids above) in on-screen order
@@ -42,6 +47,7 @@ export class RYVDecisionEngine {
       const data = await fetchForm(this.formId);
       this.availableStates = data.states || [];
       this.stateDisplayStyle = data.state_display_style || 'buttons';
+      this.statePickerLabel = data.state_picker_label || 'Select your state';
       this.truncateFrom(0);
       this.renderStateCard();
     } catch (err) {
@@ -55,7 +61,8 @@ export class RYVDecisionEngine {
       this.availableStates,
       this.stateId,
       (stateId) => this.onSelectState(stateId),
-      this.stateDisplayStyle
+      this.stateDisplayStyle,
+      this.statePickerLabel
     );
     this.appendCard(STATE_CARD_ID, card, false);
   }
@@ -153,9 +160,9 @@ export class RYVDecisionEngine {
       case 'textarea':
         return renderer.renderInputCard(node, this.answers.get(nodeId) || '', (value) => this.onAnswerChange(nodeId, value));
       case 'markup':
-        return renderer.renderMarkupCard(node, isTerminal, () => this.restart());
+        return renderer.renderMarkupCard(node, isTerminal && this.showStartOver, () => this.restart());
       default:
-        return renderer.renderUnsupportedCard(node, isTerminal, () => this.restart());
+        return renderer.renderUnsupportedCard(node, isTerminal && this.showStartOver, () => this.restart());
     }
   }
 

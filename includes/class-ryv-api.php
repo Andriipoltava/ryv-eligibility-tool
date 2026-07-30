@@ -113,6 +113,7 @@ class RYV_API {
 				'title'               => $post->post_title,
 				'states'              => $out,
 				'state_display_style' => $this->get_state_display_style( $post_id ),
+				'state_picker_label'  => $this->get_state_picker_label( $post_id ),
 			),
 			200
 		);
@@ -203,6 +204,25 @@ class RYV_API {
 		$style   = is_array( $schema ) && ! empty( $schema['state_display_style'] ) ? $schema['state_display_style'] : 'buttons';
 
 		return in_array( $style, $allowed, true ) ? $style : 'buttons';
+	}
+
+	/**
+	 * The state picker's title, e.g. "Select your state" - editable per-form
+	 * in the builder (schema-level, sibling of `states`) so a form whose
+	 * first choice isn't really "a state" isn't stuck with that wording.
+	 *
+	 * @param int $post_id Post ID.
+	 * @return string
+	 */
+	private function get_state_picker_label( int $post_id ): string {
+		$json   = get_post_meta( $post_id, RYV_CPT::SCHEMA_META_KEY, true );
+		$schema = json_decode( (string) $json, true );
+
+		$label = is_array( $schema ) && ! empty( $schema['state_picker_label'] ) && is_string( $schema['state_picker_label'] )
+			? $schema['state_picker_label']
+			: __( 'Select your state', 'ryv-eligibility-tool' );
+
+		return $label;
 	}
 
 	/**

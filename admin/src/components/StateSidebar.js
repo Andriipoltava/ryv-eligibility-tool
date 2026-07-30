@@ -17,6 +17,8 @@ export default function StateSidebar({
   onRemove,
   stateDisplayStyle,
   onStateDisplayStyleChange,
+  statePickerLabel,
+  onStatePickerLabelChange,
 }) {
   const [newId, setNewId] = useState('');
   const [newLabel, setNewLabel] = useState('');
@@ -32,6 +34,17 @@ export default function StateSidebar({
   return (
     <div className="ryv-builder-states">
       <h2>{__('States', 'ryv-eligibility-tool')}</h2>
+
+      <TextControl
+        label={__('Picker Label', 'ryv-eligibility-tool')}
+        help={__(
+          'The first question\'s title. Defaults to "Select your state" - change it if this form\'s first choice isn\'t really a state (e.g. "Select your category").',
+          'ryv-eligibility-tool'
+        )}
+        placeholder={__('Select your state', 'ryv-eligibility-tool')}
+        value={statePickerLabel || ''}
+        onChange={onStatePickerLabelChange}
+      />
 
       <SelectControl
         label={__('State picker display', 'ryv-eligibility-tool')}

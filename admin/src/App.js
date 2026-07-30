@@ -194,6 +194,10 @@ export default function App() {
         onStateDisplayStyleChange={(state_display_style) =>
           updateSchema((prev) => ({ ...prev, state_display_style }))
         }
+        statePickerLabel={schema.state_picker_label}
+        onStatePickerLabelChange={(state_picker_label) =>
+          updateSchema((prev) => ({ ...prev, state_picker_label }))
+        }
       />
 
       {activeState && (

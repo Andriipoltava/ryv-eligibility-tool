@@ -82,9 +82,9 @@ export function renderErrorCard(message, onRetry) {
   return box;
 }
 
-export function renderStateCard(states, selectedStateId, onSelect, displayStyle = 'buttons') {
+export function renderStateCard(states, selectedStateId, onSelect, displayStyle = 'buttons', label = 'Select your state') {
   const wrap = el('div');
-  wrap.appendChild(titleEl('Select your state'));
+  wrap.appendChild(titleEl(label));
 
   if (!states || states.length === 0) {
     wrap.appendChild(el('p', { className: 'ryv-loading', text: 'No states are configured for this form yet.' }));

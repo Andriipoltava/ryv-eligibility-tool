@@ -87,6 +87,22 @@ class RYV_Widget extends \Elementor\Widget_Base {
 			)
 		);
 
+		$this->add_control(
+			'show_start_over',
+			array(
+				'label'        => __( 'Show "Start Over" Button', 'ryv-eligibility-tool' ),
+				'type'         => \Elementor\Controls_Manager::SWITCHER,
+				'label_on'     => __( 'Show', 'ryv-eligibility-tool' ),
+				'label_off'    => __( 'Hide', 'ryv-eligibility-tool' ),
+				'return_value' => 'yes',
+				'default'      => 'yes',
+				'description'  => __(
+					'Shown on a terminal result card (markup with no further question). Some placements - e.g. a form meant to be filled out once per page load - may not want it.',
+					'ryv-eligibility-tool'
+				),
+			)
+		);
+
 		$this->end_controls_section();
 
 		$this->register_color_controls();
@@ -860,6 +876,12 @@ class RYV_Widget extends \Elementor\Widget_Base {
 			return;
 		}
 
-		printf( '<div class="ryv-app-wrapper" data-form-id="%d"></div>', absint( $form_id ) );
+		$show_start_over = 'yes' === $this->get_settings_for_display( 'show_start_over' );
+
+		printf(
+			'<div class="ryv-app-wrapper" data-form-id="%d" data-show-start-over="%d"></div>',
+			absint( $form_id ),
+			$show_start_over ? 1 : 0
+		);
 	}
 }
