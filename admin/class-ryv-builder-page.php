@@ -40,10 +40,16 @@ class RYV_Builder_Page {
 	}
 
 	/**
-	 * Register the submenu page under the ryv_forms CPT menu.
+	 * Register the builder page under the ryv_forms CPT menu, then hide its
+	 * top-level entry - `add_submenu_page()` is what makes
+	 * `edit.php?post_type=ryv_forms&page=ryv-form-builder` a routable page
+	 * (needed by redirect_post_edit()/redirect_post_new() and by direct
+	 * `&post_id=` links), but a visible menu item for it duplicates
+	 * WordPress's own "Add New Form" - both land on the same empty
+	 * "create new form" screen when opened with no post_id.
 	 */
 	public function register_menu() {
-		add_submenu_page(
+		$hook = add_submenu_page(
 			'edit.php?post_type=' . RYV_CPT::POST_TYPE,
 			__( 'Form Builder', 'ryv-eligibility-tool' ),
 			__( 'Form Builder', 'ryv-eligibility-tool' ),
@@ -51,6 +57,24 @@ class RYV_Builder_Page {
 			self::PAGE_SLUG,
 			array( $this, 'render_page' )
 		);
+
+		remove_submenu_page( 'edit.php?post_type=' . RYV_CPT::POST_TYPE, self::PAGE_SLUG );
+
+		// remove_submenu_page() also removes the entry get_admin_page_title()
+		// reads the page's <title> from, which under PHP 8.2 surfaces as a
+		// strip_tags(null) deprecation notice in admin-header.php (and the
+		// "headers already sent" warnings that follow from it printing before
+		// the page's own headers go out). Set the title back explicitly, only
+		// for this page's own load - not admin_menu, which runs on every
+		// wp-admin request.
+		if ( $hook ) {
+			add_action(
+				"load-{$hook}",
+				static function () {
+					$GLOBALS['title'] = __( 'Form Builder', 'ryv-eligibility-tool' );
+				}
+			);
+		}
 	}
 
 	/**
