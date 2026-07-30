@@ -33,7 +33,10 @@ async function request(path) {
   return response.json();
 }
 
-/** Fetches the whole flat graph ({ form_id, title, start_node, nodes }) in one call. */
 export function fetchForm(formId) {
   return request(`/form/${encodeURIComponent(formId)}`);
+}
+
+export function fetchFormState(formId, stateId) {
+  return request(`/form/${encodeURIComponent(formId)}/state/${encodeURIComponent(stateId)}`);
 }

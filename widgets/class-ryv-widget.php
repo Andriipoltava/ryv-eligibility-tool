@@ -200,7 +200,7 @@ class RYV_Widget extends \Elementor\Widget_Base {
 			array(
 				'name'     => 'button_typography',
 				'label'    => __( 'Buttons', 'ryv-eligibility-tool' ),
-				'selector' => '{{WRAPPER}} .ryv-option-btn, {{WRAPPER}} .ryv-continue-btn, {{WRAPPER}} .ryv-back-btn',
+				'selector' => '{{WRAPPER}} .ryv-option-btn, {{WRAPPER}} .ryv-continue-btn',
 			)
 		);
 

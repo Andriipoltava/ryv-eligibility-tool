@@ -34,6 +34,7 @@ class RYV_Assets {
 		// get_script_depends()/get_style_depends() and enqueues them on this
 		// same hook - registration has to land first.
 		add_action( 'wp_enqueue_scripts', array( $this, 'register' ), 5 );
+		add_filter( 'script_loader_tag', array( $this, 'add_module_type_attribute' ), 10, 2 );
 	}
 
 	/**
@@ -58,8 +59,6 @@ class RYV_Assets {
 			true
 		);
 
-		wp_script_add_data( self::SCRIPT_HANDLE, 'type', 'module' );
-
 		wp_localize_script(
 			self::SCRIPT_HANDLE,
 			'RYVSettings',
@@ -68,5 +67,26 @@ class RYV_Assets {
 				'nonce'   => wp_create_nonce( 'wp_rest' ),
 			)
 		);
+	}
+
+	/**
+	 * wp_script_add_data( $handle, 'type', 'module' ) is not actually read by
+	 * WP core's script loader - core has no support for a 'type' data key, so
+	 * the decision-engine script was silently shipping as a classic script
+	 * despite using `import`, causing a browser-level
+	 * "Cannot use import statement outside a module" SyntaxError. Rewriting
+	 * the tag directly via this filter is the standard way to ship an ES
+	 * module through wp_enqueue_script() prior to wp_enqueue_script_module().
+	 *
+	 * @param string $tag    Script tag markup.
+	 * @param string $handle Script handle.
+	 * @return string
+	 */
+	public function add_module_type_attribute( $tag, $handle ) {
+		if ( self::SCRIPT_HANDLE !== $handle ) {
+			return $tag;
+		}
+
+		return str_replace( '<script ', '<script type="module" ', $tag );
 	}
 }

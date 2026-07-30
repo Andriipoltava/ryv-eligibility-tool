@@ -1,10 +1,9 @@
 /**
  * DOM builders for each step's "card". The whole questionnaire renders as a
  * growing vertical list of cards - one per answered (or currently-active)
- * question - and every card stays clickable/editable for as long as it's on
- * screen: changing an answer just re-renders everything downstream of it
- * (handled by engine.js). The Back button (createControls()) is a shortcut
- * for the same truncate-and-recompute mechanism, not a separate mode.
+ * question - with no separate Back/Continue chrome: every card stays
+ * clickable/editable for as long as it's on screen, and changing an answer
+ * just re-renders everything downstream of it (handled by engine.js).
  *
  * Class names here are semantic (.ryv-option-btn, .ryv-card, ...) and are
  * defined in assets/src/input.css using @apply on the prefixed Tailwind
@@ -31,32 +30,6 @@ export function createList() {
 }
 
 /**
- * A small persistent control bar (currently just the Back button) rendered
- * once, above the card list. `_backBtn` is stashed on the returned element
- * so setBackEnabled() doesn't need a second lookup mechanism.
- */
-export function createControls(onBack) {
-  const wrap = el('div', { className: 'ryv-controls' });
-  const backBtn = el('button', {
-    className: 'ryv-back-btn ryv-hidden',
-    text: '← Back',
-    attrs: { type: 'button', disabled: 'disabled' },
-    on: { click: onBack },
-  });
-  wrap.appendChild(backBtn);
-  wrap._backBtn = backBtn;
-  return wrap;
-}
-
-/** Toggle the Back button rendered by createControls(). */
-export function setBackEnabled(controls, enabled) {
-  const backBtn = controls && controls._backBtn;
-  if (!backBtn) return;
-  backBtn.disabled = !enabled;
-  backBtn.classList.toggle('ryv-hidden', !enabled);
-}
-
-/**
  * Append `card` to `container`. New cards fade/slide in; cards being
  * rebuilt in place (an edited answer) skip the animation so the page
  * doesn't jump while you're still looking at what you just clicked.
@@ -73,19 +46,6 @@ export function appendCard(container, card, animate = true) {
     container.appendChild(card);
   }
   return card;
-}
-
-/**
- * Fade/slide `element` out, then remove it. Used by truncateFrom() so
- * cards dropped off the end of the list (an edited answer, Back) leave the
- * same way new ones arrive, instead of just vanishing.
- */
-export function removeCard(element) {
-  if (!element || !element.parentNode) return;
-  element.classList.add('ryv-card-leave');
-  window.setTimeout(() => {
-    if (element.parentNode) element.parentNode.removeChild(element);
-  }, 200);
 }
 
 export function renderLoadingCard() {
@@ -108,22 +68,40 @@ export function renderErrorCard(message, onRetry) {
   return box;
 }
 
+export function renderStateCard(states, selectedStateId, onSelect) {
+  const wrap = el('div');
+  wrap.appendChild(el('h2', { className: 'ryv-question-title', text: 'Select your state' }));
+
+  if (!states || states.length === 0) {
+    wrap.appendChild(el('p', { className: 'ryv-loading', text: 'No states are configured for this form yet.' }));
+    return wrap;
+  }
+
+  states.forEach((state) => {
+    const isSelected = state.id === selectedStateId;
+    const btn = el('button', {
+      className: 'ryv-option-btn',
+      text: state.label,
+      attrs: { type: 'button', 'aria-pressed': isSelected ? 'true' : 'false' },
+      on: { click: () => onSelect(state.id) },
+    });
+    wrap.appendChild(btn);
+  });
+
+  return wrap;
+}
+
 /**
- * Any node with an `options` array renders as this button group, whatever
- * its `type` claims to be (radio/checkbox/webform_buttons/...) - the engine
- * is dumb about presentation, it only cares that `isMulti` tells it whether
- * to toggle one button at a time or many.
- *
- * @param {object} node RYV node ({ type, title, options }).
- * @param {string[]} selectedValues Currently-recorded answer for this node (both single- and multi-select store an array).
- * @param {boolean} isMulti Whether more than one option can be selected at once.
+ * @param {object} node RYV node ({ type: 'radio'|'checkbox', title, options }).
+ * @param {string[]} selectedValues Currently-recorded answer for this node (both radio and checkbox store an array).
  * @param {(values: string[]) => void} onChange Called with the full set of selected value(s) after every click -
  *   immediately, no separate Continue step. An empty array means the answer was cleared.
  */
-export function renderChoiceCard(node, selectedValues, isMulti, onChange) {
+export function renderQuestionCard(node, selectedValues, onChange) {
   const wrap = el('div');
   wrap.appendChild(el('h2', { className: 'ryv-question-title', text: node.title }));
 
+  const isMulti = node.type === 'checkbox';
   const selected = new Set(selectedValues || []);
   const buttons = new Map();
 
@@ -157,30 +135,6 @@ export function renderChoiceCard(node, selectedValues, isMulti, onChange) {
     wrap.appendChild(btn);
   });
 
-  return wrap;
-}
-
-/**
- * `type: 'select'` gets a native dropdown instead of a button group -
- * same contract as renderChoiceCard (options[].next_node), just a single
- * scalar value instead of an array.
- */
-export function renderSelectCard(node, selectedValue, onChange) {
-  const wrap = el('div');
-  wrap.appendChild(el('h2', { className: 'ryv-question-title', text: node.title }));
-
-  const select = el('select', { className: 'ryv-input' });
-  select.appendChild(el('option', { text: '— Select —', attrs: { value: '' } }));
-
-  (node.options || []).forEach((option) => {
-    const opt = el('option', { text: option.label, attrs: { value: option.value } });
-    select.appendChild(opt);
-  });
-  select.value = selectedValue || '';
-
-  select.addEventListener('change', () => onChange(select.value));
-
-  wrap.appendChild(select);
   return wrap;
 }
 
@@ -222,25 +176,18 @@ export function renderInputCard(node, previousValue, onChange) {
 }
 
 /**
- * Content-only node (`markup`, `processed_text`, or anything else with no
- * `options` and no text-input semantics): renders its HTML and, per
- * engine.js's computeNext(), either auto-advances or - if terminal - shows
- * "Start Over".
- *
- * The HTML (`node.content` or `node.text` - the importer and the new flat
- * schema example use different field names for the same thing) is trusted:
- * it only ever comes from a YAML file imported (or a schema edited) by an
- * admin with `manage_options`, the same trust boundary WordPress applies to
- * post content - not user input.
+ * `node.content` is trusted HTML: it only ever comes from a YAML file
+ * imported (or a schema edited) by an admin with `manage_options`, the same
+ * trust boundary WordPress applies to post content - not user input.
  */
-export function renderContentCard(node, isTerminal, onRestart) {
+export function renderMarkupCard(node, isTerminal, onRestart) {
   const wrap = el('div');
   if (node.title) {
     wrap.appendChild(el('h2', { className: 'ryv-question-title', text: node.title }));
   }
 
   const content = el('div', { className: 'ryv-content' });
-  content.innerHTML = node.content || node.text || '';
+  content.innerHTML = node.content || '';
   wrap.appendChild(content);
 
   if (isTerminal) {
