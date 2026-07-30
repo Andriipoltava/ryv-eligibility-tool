@@ -103,6 +103,7 @@ final class RYV_Plugin {
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-db.php';
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-submission-log.php';
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-edit-log.php';
+		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-schema-diff.php';
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-api.php';
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-admin-api.php';
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-assets.php';

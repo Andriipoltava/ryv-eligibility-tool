@@ -166,6 +166,51 @@ class RYV_Logs_Page {
 	}
 
 	/**
+	 * Short human-readable summary of an RYV_Schema_Diff::compute() result,
+	 * for the collapsed <summary> of the Activity Log's expandable raw-JSON
+	 * view - e.g. "1 state added, 2 states changed".
+	 *
+	 * @param array $diff Decoded diff.
+	 * @return string
+	 */
+	public static function summarize_diff( array $diff ): string {
+		$parts = array();
+
+		if ( ! empty( $diff['states_added'] ) ) {
+			$count   = count( $diff['states_added'] );
+			$parts[] = sprintf(
+				/* translators: %d: number of states added */
+				_n( '%d state added', '%d states added', $count, 'ryv-eligibility-tool' ),
+				$count
+			);
+		}
+
+		if ( ! empty( $diff['states_removed'] ) ) {
+			$count   = count( $diff['states_removed'] );
+			$parts[] = sprintf(
+				/* translators: %d: number of states removed */
+				_n( '%d state removed', '%d states removed', $count, 'ryv-eligibility-tool' ),
+				$count
+			);
+		}
+
+		if ( ! empty( $diff['states_changed'] ) ) {
+			$count   = count( $diff['states_changed'] );
+			$parts[] = sprintf(
+				/* translators: %d: number of states changed */
+				_n( '%d state changed', '%d states changed', $count, 'ryv-eligibility-tool' ),
+				$count
+			);
+		}
+
+		if ( ! empty( $diff['form_settings_changed'] ) ) {
+			$parts[] = __( 'form settings changed', 'ryv-eligibility-tool' );
+		}
+
+		return $parts ? implode( ', ', $parts ) : __( 'no schema changes', 'ryv-eligibility-tool' );
+	}
+
+	/**
 	 * Format a UTC `Y-m-d H:i:s` timestamp (as stored via current_time( 'mysql', true ))
 	 * in the site's local timezone/format.
 	 *

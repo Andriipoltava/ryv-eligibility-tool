@@ -26,7 +26,7 @@ class RYV_DB {
 	/**
 	 * Bump this whenever install() changes.
 	 */
-	const DB_VERSION = '1.0';
+	const DB_VERSION = '1.1';
 
 	/**
 	 * @return string
@@ -86,12 +86,15 @@ class RYV_DB {
 			) {$charset_collate};"
 		);
 
-		// One row per builder Save - who/when only, no field-level diff.
+		// One row per builder Save - who/when, plus a structural JSON diff of
+		// what changed in the schema (RYV_Schema_Diff), nullable since a save
+		// with no actual change still records who/when.
 		dbDelta(
 			"CREATE TABLE {$edit_log} (
 				id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
 				form_id BIGINT UNSIGNED NOT NULL,
 				user_id BIGINT UNSIGNED NOT NULL,
+				diff LONGTEXT NULL,
 				edited_at DATETIME NOT NULL,
 				PRIMARY KEY  (id),
 				KEY form_id (form_id)

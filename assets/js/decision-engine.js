@@ -6,10 +6,22 @@ if (document.readyState === 'loading') {
   initAll();
 }
 
-// Elementor's editor injects widgets after DOMContentLoaded (AJAX preview
-// re-renders) - re-scan whenever that happens so widgets added later still
-// get initialized, without double-initializing ones that already are
-// (initAll() guards on data-ryv-initialized).
-if (window.elementorFrontend && window.elementorFrontend.hooks) {
-  window.elementorFrontend.hooks.addAction('frontend/element_ready/global', () => initAll());
+// Verified by direct DOM inspection inside Elementor's editor preview
+// iframe: `.ryv-app-wrapper` genuinely does not exist yet at the point this
+// deferred module script runs its initial pass - Elementor renders widget
+// markup into the iframe on its own schedule. A `frontend/element_ready`
+// hook listener looked like the fix, but missed it too: `elementorFrontend`
+// itself isn't guaranteed to exist yet when this deferred module runs (a
+// race this script can lose), so the listener sometimes never even gets
+// registered in time. A MutationObserver watching for the wrapper itself
+// sidesteps both races - it needs no Elementor API to exist yet, just the
+// native `window.frameElement` check (available before any script runs) to
+// scope it to Elementor's own preview iframe, so real visitors on the
+// published page - where the wrapper is always static server-rendered HTML
+// already present at parse time - never pay for an observer they'll never
+// need.
+const inElementorPreview = window.frameElement && window.frameElement.id === 'elementor-preview-iframe';
+
+if (inElementorPreview) {
+  new MutationObserver(() => initAll()).observe(document.documentElement, { childList: true, subtree: true });
 }

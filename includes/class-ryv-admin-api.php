@@ -121,6 +121,10 @@ class RYV_Admin_API {
 			);
 		}
 
+		// Captured before the write below, so the diff reflects what this save
+		// actually changed rather than comparing the new schema to itself.
+		$old_schema = $this->decode_schema( $post_id );
+
 		// wp_slash() is required here: update_post_meta() unslashes its input
 		// before storing (WP's meta API assumes slashed data), so an
 		// un-slashed JSON string loses every "\"" and "\uXXXX" escape on the
@@ -131,7 +135,7 @@ class RYV_Admin_API {
 			wp_slash( wp_json_encode( $schema, JSON_UNESCAPED_SLASHES ) )
 		);
 
-		RYV_Edit_Log::record( $post_id, get_current_user_id() );
+		RYV_Edit_Log::record( $post_id, get_current_user_id(), RYV_Schema_Diff::compute( $old_schema, $schema ) );
 
 		return new WP_REST_Response(
 			array(

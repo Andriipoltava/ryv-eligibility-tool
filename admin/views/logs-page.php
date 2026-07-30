@@ -84,11 +84,16 @@ if ( ! defined( 'ABSPATH' ) ) {
 				<tr>
 					<th><?php esc_html_e( 'Form', 'ryv-eligibility-tool' ); ?></th>
 					<th><?php esc_html_e( 'Edited By', 'ryv-eligibility-tool' ); ?></th>
+					<th><?php esc_html_e( 'Changes', 'ryv-eligibility-tool' ); ?></th>
 					<th><?php esc_html_e( 'Edited At', 'ryv-eligibility-tool' ); ?></th>
 				</tr>
 			</thead>
 			<tbody>
 				<?php foreach ( $edits as $row ) : ?>
+					<?php
+					$edit_diff = json_decode( (string) ( $row['diff'] ?? '' ), true );
+					$edit_diff = is_array( $edit_diff ) ? $edit_diff : array();
+					?>
 					<tr>
 						<td>
 							<a href="<?php echo esc_url( get_edit_post_link( (int) $row['form_id'] ) ); ?>">
@@ -96,6 +101,16 @@ if ( ! defined( 'ABSPATH' ) ) {
 							</a>
 						</td>
 						<td><?php echo esc_html( RYV_Logs_Page::user_display_name( (int) $row['user_id'] ) ); ?></td>
+						<td>
+							<?php if ( empty( $edit_diff ) ) : ?>
+								—
+							<?php else : ?>
+								<details>
+									<summary><?php echo esc_html( RYV_Logs_Page::summarize_diff( $edit_diff ) ); ?></summary>
+									<pre style="max-width: 32em; white-space: pre-wrap; overflow-wrap: anywhere;"><?php echo esc_html( wp_json_encode( $edit_diff, JSON_PRETTY_PRINT ) ); ?></pre>
+								</details>
+							<?php endif; ?>
+						</td>
 						<td><?php echo esc_html( RYV_Logs_Page::format_datetime( $row['edited_at'] ) ); ?></td>
 					</tr>
 				<?php endforeach; ?>
