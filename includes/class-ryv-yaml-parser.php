@@ -191,6 +191,13 @@ class RYV_YAML_Parser {
 			$def  = $item['def'];
 			$node = $this->build_node( $id, $def, $warnings );
 
+			// Persisted purely for admin-UI grouping (the builder buckets the
+			// node list by this, since a flat 400+-node form has no other
+			// browsable structure) - build_subtree()'s own routing logic
+			// (find_default_next() etc.) only ever reads $item['group'], not
+			// this copy, so this has zero effect on graph behavior.
+			$node['group'] = $item['group'];
+
 			$nodes[ $id ] = $node;
 
 			if ( ! empty( $def['#states'] ) && is_array( $def['#states'] ) ) {
@@ -253,6 +260,16 @@ class RYV_YAML_Parser {
 			} else {
 				$nodes[ $id ]['next_node'] = $default_next;
 			}
+		}
+
+		// The entry node (the state selector, in RYV's real exports) is a
+		// standalone top-level leaf, not nested in any per-state container -
+		// flatten() has nothing to group it under but its own id, which would
+		// otherwise render as its own singleton "State: ..." bucket in the
+		// builder. It isn't really part of any state's group, so give it the
+		// same catch-all bucket as any other groupless node instead.
+		if ( isset( $ids[0] ) ) {
+			$nodes[ $ids[0] ]['group'] = 'general';
 		}
 
 		return array(
