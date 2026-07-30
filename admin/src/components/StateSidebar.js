@@ -1,9 +1,23 @@
 import { useState } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
-import { Button, TextControl } from '@wordpress/components';
+import { Button, TextControl, SelectControl } from '@wordpress/components';
 import ConfirmButton from './ConfirmButton';
 
-export default function StateSidebar({ states, activeStateId, onSelect, onAdd, onRemove }) {
+const STATE_DISPLAY_STYLE_OPTIONS = [
+  { label: __('Buttons', 'ryv-eligibility-tool'), value: 'buttons' },
+  { label: __('Radio buttons', 'ryv-eligibility-tool'), value: 'radio' },
+  { label: __('Dropdown', 'ryv-eligibility-tool'), value: 'dropdown' },
+];
+
+export default function StateSidebar({
+  states,
+  activeStateId,
+  onSelect,
+  onAdd,
+  onRemove,
+  stateDisplayStyle,
+  onStateDisplayStyleChange,
+}) {
   const [newId, setNewId] = useState('');
   const [newLabel, setNewLabel] = useState('');
 
@@ -18,6 +32,14 @@ export default function StateSidebar({ states, activeStateId, onSelect, onAdd, o
   return (
     <div className="ryv-builder-states">
       <h2>{__('States', 'ryv-eligibility-tool')}</h2>
+
+      <SelectControl
+        label={__('State picker display', 'ryv-eligibility-tool')}
+        help={__('How visitors choose their state on the frontend.', 'ryv-eligibility-tool')}
+        value={stateDisplayStyle || 'buttons'}
+        options={STATE_DISPLAY_STYLE_OPTIONS}
+        onChange={onStateDisplayStyleChange}
+      />
 
       <ul className="ryv-builder-state-list">
         {Object.keys(states).map((id) => (

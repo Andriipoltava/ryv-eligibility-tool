@@ -13,6 +13,17 @@ const TYPE_OPTIONS = [
 ];
 
 /**
+ * Only applies to 'radio' nodes - a checkbox (multi-choice) question always
+ * renders as the button list on the frontend, since 'radio'/'dropdown' only
+ * make sense for a single choice. See renderQuestionCard() in renderer.js.
+ */
+const DISPLAY_STYLE_OPTIONS = [
+  { label: __('Buttons', 'ryv-eligibility-tool'), value: 'buttons' },
+  { label: __('Radio buttons', 'ryv-eligibility-tool'), value: 'radio' },
+  { label: __('Dropdown', 'ryv-eligibility-tool'), value: 'dropdown' },
+];
+
+/**
  * @param {(oldId: string, newId: string) => void} onRename Renaming fixes up
  *   every reference to this node (entry_node + every option's/node's
  *   next_node) across the active state - see App.js's renameNode().
@@ -78,6 +89,15 @@ export default function NodeEditor({ node, nodeId, allNodeIds, onChange, onRenam
           value={node.content || ''}
           onChange={(content) => onChange({ ...node, content })}
           rows={6}
+        />
+      )}
+
+      {node.type === 'radio' && (
+        <SelectControl
+          label={__('Display as', 'ryv-eligibility-tool')}
+          value={node.display_style || 'buttons'}
+          options={DISPLAY_STYLE_OPTIONS}
+          onChange={(display_style) => onChange({ ...node, display_style })}
         />
       )}
 

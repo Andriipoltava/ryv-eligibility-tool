@@ -190,6 +190,10 @@ export default function App() {
         }}
         onAdd={addState}
         onRemove={removeState}
+        stateDisplayStyle={schema.state_display_style}
+        onStateDisplayStyleChange={(state_display_style) =>
+          updateSchema((prev) => ({ ...prev, state_display_style }))
+        }
       />
 
       {activeState && (

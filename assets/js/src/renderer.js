@@ -68,7 +68,7 @@ export function renderErrorCard(message, onRetry) {
   return box;
 }
 
-export function renderStateCard(states, selectedStateId, onSelect) {
+export function renderStateCard(states, selectedStateId, onSelect, displayStyle = 'buttons') {
   const wrap = el('div');
   wrap.appendChild(el('h2', { className: 'ryv-question-title', text: 'Select your state' }));
 
@@ -77,32 +77,104 @@ export function renderStateCard(states, selectedStateId, onSelect) {
     return wrap;
   }
 
-  states.forEach((state) => {
-    const isSelected = state.id === selectedStateId;
-    const btn = el('button', {
-      className: 'ryv-option-btn',
-      text: state.label,
-      attrs: { type: 'button', 'aria-pressed': isSelected ? 'true' : 'false' },
-      on: { click: () => onSelect(state.id) },
-    });
-    wrap.appendChild(btn);
-  });
+  renderSingleChoiceOptions(
+    wrap,
+    states.map((state) => ({ value: state.id, label: state.label })),
+    selectedStateId,
+    onSelect,
+    displayStyle,
+    'ryv-state'
+  );
 
   return wrap;
 }
 
 /**
- * @param {object} node RYV node ({ type: 'radio'|'checkbox', title, options }).
+ * Shared single-select rendering for the state picker and radio-type question
+ * nodes: 'buttons' (default, current look), 'radio' (actual radio inputs), or
+ * 'dropdown' (a native <select>). Checkbox nodes never call this - they
+ * always render as the button list, regardless of a node's display_style.
+ *
+ * @param {HTMLElement} wrap Container to append into.
+ * @param {{value: string, label: string}[]} options
+ * @param {string|null} selectedValue
+ * @param {(value: string) => void} onSelect
+ * @param {string} displayStyle 'buttons' | 'radio' | 'dropdown'
+ * @param {string} radioGroupName Unique `name` for the radio inputs, so multiple
+ *   single-choice cards on the same page don't cross-select each other.
+ */
+function renderSingleChoiceOptions(wrap, options, selectedValue, onSelect, displayStyle, radioGroupName) {
+  if (displayStyle === 'dropdown') {
+    const select = el('select', { className: 'ryv-select' });
+    select.appendChild(el('option', { text: '— Select —', attrs: { value: '', disabled: true } }));
+    options.forEach((option) => {
+      const opt = el('option', { text: option.label, attrs: { value: option.value } });
+      if (option.value === selectedValue) opt.setAttribute('selected', 'selected');
+      select.appendChild(opt);
+    });
+    if (!selectedValue) select.value = '';
+    select.addEventListener('change', () => onSelect(select.value));
+    wrap.appendChild(select);
+    return;
+  }
+
+  if (displayStyle === 'radio') {
+    options.forEach((option) => {
+      const input = el('input', {
+        className: 'ryv-radio-input',
+        attrs: { type: 'radio', name: radioGroupName, value: option.value },
+      });
+      input.checked = option.value === selectedValue;
+      input.addEventListener('change', () => onSelect(option.value));
+
+      const label = el('label', { className: 'ryv-radio-option' }, [input, el('span', { text: option.label })]);
+      wrap.appendChild(label);
+    });
+    return;
+  }
+
+  // 'buttons' (default) - unchanged look/behavior.
+  options.forEach((option) => {
+    const isSelected = option.value === selectedValue;
+    const btn = el('button', {
+      className: 'ryv-option-btn',
+      text: option.label,
+      attrs: { type: 'button', 'aria-pressed': isSelected ? 'true' : 'false' },
+      on: { click: () => onSelect(option.value) },
+    });
+    wrap.appendChild(btn);
+  });
+}
+
+/**
+ * @param {object} node RYV node ({ type: 'radio'|'checkbox', title, options, display_style? }).
  * @param {string[]} selectedValues Currently-recorded answer for this node (both radio and checkbox store an array).
  * @param {(values: string[]) => void} onChange Called with the full set of selected value(s) after every click -
  *   immediately, no separate Continue step. An empty array means the answer was cleared.
+ * @param {string} nodeId Node id, used to give the radio-input group a unique `name`.
  */
-export function renderQuestionCard(node, selectedValues, onChange) {
+export function renderQuestionCard(node, selectedValues, onChange, nodeId) {
   const wrap = el('div');
   wrap.appendChild(el('h2', { className: 'ryv-question-title', text: node.title }));
 
   const isMulti = node.type === 'checkbox';
   const selected = new Set(selectedValues || []);
+
+  // Checkbox nodes always render as the button list regardless of
+  // display_style - the display_style setting only applies to single-choice
+  // (radio) questions, same as the state picker.
+  if (!isMulti && node.display_style && node.display_style !== 'buttons') {
+    renderSingleChoiceOptions(
+      wrap,
+      node.options || [],
+      selectedValues && selectedValues[0],
+      (value) => onChange(value ? [value] : []),
+      node.display_style,
+      `ryv-node-${nodeId}`
+    );
+    return wrap;
+  }
+
   const buttons = new Map();
 
   (node.options || []).forEach((option) => {

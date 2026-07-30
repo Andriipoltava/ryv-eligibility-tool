@@ -109,9 +109,10 @@ class RYV_API {
 
 		return new WP_REST_Response(
 			array(
-				'form_id' => $post_id,
-				'title'   => $post->post_title,
-				'states'  => $out,
+				'form_id'             => $post_id,
+				'title'               => $post->post_title,
+				'states'              => $out,
+				'state_display_style' => $this->get_state_display_style( $post_id ),
 			),
 			200
 		);
@@ -183,6 +184,25 @@ class RYV_API {
 		}
 
 		return $schema['states'];
+	}
+
+	/**
+	 * How the state picker should render its options: 'buttons' (default,
+	 * unchanged look), 'radio', or 'dropdown'. Lives as a schema-level
+	 * sibling of `states` rather than per-state, since it's one picker
+	 * shared across every state on the form.
+	 *
+	 * @param int $post_id Post ID.
+	 * @return string
+	 */
+	private function get_state_display_style( int $post_id ): string {
+		$json   = get_post_meta( $post_id, RYV_CPT::SCHEMA_META_KEY, true );
+		$schema = json_decode( (string) $json, true );
+
+		$allowed = array( 'buttons', 'radio', 'dropdown' );
+		$style   = is_array( $schema ) && ! empty( $schema['state_display_style'] ) ? $schema['state_display_style'] : 'buttons';
+
+		return in_array( $style, $allowed, true ) ? $style : 'buttons';
 	}
 
 	/**

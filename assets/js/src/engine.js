@@ -22,6 +22,7 @@ export class RYVDecisionEngine {
     this.nodes = {};
     this.entryNode = null;
     this.availableStates = [];
+    this.stateDisplayStyle = 'buttons';
     this.stateId = null;
     this.answers = new Map(); // node id -> string[] (radio/checkbox values) | string (text/textarea)
     this.renderedOrder = []; // ids (real node ids, or the sentinel ids above) in on-screen order
@@ -40,6 +41,7 @@ export class RYVDecisionEngine {
     try {
       const data = await fetchForm(this.formId);
       this.availableStates = data.states || [];
+      this.stateDisplayStyle = data.state_display_style || 'buttons';
       this.truncateFrom(0);
       this.renderStateCard();
     } catch (err) {
@@ -49,7 +51,12 @@ export class RYVDecisionEngine {
   }
 
   renderStateCard() {
-    const card = renderer.renderStateCard(this.availableStates, this.stateId, (stateId) => this.onSelectState(stateId));
+    const card = renderer.renderStateCard(
+      this.availableStates,
+      this.stateId,
+      (stateId) => this.onSelectState(stateId),
+      this.stateDisplayStyle
+    );
     this.appendCard(STATE_CARD_ID, card, false);
   }
 
@@ -136,7 +143,12 @@ export class RYVDecisionEngine {
     switch (node.type) {
       case 'radio':
       case 'checkbox':
-        return renderer.renderQuestionCard(node, this.answers.get(nodeId) || [], (values) => this.onAnswerChange(nodeId, values));
+        return renderer.renderQuestionCard(
+          node,
+          this.answers.get(nodeId) || [],
+          (values) => this.onAnswerChange(nodeId, values),
+          nodeId
+        );
       case 'text':
       case 'textarea':
         return renderer.renderInputCard(node, this.answers.get(nodeId) || '', (value) => this.onAnswerChange(nodeId, value));

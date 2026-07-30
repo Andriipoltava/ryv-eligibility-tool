@@ -59,6 +59,25 @@
     @apply ryv-outline-none ryv-ring-2 ryv-ring-ryv-primary;
   }
 
+  /* display_style: 'radio' - a plain radio input + label, one per option. */
+  .ryv-radio-option {
+    @apply ryv-flex ryv-items-center ryv-gap-2 ryv-mb-2 ryv-text-ryv-text ryv-cursor-pointer;
+  }
+  .ryv-radio-input {
+    @apply ryv-h-4 ryv-w-4 ryv-border-gray-300 ryv-text-ryv-primary;
+  }
+  .ryv-radio-input:focus-visible {
+    @apply ryv-outline-none ryv-ring-2 ryv-ring-ryv-primary;
+  }
+
+  /* display_style: 'dropdown' - a single native <select>. */
+  .ryv-select {
+    @apply ryv-w-full ryv-px-4 ryv-py-2.5 ryv-rounded-lg ryv-border ryv-border-gray-300 ryv-bg-white ryv-text-ryv-text ryv-mb-4;
+  }
+  .ryv-select:focus-visible {
+    @apply ryv-outline-none ryv-ring-2 ryv-ring-ryv-primary;
+  }
+
   .ryv-error-box {
     @apply ryv-p-4 ryv-rounded-lg ryv-bg-red-50 ryv-text-red-700 ryv-border ryv-border-red-200;
   }
