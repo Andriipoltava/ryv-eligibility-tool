@@ -1,4 +1,4 @@
-import { fetchForm, fetchFormState } from './api-client.js';
+import { fetchForm, fetchFormState, logSubmission } from './api-client.js';
 import * as renderer from './renderer.js';
 
 const STATE_CARD_ID = '__state__';
@@ -23,6 +23,10 @@ export class RYVDecisionEngine {
     // placements already behaved.
     this.showStartOver = root.dataset.showStartOver !== '0';
     this.labels = { ...renderer.DEFAULT_LABELS, ...this.parseLabelsAttribute(root) };
+    // One id per attempt at the questionnaire - restart() rolls a new one so
+    // an abandoned-then-restarted trail stays on record as its own row
+    // (see RYV_Submission_Log) instead of being overwritten in place.
+    this.sessionId = this.generateSessionId();
     this.list = null;
     this.nodes = {};
     this.entryNode = null;
@@ -47,6 +51,33 @@ export class RYVDecisionEngine {
     } catch (err) {
       return {};
     }
+  }
+
+  generateSessionId() {
+    if (window.crypto && window.crypto.randomUUID) return window.crypto.randomUUID();
+    return `ryv-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  }
+
+  /**
+   * Upsert this attempt's answer trail so far - called after every state
+   * pick and every answer change. No-op until a state has been picked
+   * (nothing meaningful to log before then).
+   */
+  logProgress() {
+    if (!this.stateId) return;
+
+    const lastRealNodeId = [...this.renderedOrder].reverse().find((id) => this.nodes[id]);
+    const answers = {};
+    this.answers.forEach((value, key) => {
+      answers[key] = value;
+    });
+
+    logSubmission(this.formId, {
+      session_id: this.sessionId,
+      state_id: this.stateId,
+      current_node: lastRealNodeId || null,
+      answers,
+    });
   }
 
   mount() {
@@ -101,6 +132,7 @@ export class RYVDecisionEngine {
       this.entryNode = data.entry_node;
       this.truncateFrom(this.indexOf(LOADING_CARD_ID));
       this.renderFrom(this.entryNode, true);
+      this.logProgress();
     } catch (err) {
       this.truncateFrom(this.indexOf(LOADING_CARD_ID));
       this.appendCard(
@@ -114,6 +146,10 @@ export class RYVDecisionEngine {
     this.stateId = null;
     this.answers = new Map();
     this.nodes = {};
+    // A fresh id, not a cleared one: without this, restarting would reuse
+    // the same session row and RYV_Submission_Log::record() would overwrite
+    // the trail that was just abandoned instead of leaving it on record.
+    this.sessionId = this.generateSessionId();
     this.truncateFrom(0);
     this.renderStateCard();
   }
@@ -202,6 +238,7 @@ export class RYVDecisionEngine {
     this.appendCard(nodeId, this.buildCard(nodeId, node, isTerminal), false);
 
     if (next) this.renderFrom(next, true);
+    this.logProgress();
   }
 
   // --- rendered-list bookkeeping -------------------------------------

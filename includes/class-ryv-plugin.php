@@ -47,6 +47,13 @@ final class RYV_Plugin {
 	private $builder_page = null;
 
 	/**
+	 * Activity log page controller instance (admin-only).
+	 *
+	 * @var RYV_Logs_Page|null
+	 */
+	private $logs_page = null;
+
+	/**
 	 * Get (or create) the singleton instance.
 	 *
 	 * @return RYV_Plugin
@@ -93,6 +100,9 @@ final class RYV_Plugin {
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-cpt.php';
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-yaml-parser.php';
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-us-states.php';
+		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-db.php';
+		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-submission-log.php';
+		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-edit-log.php';
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-api.php';
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-admin-api.php';
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-assets.php';
@@ -101,6 +111,7 @@ final class RYV_Plugin {
 		if ( is_admin() ) {
 			require_once RYV_PLUGIN_DIR . 'admin/class-ryv-import-page.php';
 			require_once RYV_PLUGIN_DIR . 'admin/class-ryv-builder-page.php';
+			require_once RYV_PLUGIN_DIR . 'admin/class-ryv-logs-page.php';
 		}
 	}
 
@@ -108,6 +119,11 @@ final class RYV_Plugin {
 	 * Instantiate controllers and register plugin-wide hooks.
 	 */
 	private function init_hooks() {
+		// Cheap no-op once up to date (single get_option() check) - covers a
+		// plugin update that lands without a deactivate/reactivate cycle,
+		// which is the only other place install() would otherwise run.
+		RYV_DB::maybe_upgrade();
+
 		$this->cpt = new RYV_CPT();
 		new RYV_API();
 		new RYV_Admin_API();
@@ -117,6 +133,7 @@ final class RYV_Plugin {
 		if ( is_admin() ) {
 			$this->import_page  = new RYV_Import_Page();
 			$this->builder_page = new RYV_Builder_Page();
+			$this->logs_page    = new RYV_Logs_Page();
 		}
 	}
 
@@ -142,6 +159,9 @@ final class RYV_Plugin {
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-cpt.php';
 		$cpt = new RYV_CPT();
 		$cpt->register_post_type();
+
+		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-db.php';
+		RYV_DB::install();
 
 		flush_rewrite_rules();
 	}

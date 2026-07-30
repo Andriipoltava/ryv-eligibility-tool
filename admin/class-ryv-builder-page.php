@@ -99,8 +99,21 @@ class RYV_Builder_Page {
 	/**
 	 * Safety net for anyone landing on post.php?action=edit directly (typed
 	 * URL, bookmark, etc.) rather than through a filtered link.
+	 *
+	 * Only for the (default) "edit" action - post.php also handles Trash,
+	 * Restore, and Delete Permanently as `post.php?post=X&action=trash` (etc.)
+	 * requests, which hit this same load-post.php hook. Redirecting those to
+	 * the builder too - as this used to do unconditionally - meant clicking
+	 * Trash in the list table silently never trashed anything; it just
+	 * bounced back here before WordPress's own handler ever ran.
 	 */
 	public function redirect_post_edit() {
+		$action = isset( $_GET['action'] ) ? sanitize_key( wp_unslash( $_GET['action'] ) ) : 'edit';
+
+		if ( 'edit' !== $action ) {
+			return;
+		}
+
 		$post_id = isset( $_GET['post'] ) ? absint( wp_unslash( $_GET['post'] ) ) : 0;
 
 		if ( ! $post_id || RYV_CPT::POST_TYPE !== get_post_type( $post_id ) ) {

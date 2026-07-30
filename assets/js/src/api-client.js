@@ -40,3 +40,24 @@ export function fetchForm(formId) {
 export function fetchFormState(formId, stateId) {
   return request(`/form/${encodeURIComponent(formId)}/state/${encodeURIComponent(stateId)}`);
 }
+
+/**
+ * Fire-and-forget progress log (see RYV_Submission_Log on the PHP side) -
+ * failures are swallowed rather than surfaced, since a dropped log write
+ * should never interrupt someone filling out the actual questionnaire.
+ */
+export function logSubmission(formId, payload) {
+  const base = (settings().restUrl || DEFAULT_BASE).replace(/\/$/, '');
+  const headers = { 'Content-Type': 'application/json' };
+
+  if (settings().nonce) {
+    headers['X-WP-Nonce'] = settings().nonce;
+  }
+
+  return fetch(`${base}/form/${encodeURIComponent(formId)}/log`, {
+    method: 'POST',
+    headers,
+    credentials: 'same-origin',
+    body: JSON.stringify(payload),
+  }).catch(() => {});
+}

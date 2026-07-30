@@ -1,10 +1,15 @@
 import { useState, useEffect, useCallback } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
-import { Button, TextControl, Notice, Spinner } from '@wordpress/components';
+import { Button, TextControl, SelectControl, Notice, Spinner } from '@wordpress/components';
 import StateSidebar from './components/StateSidebar';
 import NodeList from './components/NodeList';
 import NodeEditor from './components/NodeEditor';
-import { fetchForm, saveForm, createForm } from './api';
+import { fetchForm, saveForm, createForm, updateFormStatus } from './api';
+
+const STATUS_OPTIONS = [
+  { label: __( 'Draft', 'ryv-eligibility-tool' ), value: 'draft' },
+  { label: __( 'Published', 'ryv-eligibility-tool' ), value: 'publish' },
+];
 
 const settings = window.RYVBuilderSettings || {};
 
@@ -15,6 +20,8 @@ function emptySchema() {
 export default function App() {
   const [postId] = useState(settings.postId || null);
   const [title, setTitle] = useState('');
+  const [status, setStatus] = useState('draft');
+  const [statusSaving, setStatusSaving] = useState(false);
   const [schema, setSchema] = useState(emptySchema());
   const [activeStateId, setActiveStateId] = useState(null);
   const [selectedNodeId, setSelectedNodeId] = useState(null);
@@ -32,6 +39,7 @@ export default function App() {
     fetchForm(postId)
       .then((data) => {
         setTitle(data.title);
+        setStatus(data.status || 'draft');
         setSchema(data.schema && data.schema.states ? data.schema : emptySchema());
         setActiveStateId(Object.keys(data.schema?.states || {})[0] || null);
         setError(null);
@@ -39,6 +47,22 @@ export default function App() {
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, [postId]);
+
+  const handleStatusChange = (newStatus) => {
+    setStatusSaving(true);
+    updateFormStatus(postId, newStatus)
+      .then(() => {
+        setStatus(newStatus);
+        setNotice(
+          'publish' === newStatus
+            ? __( 'Published.', 'ryv-eligibility-tool' )
+            : __( 'Switched to Draft.', 'ryv-eligibility-tool' )
+        );
+        window.setTimeout(() => setNotice(null), 3000);
+      })
+      .catch((err) => setError(err.message))
+      .finally(() => setStatusSaving(false));
+  };
 
   const handleCreate = () => {
     if (!newTitle.trim()) return;
@@ -175,6 +199,16 @@ export default function App() {
               {error}
             </Notice>
           )}
+          <SelectControl
+            label={__('Status', 'ryv-eligibility-tool')}
+            hideLabelFromVision
+            value={status}
+            options={STATUS_OPTIONS}
+            onChange={handleStatusChange}
+            disabled={statusSaving}
+            __next40pxDefaultSize
+            __nextHasNoMarginBottom
+          />
           <Button variant="primary" onClick={handleSave} isBusy={saving} disabled={saving || !dirty}>
             {dirty ? __('Save Changes', 'ryv-eligibility-tool') : __('Saved', 'ryv-eligibility-tool')}
           </Button>

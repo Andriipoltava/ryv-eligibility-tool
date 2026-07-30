@@ -85,6 +85,7 @@ class RYV_Admin_API {
 			array(
 				'post_id' => $post_id,
 				'title'   => $post->post_title,
+				'status'  => $post->post_status,
 				'schema'  => $this->decode_schema( $post_id ),
 			),
 			200
@@ -129,6 +130,8 @@ class RYV_Admin_API {
 			RYV_CPT::SCHEMA_META_KEY,
 			wp_slash( wp_json_encode( $schema, JSON_UNESCAPED_SLASHES ) )
 		);
+
+		RYV_Edit_Log::record( $post_id, get_current_user_id() );
 
 		return new WP_REST_Response(
 			array(

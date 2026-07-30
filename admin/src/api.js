@@ -38,3 +38,17 @@ export function createForm(title) {
     body: JSON.stringify({ title, status: 'draft' }),
   });
 }
+
+/**
+ * Same reasoning as createForm() - status is a plain post field, so this
+ * rides on core's REST controller for the CPT rather than going through the
+ * schema-only admin API. Every new form starts as 'draft' and the builder
+ * (which fully replaces the normal post editor, Publish box included) is
+ * otherwise the only place left to change that.
+ */
+export function updateFormStatus(postId, status) {
+  return request(`${settings().wpRestUrl}wp/v2/ryv_forms/${postId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status }),
+  });
+}

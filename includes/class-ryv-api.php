@@ -12,9 +12,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Class RYV_API
  *
- * Two read-only routes:
- *  - GET /ryv/v1/form/{post_id}            -> which states have logic on this form (populates the initial state picker)
- *  - GET /ryv/v1/form/{post_id}/state/{id} -> that state's node graph (fetched lazily, only after a state is chosen)
+ * Two read-only routes, plus one write route for anonymous progress logging:
+ *  - GET  /ryv/v1/form/{post_id}            -> which states have logic on this form (populates the initial state picker)
+ *  - GET  /ryv/v1/form/{post_id}/state/{id} -> that state's node graph (fetched lazily, only after a state is chosen)
+ *  - POST /ryv/v1/form/{post_id}/log        -> upsert this visitor's answer trail so far (see RYV_Submission_Log)
  */
 class RYV_API {
 
@@ -40,6 +41,23 @@ class RYV_API {
 			array(
 				'methods'             => WP_REST_Server::READABLE,
 				'callback'            => array( $this, 'get_form' ),
+				'permission_callback' => '__return_true',
+				'args'                => array(
+					'post_id' => array(
+						'validate_callback' => static function ( $value ) {
+							return is_numeric( $value );
+						},
+					),
+				),
+			)
+		);
+
+		register_rest_route(
+			self::NAMESPACE,
+			'/form/(?P<post_id>\d+)/log',
+			array(
+				'methods'             => WP_REST_Server::CREATABLE,
+				'callback'            => array( $this, 'log_progress' ),
 				'permission_callback' => '__return_true',
 				'args'                => array(
 					'post_id' => array(
@@ -146,6 +164,51 @@ class RYV_API {
 		}
 
 		return new WP_REST_Response( $states[ $state_id ], 200 );
+	}
+
+	/**
+	 * POST /form/{post_id}/log - upsert this visitor's answer trail so far.
+	 *
+	 * No auth, no nonce: anonymous visitors have neither, and this only ever
+	 * writes an anonymous, session-scoped row (no IP or other identifying
+	 * info is accepted or stored) - see RYV_Submission_Log.
+	 *
+	 * @param WP_REST_Request $request Request.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public function log_progress( WP_REST_Request $request ) {
+		$post_id = (int) $request['post_id'];
+		$post    = $this->get_viewable_form( $post_id );
+
+		if ( ! $post ) {
+			return $this->not_found_error();
+		}
+
+		$session_id = (string) $request->get_param( 'session_id' );
+		$session_id = substr( preg_replace( '/[^a-zA-Z0-9-]/', '', $session_id ), 0, 64 );
+
+		if ( '' === $session_id ) {
+			return new WP_Error(
+				'ryv_invalid_session',
+				__( 'A session id is required.', 'ryv-eligibility-tool' ),
+				array( 'status' => 400 )
+			);
+		}
+
+		$state_id_param = $request->get_param( 'state_id' );
+		$state_id       = is_string( $state_id_param ) && '' !== $state_id_param ? sanitize_title( $state_id_param ) : null;
+
+		$current_node_param = $request->get_param( 'current_node' );
+		$current_node       = is_string( $current_node_param ) && '' !== $current_node_param
+			? substr( sanitize_text_field( $current_node_param ), 0, 191 )
+			: null;
+
+		$answers_param = $request->get_param( 'answers' );
+		$answers       = is_array( $answers_param ) ? $answers_param : array();
+
+		RYV_Submission_Log::record( $post_id, $session_id, $state_id, $current_node, $answers );
+
+		return new WP_REST_Response( array( 'ok' => true ), 200 );
 	}
 
 	/**
