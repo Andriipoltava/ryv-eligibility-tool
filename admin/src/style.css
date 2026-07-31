@@ -13,6 +13,30 @@
   gap: 1rem;
 }
 
+.ryv-builder-title-input {
+  flex: 1;
+  min-width: 260px;
+  max-width: 520px;
+}
+
+.ryv-builder-title-input input {
+  font-size: 1.5rem;
+  font-weight: 600;
+  height: auto;
+  padding: 4px 10px;
+}
+
+.ryv-builder-description-input {
+  max-width: 720px;
+  margin-bottom: 1.5rem;
+}
+
+.ryv-builder-meta-saving {
+  font-size: 12px;
+  font-style: italic;
+  color: #646970;
+}
+
 .ryv-builder-states {
   margin-bottom: 1.5rem;
 }

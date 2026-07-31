@@ -1,9 +1,9 @@
-import { useState, useEffect, useCallback } from '@wordpress/element';
+import { useState, useEffect, useCallback, useRef } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
-import { Button, TextControl, SelectControl, Notice, Spinner } from '@wordpress/components';
+import { Button, TextControl, TextareaControl, SelectControl, Notice, Spinner } from '@wordpress/components';
 import NodeList from './components/NodeList';
 import NodeEditor from './components/NodeEditor';
-import { fetchForm, saveForm, createForm, updateFormStatus } from './api';
+import { fetchForm, saveForm, createForm, updateFormStatus, updateFormMeta } from './api';
 
 const STATUS_OPTIONS = [
   { label: __( 'Draft', 'ryv-eligibility-tool' ), value: 'draft' },
@@ -19,8 +19,13 @@ function emptySchema() {
 export default function App() {
   const [postId] = useState(settings.postId || null);
   const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
   const [status, setStatus] = useState('draft');
   const [statusSaving, setStatusSaving] = useState(false);
+  const [metaSaving, setMetaSaving] = useState(false);
+  // Last value actually persisted for title/description - lets onBlur skip
+  // the PATCH entirely when nothing changed (e.g. clicking in and back out).
+  const savedMetaRef = useRef({ title: '', description: '' });
   const [schema, setSchema] = useState(emptySchema());
   const [selectedNodeId, setSelectedNodeId] = useState(null);
   const [loading, setLoading] = useState(!!postId);
@@ -37,6 +42,8 @@ export default function App() {
     fetchForm(postId)
       .then((data) => {
         setTitle(data.title);
+        setDescription(data.description || '');
+        savedMetaRef.current = { title: data.title, description: data.description || '' };
         setStatus(data.status || 'draft');
         setSchema(data.schema && data.schema.nodes ? data.schema : emptySchema());
         setSelectedNodeId(null);
@@ -45,6 +52,20 @@ export default function App() {
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, [postId]);
+
+  /** Commits a title/description edit on blur - skipped entirely if unchanged since the last save. */
+  const commitMeta = (field, value) => {
+    if (savedMetaRef.current[field] === value) return;
+    setMetaSaving(true);
+    updateFormMeta(postId, { [field]: value })
+      .then(() => {
+        savedMetaRef.current[field] = value;
+        setNotice(__('Saved.', 'ryv-eligibility-tool'));
+        window.setTimeout(() => setNotice(null), 3000);
+      })
+      .catch((err) => setError(err.message))
+      .finally(() => setMetaSaving(false));
+  };
 
   const handleStatusChange = (newStatus) => {
     setStatusSaving(true);
@@ -146,7 +167,20 @@ export default function App() {
   return (
     <div className="ryv-builder">
       <div className="ryv-builder-header">
-        <h1>{title}</h1>
+        <TextControl
+          className="ryv-builder-title-input"
+          label={__('Form title', 'ryv-eligibility-tool')}
+          hideLabelFromVision
+          value={title}
+          onChange={setTitle}
+          onBlur={() => commitMeta('title', title)}
+          onKeyDown={(event) => {
+            if ('Enter' === event.key) event.target.blur();
+          }}
+          __next40pxDefaultSize
+          __nextHasNoMarginBottom
+        />
+        {metaSaving && <span className="ryv-builder-meta-saving">{__('Saving…', 'ryv-eligibility-tool')}</span>}
         <div className="ryv-builder-header-actions">
           {notice && (
             <Notice status="success" isDismissible={false}>
@@ -174,6 +208,17 @@ export default function App() {
         </div>
       </div>
 
+      <TextareaControl
+        className="ryv-builder-description-input"
+        label={__('Description', 'ryv-eligibility-tool')}
+        help={__('Shown on the frontend only if the Elementor widget’s "Show Description" setting is enabled.', 'ryv-eligibility-tool')}
+        value={description}
+        onChange={setDescription}
+        onBlur={() => commitMeta('description', description)}
+        rows={2}
+        __nextHasNoMarginBottom
+      />
+
       <div className="ryv-builder-body">
         <NodeList graph={schema} selectedNodeId={selectedNodeId} onSelect={setSelectedNodeId} onChange={updateGraph} />
 
@@ -182,6 +227,7 @@ export default function App() {
             node={schema.nodes[selectedNodeId]}
             nodeId={selectedNodeId}
             allNodeIds={Object.keys(schema.nodes)}
+            allNodes={schema.nodes}
             onRename={renameNode}
             onChange={(updatedNode) =>
               updateGraph((prev) => ({

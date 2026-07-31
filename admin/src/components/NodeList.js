@@ -45,7 +45,7 @@ function groupLabel(key) {
   // "State: State Alabama".
   const stripped = key.replace(/^state[_ ]/i, '');
   const words = stripped.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-  return sprintf(__('State: %s', 'ryv-eligibility-tool'), words);
+  return sprintf(__('%s', 'ryv-eligibility-tool'), words);
 }
 
 /**

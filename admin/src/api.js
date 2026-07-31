@@ -52,3 +52,23 @@ export function updateFormStatus(postId, status) {
     body: JSON.stringify({ status }),
   });
 }
+
+/**
+ * Title/description are likewise plain post fields (post_title/post_excerpt,
+ * the same ones the Elementor widget's show_title/show_description controls
+ * read directly) - not part of the schema blob, so this rides on core's REST
+ * controller too rather than the schema-only admin API. `fields` is e.g.
+ * `{ title }`, `{ description }` (core's own field name is `excerpt`; the
+ * caller uses `description` since that's the name used everywhere else in
+ * this plugin - translate it here) or both together.
+ */
+export function updateFormMeta(postId, fields) {
+  const { description, ...rest } = fields;
+  const payload = { ...rest };
+  if (description !== undefined) payload.excerpt = description;
+
+  return request(`${settings().wpRestUrl}wp/v2/ryv_forms/${postId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  });
+}

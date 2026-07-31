@@ -68,7 +68,7 @@ class RYV_Admin_API {
 	}
 
 	/**
-	 * GET /admin/form/{post_id} - the post's title + full decoded schema.
+	 * GET /admin/form/{post_id} - the post's title/description + full decoded schema.
 	 *
 	 * @param WP_REST_Request $request Request.
 	 * @return WP_REST_Response|WP_Error
@@ -83,10 +83,11 @@ class RYV_Admin_API {
 
 		return new WP_REST_Response(
 			array(
-				'post_id' => $post_id,
-				'title'   => $post->post_title,
-				'status'  => $post->post_status,
-				'schema'  => RYV_CPT::get_schema( $post_id ),
+				'post_id'     => $post_id,
+				'title'       => $post->post_title,
+				'description' => $post->post_excerpt,
+				'status'      => $post->post_status,
+				'schema'      => RYV_CPT::get_schema( $post_id ),
 			),
 			200
 		);

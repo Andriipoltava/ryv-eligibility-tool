@@ -1,4 +1,4 @@
-import { useState, useEffect } from '@wordpress/element';
+import { useState, useEffect, useMemo } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
 import { TextControl, SelectControl } from '@wordpress/components';
 import OptionsEditor from './OptionsEditor';
@@ -29,7 +29,7 @@ const DISPLAY_STYLE_OPTIONS = [
  *   every reference to this node (entry_node + every option's/node's
  *   next_node) across the whole graph - see App.js's renameNode().
  */
-export default function NodeEditor({ node, nodeId, allNodeIds, onChange, onRename }) {
+export default function NodeEditor({ node, nodeId, allNodeIds, allNodes, onChange, onRename }) {
   const [idDraft, setIdDraft] = useState(nodeId);
 
   useEffect(() => {
@@ -37,6 +37,19 @@ export default function NodeEditor({ node, nodeId, allNodeIds, onChange, onRenam
   }, [nodeId]);
 
   const isChoice = node.type === 'radio' || node.type === 'checkbox';
+
+  // Suggestions only, via <datalist> - group is a free-text field (see
+  // NodeList.js's groupKeyOf(), which falls back to an id prefix or
+  // 'general' when it's unset), so existing values are offered but never
+  // enforced as an enum.
+  const groupSuggestions = useMemo(() => {
+    const groups = new Set();
+    Object.values(allNodes || {}).forEach((n) => {
+      if (n.group) groups.add(n.group);
+    });
+    return Array.from(groups).sort();
+  }, [allNodes]);
+
   const nextNodeOptions = [
     { label: __('— End —', 'ryv-eligibility-tool'), value: '' },
     ...allNodeIds.filter((id) => id !== nodeId).map((id) => ({ label: id, value: id })),
@@ -87,6 +100,22 @@ export default function NodeEditor({ node, nodeId, allNodeIds, onChange, onRenam
           'ryv-eligibility-tool'
         )}
       />
+
+      <TextControl
+        label={__('Group', 'ryv-eligibility-tool')}
+        value={node.group || ''}
+        onChange={(group) => onChange({ ...node, group })}
+        list="ryv-group-suggestions"
+        help={__(
+          'Controls which collapsible bucket this question is filed under in the node list. Leave blank to fall back to the id prefix (before "__") or "General".',
+          'ryv-eligibility-tool'
+        )}
+      />
+      <datalist id="ryv-group-suggestions">
+        {groupSuggestions.map((group) => (
+          <option key={group} value={group} />
+        ))}
+      </datalist>
 
       {node.type === 'markup' && (
         <div className="ryv-builder-field">

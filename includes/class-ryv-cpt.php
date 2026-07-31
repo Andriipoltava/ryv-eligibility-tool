@@ -73,7 +73,11 @@ class RYV_CPT {
 			'show_in_rest'        => true,
 			'rest_base'           => 'ryv_forms',
 			'menu_icon'           => 'dashicons-forms',
-			'supports'            => array( 'title' ),
+			// 'excerpt' is what the builder SPA edits as "Description" (also
+			// what the Elementor widget's show_description control reads
+			// directly off the post) - it must be in `supports` or core's
+			// REST controller won't expose an `excerpt` field to PATCH at all.
+			'supports'            => array( 'title', 'excerpt' ),
 			'capability_type'     => 'post',
 			'map_meta_cap'        => true,
 			'hierarchical'        => false,
