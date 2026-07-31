@@ -112,7 +112,15 @@ class RYV_CPT {
 					),
 				),
 				'auth_callback'     => static function () {
-					return current_user_can( 'edit_posts' );
+					// Must match RYV_Admin_API::check_permission()'s
+					// `manage_options` gate: this meta is also exposed
+					// read/write through core's own `/wp/v2/ryv_forms/{id}`
+					// endpoint via `show_in_rest` below, and its raw HTML
+					// content needs the same trust boundary regardless of
+					// which REST route writes it - `edit_posts` would let an
+					// Editor bypass the tightened admin-api.php route
+					// entirely by writing this meta field directly.
+					return current_user_can( 'manage_options' );
 				},
 			)
 		);

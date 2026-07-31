@@ -19,9 +19,14 @@ if ( ! defined( 'ABSPATH' ) ) {
 class RYV_Builder_Page {
 
 	/**
-	 * Capability required to use the builder.
+	 * Capability required to use the builder. Must match
+	 * RYV_Admin_API::check_permission() (`manage_options`): a form's
+	 * `markup` nodes carry raw, unsanitized HTML that's rendered via
+	 * `innerHTML` on the public frontend, the same trust boundary as the
+	 * YAML importer (RYV_Import_Page::CAPABILITY) - anything weaker would
+	 * let a non-administrator (e.g. an Editor) author a stored-XSS payload.
 	 */
-	const CAPABILITY = 'edit_posts';
+	const CAPABILITY = 'manage_options';
 
 	/**
 	 * Hook slug for this submenu page.
@@ -120,7 +125,7 @@ class RYV_Builder_Page {
 			return;
 		}
 
-		if ( ! current_user_can( 'edit_post', $post_id ) ) {
+		if ( ! current_user_can( self::CAPABILITY ) ) {
 			return;
 		}
 

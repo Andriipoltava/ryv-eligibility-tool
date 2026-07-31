@@ -58,13 +58,20 @@ class RYV_Admin_API {
 	}
 
 	/**
-	 * Only someone who can edit this specific post may read/write its schema.
+	 * Only administrators may read/write a form's schema: `nodes[].content`
+	 * is raw, unsanitized HTML rendered via `innerHTML` on the public
+	 * frontend (see renderer.js's renderMarkupCard()), so this has to match
+	 * the same `manage_options` trust boundary as the YAML importer
+	 * (RYV_Import_Page::CAPABILITY) - anything weaker (e.g. `edit_post`,
+	 * which an Editor or even a Contributor/Author satisfies for their own
+	 * posts) would let a non-administrator author a stored-XSS payload that
+	 * executes for every anonymous visitor once the form is published.
 	 *
 	 * @param WP_REST_Request $request Request.
 	 * @return bool
 	 */
 	public function check_permission( WP_REST_Request $request ) {
-		return current_user_can( 'edit_post', (int) $request['post_id'] );
+		return current_user_can( 'manage_options' );
 	}
 
 	/**

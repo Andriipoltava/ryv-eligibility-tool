@@ -26,7 +26,7 @@ class RYV_DB {
 	/**
 	 * Bump this whenever install() changes.
 	 */
-	const DB_VERSION = '1.1';
+	const DB_VERSION = '1.2';
 
 	/**
 	 * @return string
@@ -70,6 +70,11 @@ class RYV_DB {
 		// One row per (form_id, session_id): logProgress() upserts into this as
 		// the visitor answers questions, so a browse-away-mid-questionnaire
 		// still leaves their partial trail on record, not just completions.
+		// The UNIQUE KEY is what makes RYV_Submission_Log::record()'s
+		// INSERT ... ON DUPLICATE KEY UPDATE atomic - without it, two
+		// concurrent requests for the same session could each miss the
+		// other's row (a plain SELECT-then-INSERT/UPDATE race) and insert
+		// duplicate rows instead of updating one.
 		dbDelta(
 			"CREATE TABLE {$submissions} (
 				id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -82,7 +87,8 @@ class RYV_DB {
 				updated_at DATETIME NOT NULL,
 				PRIMARY KEY  (id),
 				KEY form_id (form_id),
-				KEY session_id (session_id)
+				KEY session_id (session_id),
+				UNIQUE KEY session_form (form_id, session_id)
 			) {$charset_collate};"
 		);
 

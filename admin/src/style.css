@@ -173,6 +173,9 @@
   background: none;
   padding: 8px 10px;
   cursor: pointer;
+  max-width: 240px;
+  overflow: clip;
+
 }
 
 .ryv-builder-node-type {

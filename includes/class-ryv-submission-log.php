@@ -43,38 +43,28 @@ class RYV_Submission_Log {
 		$table = RYV_DB::submissions_table();
 		$now   = current_time( 'mysql', true );
 
-		$existing_id = $wpdb->get_var(
+		// A single atomic upsert on the (form_id, session_id) UNIQUE KEY
+		// (see RYV_DB::install()) rather than a separate SELECT then
+		// conditional INSERT/UPDATE - that older approach raced under two
+		// near-simultaneous requests for the same session (e.g. a retried
+		// log call), where both could miss each other's row and both
+		// INSERT, leaving duplicate rows instead of one upserted row.
+		$wpdb->query(
 			$wpdb->prepare(
-				"SELECT id FROM {$table} WHERE form_id = %d AND session_id = %s",
+				"INSERT INTO {$table} (form_id, session_id, state_id, current_node, answers, created_at, updated_at)
+				VALUES (%d, %s, %s, %s, %s, %s, %s)
+				ON DUPLICATE KEY UPDATE
+					state_id = VALUES(state_id),
+					current_node = VALUES(current_node),
+					answers = VALUES(answers),
+					updated_at = VALUES(updated_at)",
 				$form_id,
-				$session_id
-			)
-		);
-
-		if ( $existing_id ) {
-			$wpdb->update(
-				$table,
-				array(
-					'state_id'     => $state_id,
-					'current_node' => $current_node,
-					'answers'      => $answers_json,
-					'updated_at'   => $now,
-				),
-				array( 'id' => (int) $existing_id )
-			);
-			return;
-		}
-
-		$wpdb->insert(
-			$table,
-			array(
-				'form_id'      => $form_id,
-				'session_id'   => $session_id,
-				'state_id'     => $state_id,
-				'current_node' => $current_node,
-				'answers'      => $answers_json,
-				'created_at'   => $now,
-				'updated_at'   => $now,
+				$session_id,
+				$state_id,
+				$current_node,
+				$answers_json,
+				$now,
+				$now
 			)
 		);
 	}

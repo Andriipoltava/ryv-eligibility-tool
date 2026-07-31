@@ -295,7 +295,13 @@ The builder round-trips the **entire** schema on save (`includes/class-ryv-admin
 `GET`/`POST /ryv/v1/admin/form/{post_id}`) rather than merging partial updates
 server-side - it loads everything into memory once, edits happen client-side,
 "Save" PUTs the whole thing back. Auth-gated by
-`current_user_can('edit_post', $post_id)`, distinct from the public, read-only
+`current_user_can('manage_options')` - not `edit_post`/`edit_posts` - since
+`nodes[].content` is raw HTML rendered via `innerHTML` on the public frontend,
+the same trust boundary as the YAML importer; this is enforced in both
+`RYV_Admin_API::check_permission()` and the `_ryv_form_schema` postmeta's own
+`auth_callback` (`RYV_CPT::register_meta()`), since that meta is also
+independently writable through core's `/wp/v2/ryv_forms/{id}` endpoint.
+Distinct from the public, read-only
 `RYV_API`. New-post creation reuses core's already-REST-enabled `ryv_forms`
 endpoint (`POST /wp/v2/ryv_forms`) rather than adding a bespoke one; status
 changes (draft/publish) similarly ride on core's `PATCH /wp/v2/ryv_forms/{id}`

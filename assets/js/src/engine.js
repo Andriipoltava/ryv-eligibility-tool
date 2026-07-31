@@ -113,8 +113,19 @@ export class RYVDecisionEngine {
    */
   renderFrom(nodeId, animate) {
     let current = nodeId;
+    // Nothing in the builder or the YAML importer prevents next_node from
+    // routing back into an ancestor (only a direct self-reference is
+    // blocked, in NodeEditor.js) - without this guard, a cyclic graph would
+    // spin this loop forever and hang the visitor's tab.
+    const visited = new Set();
 
     while (current) {
+      if (visited.has(current)) {
+        console.warn(`RYV: cycle detected in decision graph at node "${current}" - stopping.`);
+        break;
+      }
+      visited.add(current);
+
       const node = this.nodes[current];
 
       if (!node) {
