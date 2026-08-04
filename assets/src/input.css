@@ -168,9 +168,16 @@
     @apply ryv-p-4 ryv-rounded-lg ryv-bg-red-50 ryv-text-red-700 ryv-border ryv-border-red-200;
   }
 
-  /* lead_capture node: a small Name/Email form, reusing .ryv-input/.ryv-continue-btn. */
+  /* lead_capture node: a form built from node.form_fields, reusing .ryv-input/.ryv-continue-btn. */
   .ryv-lead-form {
     @apply ryv-flex ryv-flex-col;
+  }
+  .ryv-field-label {
+    @apply ryv-block ryv-mb-1;
+  }
+  .ryv-field-label-text {
+    @apply ryv-block ryv-mb-1 ryv-text-sm ryv-font-medium;
+    color: var(--ryv-text-color, #1f2937);
   }
   .ryv-lead-form-error {
     @apply ryv-text-sm ryv-text-red-700 ryv-mb-4;

@@ -226,3 +226,36 @@
 .ryv-builder-classic-editor {
   width: 100%;
 }
+
+.ryv-builder-lead-capture-tabs .components-tab-panel__tabs {
+  margin-bottom: 1rem;
+}
+
+.ryv-builder-form-field-row {
+  display: grid;
+  grid-template-columns: auto 1fr 1fr auto auto auto;
+  gap: 0.5rem;
+  align-items: flex-end;
+  margin-bottom: 0.75rem;
+}
+
+.ryv-builder-form-field-reorder {
+  display: flex;
+  gap: 2px;
+  padding-bottom: 8px;
+}
+
+.ryv-builder-form-fields-empty {
+  color: #646970;
+  font-style: italic;
+}
+
+.ryv-builder-email-settings h3 {
+  margin-top: 1.5rem;
+}
+
+.ryv-builder-field-help {
+  color: #646970;
+  font-size: 12px;
+  font-style: italic;
+}

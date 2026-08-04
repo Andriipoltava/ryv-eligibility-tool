@@ -26,8 +26,6 @@ export const DEFAULT_LABELS = {
   selectPlaceholder: '— Select —',
   submit: 'Submit',
   submitting: 'Submitting…',
-  leadNamePlaceholder: 'Name',
-  leadEmailPlaceholder: 'Email',
   leadSubmitted: 'Thank you - your information has been submitted.',
   leadError: 'Something went wrong submitting your information. Please try again.',
 };
@@ -273,21 +271,52 @@ export function renderInputCard(node, previousValue, onChange) {
 }
 
 /**
- * `lead_capture` node: a small Name/Email form. `node.actions` (save_to_db /
- * email_admin / email_user, configured in the builder) is never read here -
- * it's only interpreted server-side by RYV_API::submit_lead(), since it's
- * what decides what the backend does with the submission, not how the form
- * itself looks.
+ * HTML5 input `type` attribute for each supported `form_fields[].type` -
+ * 'textarea' isn't in here since it's a different tag entirely, handled
+ * separately in buildFieldControl().
+ */
+const FIELD_INPUT_TYPES = new Set(['text', 'email', 'date', 'tel']);
+
+/**
+ * One `<label>`-wrapped input/textarea for a single `node.form_fields[]`
+ * entry - the label text is the admin-authored `field.label`, the control's
+ * `name`/map key is `field.name` (also what `{field_name}` template
+ * placeholders reference server-side in RYV_API::render_template()).
+ */
+function buildFieldControl(field) {
+  const tag = field.type === 'textarea' ? 'textarea' : 'input';
+  const attrs = { name: field.name };
+  if (tag === 'input') {
+    attrs.type = FIELD_INPUT_TYPES.has(field.type) ? field.type : 'text';
+  }
+  if (field.required) attrs.required = 'required';
+
+  const wrapLabel = el('label', { className: 'ryv-field-label' });
+  wrapLabel.appendChild(el('span', { className: 'ryv-field-label-text', text: field.label || field.name }));
+  const control = el(tag, { className: 'ryv-input', attrs });
+  wrapLabel.appendChild(control);
+
+  return { wrapLabel, control };
+}
+
+/**
+ * `lead_capture` node: a form built entirely from `node.form_fields`
+ * (label/name/type/required, authored in the builder) - what the form does
+ * with a submission (`node.email_settings`: save_to_db/admin & user emails/
+ * templates) is never read here, only interpreted server-side by
+ * RYV_API::submit_lead(), since it decides backend behavior, not how the
+ * form itself looks.
  *
- * @param {object} node RYV node ({ type: 'lead_capture', title }).
- * @param {{name: string, email: string}|null} submittedValue Set once this
- *   node has been successfully submitted - swaps the form out for a static
- *   confirmation message instead of re-showing empty inputs, same idea as
- *   renderInputCard() carrying forward `previousValue`.
- * @param {(values: {name: string, email: string}) => Promise<any>} onSubmit
- *   Called with the trimmed input values; engine.js wires this to
- *   submitLead() followed by recording the answer. The returned promise's
- *   rejection is caught here to show an inline error and re-enable the form.
+ * @param {object} node RYV node ({ type: 'lead_capture', title, form_fields }).
+ * @param {Object<string,string>|null} submittedValue Set once this node has
+ *   been successfully submitted (field name -> submitted value) - swaps the
+ *   form out for a static confirmation message instead of re-showing empty
+ *   inputs, same idea as renderInputCard() carrying forward `previousValue`.
+ * @param {(values: Object<string,string>) => Promise<any>} onSubmit Called
+ *   with `{ [field.name]: trimmed value }` for every field; engine.js wires
+ *   this to submitLead() followed by recording the answer. The returned
+ *   promise's rejection is caught here to show an inline error and
+ *   re-enable the form.
  * @param {object} labels
  */
 export function renderLeadCaptureCard(node, submittedValue, onSubmit, labels = DEFAULT_LABELS) {
@@ -299,19 +328,15 @@ export function renderLeadCaptureCard(node, submittedValue, onSubmit, labels = D
     return wrap;
   }
 
+  const fields = (node.form_fields || []).filter((field) => field && field.name);
   const form = el('form', { className: 'ryv-lead-form' });
+  const controls = new Map(); // field name -> input/textarea element
 
-  const nameInput = el('input', {
-    className: 'ryv-input',
-    attrs: { type: 'text', name: 'name', autocomplete: 'name' },
+  fields.forEach((field) => {
+    const { wrapLabel, control } = buildFieldControl(field);
+    controls.set(field.name, control);
+    form.appendChild(wrapLabel);
   });
-  nameInput.placeholder = labels.leadNamePlaceholder;
-
-  const emailInput = el('input', {
-    className: 'ryv-input',
-    attrs: { type: 'email', name: 'email', autocomplete: 'email', required: 'required' },
-  });
-  emailInput.placeholder = labels.leadEmailPlaceholder;
 
   const errorBox = el('p', { className: 'ryv-lead-form-error' });
   errorBox.style.display = 'none';
@@ -322,16 +347,14 @@ export function renderLeadCaptureCard(node, submittedValue, onSubmit, labels = D
     attrs: { type: 'submit' },
   });
 
-  form.appendChild(emailInput);
-  form.appendChild(nameInput);
   form.appendChild(errorBox);
   form.appendChild(submitBtn);
 
   form.addEventListener('submit', (event) => {
     event.preventDefault();
 
-    if (!emailInput.checkValidity()) {
-      emailInput.reportValidity();
+    if (!form.checkValidity()) {
+      form.reportValidity();
       return;
     }
 
@@ -339,7 +362,12 @@ export function renderLeadCaptureCard(node, submittedValue, onSubmit, labels = D
     submitBtn.disabled = true;
     submitBtn.textContent = labels.submitting;
 
-    Promise.resolve(onSubmit({ name: nameInput.value.trim(), email: emailInput.value.trim() })).catch((err) => {
+    const values = {};
+    controls.forEach((control, name) => {
+      values[name] = control.value.trim();
+    });
+
+    Promise.resolve(onSubmit(values)).catch((err) => {
       submitBtn.disabled = false;
       submitBtn.textContent = labels.submit;
       errorBox.textContent = (err && err.message) || labels.leadError;

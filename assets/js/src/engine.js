@@ -208,14 +208,15 @@ export class RYVDecisionEngine {
   }
 
   /**
-   * POSTs a `lead_capture` node's values to the backend (which reads that
-   * node's `actions` config - save_to_db/email_admin/email_user - and acts
-   * on it) before recording the answer. Left un-caught here so
-   * renderLeadCaptureCard's own `.catch()` can show an inline error and
-   * leave the form re-submittable, instead of silently advancing.
+   * POSTs a `lead_capture` node's dynamic field values to the backend (which
+   * reads that node's `email_settings` config - save_to_db/admin & user
+   * emails/templates - and acts on it) before recording the answer. Left
+   * un-caught here so renderLeadCaptureCard's own `.catch()` can show an
+   * inline error and leave the form re-submittable, instead of silently
+   * advancing.
    */
   onLeadSubmit(nodeId, values) {
-    return submitLead(this.formId, { node_id: nodeId, name: values.name, email: values.email }).then(() => {
+    return submitLead(this.formId, { node_id: nodeId, form_data: values }).then(() => {
       this.onAnswerChange(nodeId, values);
     });
   }

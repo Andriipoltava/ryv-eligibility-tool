@@ -1,8 +1,10 @@
 import { useState, useEffect, useMemo } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
-import { TextControl, SelectControl, CheckboxControl, TextareaControl } from '@wordpress/components';
+import { TextControl, SelectControl, TabPanel } from '@wordpress/components';
 import OptionsEditor from './OptionsEditor';
 import ClassicEditor from './ClassicEditor';
+import FormFieldsEditor from './FormFieldsEditor';
+import EmailSettingsEditor from './EmailSettingsEditor';
 
 const TYPE_OPTIONS = [
   { label: __('Radio (single choice)', 'ryv-eligibility-tool'), value: 'radio' },
@@ -141,41 +143,28 @@ export default function NodeEditor({ node, nodeId, allNodeIds, allNodes, onChang
 
       {node.type === 'lead_capture' && (
         <div className="ryv-builder-field ryv-builder-lead-capture-settings">
-          <h3>{__('On submit, do the following:', 'ryv-eligibility-tool')}</h3>
-
-          <CheckboxControl
-            label={__('Save submission to the database', 'ryv-eligibility-tool')}
-            checked={!!(node.actions && node.actions.save_to_db)}
-            onChange={(save_to_db) => onChange({ ...node, actions: { ...node.actions, save_to_db } })}
-          />
-
-          <CheckboxControl
-            label={__('Email the admin', 'ryv-eligibility-tool')}
-            checked={!!(node.actions && node.actions.email_admin)}
-            onChange={(email_admin) => onChange({ ...node, actions: { ...node.actions, email_admin } })}
-          />
-
-          {node.actions && node.actions.email_admin && (
-            <TextControl
-              label={__('Admin email address', 'ryv-eligibility-tool')}
-              value={(node.actions && node.actions.admin_email_address) || ''}
-              onChange={(admin_email_address) => onChange({ ...node, actions: { ...node.actions, admin_email_address } })}
-            />
-          )}
-
-          <CheckboxControl
-            label={__('Email the user', 'ryv-eligibility-tool')}
-            checked={!!(node.actions && node.actions.email_user)}
-            onChange={(email_user) => onChange({ ...node, actions: { ...node.actions, email_user } })}
-          />
-
-          {node.actions && node.actions.email_user && (
-            <TextareaControl
-              label={__('Message to send the user (with their results)', 'ryv-eligibility-tool')}
-              value={(node.actions && node.actions.user_email_message) || ''}
-              onChange={(user_email_message) => onChange({ ...node, actions: { ...node.actions, user_email_message } })}
-            />
-          )}
+          <TabPanel
+            className="ryv-builder-lead-capture-tabs"
+            tabs={[
+              { name: 'fields', title: __('Form Fields', 'ryv-eligibility-tool') },
+              { name: 'email', title: __('Email Settings', 'ryv-eligibility-tool') },
+            ]}
+          >
+            {(tab) =>
+              'fields' === tab.name ? (
+                <FormFieldsEditor
+                  fields={node.form_fields || []}
+                  onChange={(form_fields) => onChange({ ...node, form_fields })}
+                />
+              ) : (
+                <EmailSettingsEditor
+                  emailSettings={node.email_settings || {}}
+                  formFields={node.form_fields || []}
+                  onChange={(email_settings) => onChange({ ...node, email_settings })}
+                />
+              )
+            }
+          </TabPanel>
         </div>
       )}
 

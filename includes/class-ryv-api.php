@@ -168,10 +168,12 @@ class RYV_API {
 	 *
 	 * No auth, no nonce, same as log_progress() above: this is the public
 	 * questionnaire's own form submission, not an authenticated action. The
-	 * node's `actions` config (what to actually do with the submission) is
-	 * read straight from the schema rather than trusted from the request -
-	 * only `node_id`/`name`/`email`/`session_id` come from the client, all
-	 * sanitized before use.
+	 * node's `form_fields` (what inputs exist) and `email_settings` (what to
+	 * do with the submission) are read straight from the schema rather than
+	 * trusted from the request - only `node_id`/`form_data`/`session_id`
+	 * come from the client, and `form_data` is only ever read for keys the
+	 * schema's own `form_fields` declares, each sanitized per that field's
+	 * declared type before it's stored or dropped into an email template.
 	 *
 	 * @param WP_REST_Request $request Request.
 	 * @return WP_REST_Response|WP_Error
@@ -205,60 +207,184 @@ class RYV_API {
 			);
 		}
 
-		$email = sanitize_email( (string) $request->get_param( 'email' ) );
+		$form_fields = isset( $node['form_fields'] ) && is_array( $node['form_fields'] ) ? $node['form_fields'] : array();
+		$submitted   = $request->get_param( 'form_data' );
+		$submitted   = is_array( $submitted ) ? $submitted : array();
 
-		if ( '' === $email || ! is_email( $email ) ) {
+		list( $sanitized_data, $invalid_labels ) = $this->sanitize_form_data( $form_fields, $submitted );
+
+		if ( ! empty( $invalid_labels ) ) {
 			return new WP_Error(
-				'ryv_invalid_email',
-				__( 'A valid email address is required.', 'ryv-eligibility-tool' ),
+				'ryv_invalid_form_data',
+				sprintf(
+					/* translators: %s: comma-separated list of field labels */
+					__( 'Missing or invalid value for: %s', 'ryv-eligibility-tool' ),
+					implode( ', ', $invalid_labels )
+				),
 				array( 'status' => 400 )
 			);
 		}
-
-		$name = sanitize_text_field( (string) $request->get_param( 'name' ) );
 
 		$session_id_param = $request->get_param( 'session_id' );
 		$session_id        = is_string( $session_id_param ) && '' !== $session_id_param
 			? substr( preg_replace( '/[^a-zA-Z0-9-]/', '', $session_id_param ), 0, 64 )
 			: null;
 
-		$actions = is_array( $node['actions'] ?? null ) ? $node['actions'] : array();
+		$email_settings = is_array( $node['email_settings'] ?? null ) ? $node['email_settings'] : array();
 
-		if ( ! empty( $actions['save_to_db'] ) ) {
-			RYV_Leads::record( $post_id, $node_id, $session_id, $name, $email );
+		if ( ! empty( $email_settings['save_to_db'] ) ) {
+			RYV_Leads::record( $post_id, $node_id, $session_id, $sanitized_data );
 		}
 
-		if ( ! empty( $actions['email_admin'] ) && ! empty( $actions['admin_email_address'] ) ) {
-			$admin_email = sanitize_email( (string) $actions['admin_email_address'] );
+		if ( ! empty( $email_settings['enable_admin_email'] ) && ! empty( $email_settings['admin_email_to'] ) ) {
+			$recipients = array_filter(
+				array_map( 'sanitize_email', array_map( 'trim', explode( ',', (string) $email_settings['admin_email_to'] ) ) ),
+				'is_email'
+			);
 
-			if ( is_email( $admin_email ) ) {
-				$subject = sprintf(
-					/* translators: %s: form title */
-					__( 'New form submission - %s', 'ryv-eligibility-tool' ),
-					$post->post_title
+			if ( ! empty( $recipients ) ) {
+				$subject = $this->render_template(
+					sanitize_text_field( (string) ( $email_settings['admin_email_subject'] ?? '' ) ),
+					$sanitized_data,
+					$form_fields
 				);
-				$body = sprintf(
-					"Name: %s\nEmail: %s",
-					'' !== $name ? $name : __( '(not provided)', 'ryv-eligibility-tool' ),
-					$email
+				$body = $this->render_template(
+					sanitize_textarea_field( (string) ( $email_settings['admin_email_body'] ?? '' ) ),
+					$sanitized_data,
+					$form_fields
 				);
 
-				wp_mail( $admin_email, $subject, $body );
+				wp_mail( $recipients, $subject, $body );
 			}
 		}
 
-		if ( ! empty( $actions['email_user'] ) ) {
-			$message = isset( $actions['user_email_message'] ) ? sanitize_textarea_field( (string) $actions['user_email_message'] ) : '';
-			$subject = sprintf(
-				/* translators: %s: form title */
-				__( 'Your results - %s', 'ryv-eligibility-tool' ),
-				$post->post_title
-			);
+		if ( ! empty( $email_settings['enable_user_email'] ) && ! empty( $email_settings['user_email_field'] ) ) {
+			$field_name = sanitize_key( (string) $email_settings['user_email_field'] );
+			$user_email = isset( $sanitized_data[ $field_name ] ) ? sanitize_email( $sanitized_data[ $field_name ] ) : '';
 
-			wp_mail( $email, $subject, $message );
+			if ( is_email( $user_email ) ) {
+				$subject = $this->render_template(
+					sanitize_text_field( (string) ( $email_settings['user_email_subject'] ?? '' ) ),
+					$sanitized_data,
+					$form_fields
+				);
+				$body = $this->render_template(
+					sanitize_textarea_field( (string) ( $email_settings['user_email_body'] ?? '' ) ),
+					$sanitized_data,
+					$form_fields
+				);
+
+				wp_mail( $user_email, $subject, $body );
+			}
 		}
 
 		return new WP_REST_Response( array( 'ok' => true ), 200 );
+	}
+
+	/**
+	 * Sanitize submitted `form_data` against the node's own `form_fields`
+	 * declaration - only keys the schema declares are ever read (anything
+	 * else in the request payload is silently dropped), each sanitized per
+	 * its declared `type` rather than with one generic sanitizer.
+	 *
+	 * @param array $form_fields Node's `form_fields` ({ label, name, type, required }[]).
+	 * @param array $submitted   Raw `form_data` from the request (field name => value).
+	 * @return array{0: array<string,string>, 1: string[]} Sanitized `{name: value}` map,
+	 *   and the labels of any required/invalid fields (empty means valid).
+	 */
+	private function sanitize_form_data( array $form_fields, array $submitted ): array {
+		$sanitized_data = array();
+		$invalid_labels = array();
+
+		foreach ( $form_fields as $field ) {
+			if ( ! is_array( $field ) || empty( $field['name'] ) ) {
+				continue;
+			}
+
+			$name  = sanitize_key( (string) $field['name'] );
+			$type  = isset( $field['type'] ) ? (string) $field['type'] : 'text';
+			$label = ! empty( $field['label'] ) ? sanitize_text_field( (string) $field['label'] ) : $name;
+
+			$raw = array_key_exists( $field['name'], $submitted ) ? $submitted[ $field['name'] ] : '';
+			$raw = is_scalar( $raw ) ? (string) $raw : '';
+
+			if ( 'email' === $type ) {
+				$value = sanitize_email( $raw );
+			} elseif ( 'textarea' === $type ) {
+				$value = sanitize_textarea_field( $raw );
+			} else {
+				$value = sanitize_text_field( $raw );
+			}
+
+			$is_missing = ! empty( $field['required'] ) && '' === $value;
+			$is_bad_email = 'email' === $type && '' !== $value && ! is_email( $value );
+
+			if ( $is_missing || $is_bad_email ) {
+				$invalid_labels[] = $label;
+			}
+
+			$sanitized_data[ $name ] = $value;
+		}
+
+		return array( $sanitized_data, $invalid_labels );
+	}
+
+	/**
+	 * Replace `{field_name}` placeholders in an admin-authored email
+	 * template with the matching sanitized submitted value, plus the
+	 * special `{all_fields}` tag (a "Label: Value" summary of every
+	 * submitted field). Placeholders with no matching field are left
+	 * untouched rather than silently blanked, so a typo'd tag stays visible
+	 * instead of disappearing.
+	 *
+	 * @param string $template       Subject or body template.
+	 * @param array  $sanitized_data Sanitized `{name: value}` map from sanitize_form_data().
+	 * @param array  $form_fields    Node's `form_fields`, for {all_fields}'s labels/ordering.
+	 * @return string
+	 */
+	private function render_template( string $template, array $sanitized_data, array $form_fields ): string {
+		if ( '' === $template ) {
+			return '';
+		}
+
+		return preg_replace_callback(
+			'/\{([a-zA-Z0-9_]+)\}/',
+			function ( $matches ) use ( $sanitized_data, $form_fields ) {
+				$key = $matches[1];
+
+				if ( 'all_fields' === $key ) {
+					return $this->format_all_fields( $sanitized_data, $form_fields );
+				}
+
+				return array_key_exists( $key, $sanitized_data ) ? $sanitized_data[ $key ] : $matches[0];
+			},
+			$template
+		);
+	}
+
+	/**
+	 * The `{all_fields}` template tag's expansion: one "Label: Value" line
+	 * per submitted field, in `form_fields` order.
+	 *
+	 * @param array $sanitized_data Sanitized `{name: value}` map.
+	 * @param array $form_fields    Node's `form_fields`.
+	 * @return string
+	 */
+	private function format_all_fields( array $sanitized_data, array $form_fields ): string {
+		$lines = array();
+
+		foreach ( $form_fields as $field ) {
+			$name = is_array( $field ) && ! empty( $field['name'] ) ? sanitize_key( (string) $field['name'] ) : '';
+
+			if ( '' === $name || ! array_key_exists( $name, $sanitized_data ) ) {
+				continue;
+			}
+
+			$label   = ! empty( $field['label'] ) ? sanitize_text_field( (string) $field['label'] ) : $name;
+			$lines[] = sprintf( '%s: %s', $label, $sanitized_data[ $name ] );
+		}
+
+		return implode( "\n", $lines );
 	}
 
 	/**

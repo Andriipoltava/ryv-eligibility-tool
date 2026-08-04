@@ -26,7 +26,7 @@ class RYV_DB {
 	/**
 	 * Bump this whenever install() changes.
 	 */
-	const DB_VERSION = '1.3';
+	const DB_VERSION = '1.4';
 
 	/**
 	 * @return string
@@ -121,19 +121,32 @@ class RYV_DB {
 		// wp_ryv_submissions since that one is an anonymous, upserted
 		// in-progress trail with no identifying fields, while this one is
 		// the deliberate, named/emailed contact record a visitor opts into.
+		// `form_data` is a JSON blob of { field_name: value } rather than
+		// fixed name/email columns, since `lead_capture` nodes now define an
+		// arbitrary admin-configured set of fields (see node.form_fields) -
+		// there's no fixed schema left to give its own columns to.
 		dbDelta(
 			"CREATE TABLE {$leads} (
 				id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
 				form_id BIGINT UNSIGNED NOT NULL,
 				node_id VARCHAR(191) NOT NULL,
 				session_id VARCHAR(64) NULL,
-				name VARCHAR(191) NULL,
-				email VARCHAR(191) NOT NULL,
+				form_data LONGTEXT NULL,
 				created_at DATETIME NOT NULL,
 				PRIMARY KEY  (id),
 				KEY form_id (form_id)
 			) {$charset_collate};"
 		);
+
+		// dbDelta() only ever adds/widens columns, it never drops them -
+		// explicitly drop the old hardcoded name/email columns (from before
+		// form_fields existed) on an in-place upgrade from DB_VERSION < 1.4.
+		$existing_columns = $wpdb->get_col( "SHOW COLUMNS FROM {$leads}", 0 );
+		foreach ( array( 'name', 'email' ) as $legacy_column ) {
+			if ( in_array( $legacy_column, $existing_columns, true ) ) {
+				$wpdb->query( "ALTER TABLE {$leads} DROP COLUMN {$legacy_column}" );
+			}
+		}
 
 		update_option( self::DB_VERSION_OPTION, self::DB_VERSION );
 	}
