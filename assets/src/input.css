@@ -3,8 +3,18 @@
 @tailwind utilities;
 
 @layer components {
+  /*
+   * background-color/font-family here are the RYV_Settings_Page "Global
+   * Styles" admin page's own two new custom properties - both default to
+   * `transparent`/`inherit` (i.e. today's actual behavior) since neither
+   * had an equivalent before that page existed; see its build_css()
+   * docblock for why bg_color/font_family default to '' (omitted) rather
+   * than a concrete value.
+   */
   .ryv-app-wrapper {
     @apply ryv-relative ryv-max-w-xl ryv-mx-auto;
+    background-color: var(--ryv-bg-color, transparent);
+    font-family: var(--ryv-font, inherit);
   }
 
   .ryv-list {
@@ -77,15 +87,19 @@
     @apply ryv-text-left ryv-transition-colors ryv-duration-150;
     width: var(--ryv-btn-width, 100%);
     color: var(--ryv-btn-text-color, var(--ryv-text-color, #1f2937));
-    background-color: var(--ryv-btn-bg, #fff);
+    background-color: var(--ryv-btn-bg, var(--ryv-bg-color, #fff));
     border-style: solid;
     border-width: var(--ryv-btn-border-width, 1px);
     border-color: var(--ryv-btn-border-color, #d1d5db);
-    border-radius: var(--ryv-btn-border-radius, 0.5rem);
+    border-radius: var(--ryv-btn-border-radius, var(--ryv-radius, 0.5rem));
     padding: var(--ryv-btn-padding, 0.75rem 1rem);
   }
   .ryv-option-btn:hover {
-    background-color: var(--ryv-btn-bg-hover, var(--ryv-btn-bg, #fff));
+    /* var(--ryv-btn-bg, ...) is resolved independently per-declaration (it's
+       the actual custom property, not "whatever the base rule fell back to"),
+       so --ryv-bg-color has to be threaded through here too, or a global
+       background would visibly flash back to #fff on hover. */
+    background-color: var(--ryv-btn-bg-hover, var(--ryv-btn-bg, var(--ryv-bg-color, #fff)));
     border-color: var(--ryv-btn-border-color-hover, var(--ryv-primary-color, #1d4ed8));
   }
   .ryv-option-btn:focus-visible {
@@ -104,7 +118,7 @@
     border-style: solid;
     border-width: var(--ryv-continue-btn-border-width, 0px);
     border-color: var(--ryv-continue-btn-border-color, transparent);
-    border-radius: var(--ryv-continue-btn-border-radius, 0.5rem);
+    border-radius: var(--ryv-continue-btn-border-radius, var(--ryv-radius, 0.5rem));
     padding: var(--ryv-continue-btn-padding, 0.625rem 1.25rem);
   }
   .ryv-continue-btn:hover {
@@ -118,11 +132,11 @@
   .ryv-input {
     @apply ryv-w-full ryv-mb-4;
     color: var(--ryv-input-text-color, var(--ryv-text-color, #1f2937));
-    background-color: var(--ryv-input-bg, #fff);
+    background-color: var(--ryv-input-bg, var(--ryv-bg-color, #fff));
     border-style: solid;
     border-width: var(--ryv-input-border-width, 1px);
     border-color: var(--ryv-input-border-color, #d1d5db);
-    border-radius: var(--ryv-input-border-radius, 0.5rem);
+    border-radius: var(--ryv-input-border-radius, var(--ryv-radius, 0.5rem));
     padding: var(--ryv-input-padding, 0.625rem 1rem);
   }
   .ryv-input:hover {
@@ -150,11 +164,11 @@
   .ryv-select {
     @apply ryv-w-full ryv-mb-4;
     color: var(--ryv-select-text-color, var(--ryv-text-color, #1f2937));
-    background-color: var(--ryv-select-bg, #fff);
+    background-color: var(--ryv-select-bg, var(--ryv-bg-color, #fff));
     border-style: solid;
     border-width: var(--ryv-select-border-width, 1px);
     border-color: var(--ryv-select-border-color, #d1d5db);
-    border-radius: var(--ryv-select-border-radius, 0.5rem);
+    border-radius: var(--ryv-select-border-radius, var(--ryv-radius, 0.5rem));
     padding: var(--ryv-select-padding, 0.625rem 1rem);
   }
   .ryv-select:hover {

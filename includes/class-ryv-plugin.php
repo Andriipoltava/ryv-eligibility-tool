@@ -119,6 +119,12 @@ final class RYV_Plugin {
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-elementor.php';
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-shortcode.php';
 
+		// Not is_admin()-gated like the other admin/*-page.php controllers
+		// below - RYV_Settings_Page also feeds the frontend CSS variable
+		// cascade (see its own docblock), so it needs to load on every
+		// request, not just wp-admin ones.
+		require_once RYV_PLUGIN_DIR . 'admin/class-ryv-settings-page.php';
+
 		if ( is_admin() ) {
 			require_once RYV_PLUGIN_DIR . 'admin/class-ryv-import-page.php';
 			require_once RYV_PLUGIN_DIR . 'admin/class-ryv-builder-page.php';
@@ -142,6 +148,7 @@ final class RYV_Plugin {
 		new RYV_Assets();
 		new RYV_Elementor();
 		new RYV_Shortcode();
+		new RYV_Settings_Page();
 
 		if ( is_admin() ) {
 			$this->import_page      = new RYV_Import_Page();
