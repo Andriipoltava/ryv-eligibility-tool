@@ -229,6 +229,22 @@ class RYV_Widget extends \Elementor\Widget_Base {
 	/**
 	 * Colors -> CSS custom properties on .ryv-app-wrapper, consumed by
 	 * assets/src/input.css (e.g. `var(--ryv-primary-color, #1d4ed8)`).
+	 *
+	 * primary_color/text_color deliberately have no 'default': Elementor's
+	 * CSS generator (Core\Files\CSS\Base::get_style_control_value()) treats
+	 * an empty control value as null and skips emitting that `selectors`
+	 * rule entirely, so leaving either blank means this widget instance
+	 * writes no --ryv-primary-color/--ryv-text-color of its own - it falls
+	 * straight through to RYV_Settings_Page's Global Styles (also written
+	 * to the same variable names, just at `:root, .ryv-app-wrapper` scope
+	 * instead of this widget instance's own higher-specificity selector),
+	 * or to input.css's own hardcoded fallback if Global Styles was never
+	 * configured either. A *default* value here (like the old hardcoded
+	 * '#1d4ed8') would instead have Elementor emit that literal color on
+	 * every single instance unconditionally, permanently outranking Global
+	 * Styles regardless of whether the admin ever touched the control.
+	 * secondary_color keeps its own default since Global Styles has no
+	 * "Secondary Color" setting for it to fall back to.
 	 */
 	private function register_color_controls() {
 		$this->start_controls_section(
@@ -242,10 +258,10 @@ class RYV_Widget extends \Elementor\Widget_Base {
 		$this->add_control(
 			'primary_color',
 			array(
-				'label'     => __( 'Primary Color', 'ryv-eligibility-tool' ),
-				'type'      => \Elementor\Controls_Manager::COLOR,
-				'default'   => '#1d4ed8',
-				'selectors' => array(
+				'label'       => __( 'Primary Color', 'ryv-eligibility-tool' ),
+				'type'        => \Elementor\Controls_Manager::COLOR,
+				'description' => __( 'Leave blank to use the site-wide default set under RYV Forms → Global Styles.', 'ryv-eligibility-tool' ),
+				'selectors'   => array(
 					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-primary-color: {{VALUE}};',
 				),
 			)
@@ -266,10 +282,10 @@ class RYV_Widget extends \Elementor\Widget_Base {
 		$this->add_control(
 			'text_color',
 			array(
-				'label'     => __( 'Text Color', 'ryv-eligibility-tool' ),
-				'type'      => \Elementor\Controls_Manager::COLOR,
-				'default'   => '#1f2937',
-				'selectors' => array(
+				'label'       => __( 'Text Color', 'ryv-eligibility-tool' ),
+				'type'        => \Elementor\Controls_Manager::COLOR,
+				'description' => __( 'Leave blank to use the site-wide default set under RYV Forms → Global Styles.', 'ryv-eligibility-tool' ),
+				'selectors'   => array(
 					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-text-color: {{VALUE}};',
 				),
 			)
@@ -523,10 +539,11 @@ class RYV_Widget extends \Elementor\Widget_Base {
 		$this->add_control(
 			'button_border_radius',
 			array(
-				'label'      => __( 'Border Radius', 'ryv-eligibility-tool' ),
-				'type'       => \Elementor\Controls_Manager::DIMENSIONS,
-				'size_units' => array( 'px', 'em', 'rem', '%' ),
-				'selectors'  => array(
+				'label'       => __( 'Border Radius', 'ryv-eligibility-tool' ),
+				'type'        => \Elementor\Controls_Manager::DIMENSIONS,
+				'description' => __( 'Leave blank to use the site-wide default set under RYV Forms → Global Styles.', 'ryv-eligibility-tool' ),
+				'size_units'  => array( 'px', 'em', 'rem', '%' ),
+				'selectors'   => array(
 					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-btn-border-radius: {{TOP}}{{UNIT}} {{RIGHT}}{{UNIT}} {{BOTTOM}}{{UNIT}} {{LEFT}}{{UNIT}};',
 				),
 			)
@@ -571,10 +588,13 @@ class RYV_Widget extends \Elementor\Widget_Base {
 		$this->add_control(
 			'button_bg_color',
 			array(
-				'label'     => __( 'Background Color', 'ryv-eligibility-tool' ),
-				'type'      => \Elementor\Controls_Manager::COLOR,
-				'default'   => '#ffffff',
-				'selectors' => array(
+				'label'       => __( 'Background Color', 'ryv-eligibility-tool' ),
+				'type'        => \Elementor\Controls_Manager::COLOR,
+				// No 'default' - see register_color_controls()'s docblock for
+				// why: this falls through to --ryv-bg-color (Global Styles)
+				// instead of a hardcoded white when left blank.
+				'description' => __( 'Leave blank to use the site-wide default set under RYV Forms → Global Styles.', 'ryv-eligibility-tool' ),
+				'selectors'   => array(
 					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-btn-bg: {{VALUE}};',
 				),
 			)
@@ -693,10 +713,11 @@ class RYV_Widget extends \Elementor\Widget_Base {
 		$this->add_control(
 			'continue_button_border_radius',
 			array(
-				'label'      => __( 'Border Radius', 'ryv-eligibility-tool' ),
-				'type'       => \Elementor\Controls_Manager::DIMENSIONS,
-				'size_units' => array( 'px', 'em', 'rem', '%' ),
-				'selectors'  => array(
+				'label'       => __( 'Border Radius', 'ryv-eligibility-tool' ),
+				'type'        => \Elementor\Controls_Manager::DIMENSIONS,
+				'description' => __( 'Leave blank to use the site-wide default set under RYV Forms → Global Styles.', 'ryv-eligibility-tool' ),
+				'size_units'  => array( 'px', 'em', 'rem', '%' ),
+				'selectors'   => array(
 					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-continue-btn-border-radius: {{TOP}}{{UNIT}} {{RIGHT}}{{UNIT}} {{BOTTOM}}{{UNIT}} {{LEFT}}{{UNIT}};',
 				),
 			)
@@ -822,10 +843,11 @@ class RYV_Widget extends \Elementor\Widget_Base {
 		$this->add_control(
 			'dropdown_border_radius',
 			array(
-				'label'      => __( 'Border Radius', 'ryv-eligibility-tool' ),
-				'type'       => \Elementor\Controls_Manager::DIMENSIONS,
-				'size_units' => array( 'px', 'em', 'rem', '%' ),
-				'selectors'  => array(
+				'label'       => __( 'Border Radius', 'ryv-eligibility-tool' ),
+				'type'        => \Elementor\Controls_Manager::DIMENSIONS,
+				'description' => __( 'Leave blank to use the site-wide default set under RYV Forms → Global Styles.', 'ryv-eligibility-tool' ),
+				'size_units'  => array( 'px', 'em', 'rem', '%' ),
+				'selectors'   => array(
 					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-select-border-radius: {{TOP}}{{UNIT}} {{RIGHT}}{{UNIT}} {{BOTTOM}}{{UNIT}} {{LEFT}}{{UNIT}};',
 				),
 			)
@@ -870,10 +892,11 @@ class RYV_Widget extends \Elementor\Widget_Base {
 		$this->add_control(
 			'dropdown_bg_color',
 			array(
-				'label'     => __( 'Background Color', 'ryv-eligibility-tool' ),
-				'type'      => \Elementor\Controls_Manager::COLOR,
-				'default'   => '#ffffff',
-				'selectors' => array(
+				'label'       => __( 'Background Color', 'ryv-eligibility-tool' ),
+				'type'        => \Elementor\Controls_Manager::COLOR,
+				// No 'default' - see register_color_controls()'s docblock.
+				'description' => __( 'Leave blank to use the site-wide default set under RYV Forms → Global Styles.', 'ryv-eligibility-tool' ),
+				'selectors'   => array(
 					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-select-bg: {{VALUE}};',
 				),
 			)
@@ -952,10 +975,11 @@ class RYV_Widget extends \Elementor\Widget_Base {
 		$this->add_control(
 			'input_border_radius',
 			array(
-				'label'      => __( 'Border Radius', 'ryv-eligibility-tool' ),
-				'type'       => \Elementor\Controls_Manager::DIMENSIONS,
-				'size_units' => array( 'px', 'em', 'rem', '%' ),
-				'selectors'  => array(
+				'label'       => __( 'Border Radius', 'ryv-eligibility-tool' ),
+				'type'        => \Elementor\Controls_Manager::DIMENSIONS,
+				'description' => __( 'Leave blank to use the site-wide default set under RYV Forms → Global Styles.', 'ryv-eligibility-tool' ),
+				'size_units'  => array( 'px', 'em', 'rem', '%' ),
+				'selectors'   => array(
 					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-input-border-radius: {{TOP}}{{UNIT}} {{RIGHT}}{{UNIT}} {{BOTTOM}}{{UNIT}} {{LEFT}}{{UNIT}};',
 				),
 			)
@@ -1000,10 +1024,11 @@ class RYV_Widget extends \Elementor\Widget_Base {
 		$this->add_control(
 			'input_bg_color',
 			array(
-				'label'     => __( 'Background Color', 'ryv-eligibility-tool' ),
-				'type'      => \Elementor\Controls_Manager::COLOR,
-				'default'   => '#ffffff',
-				'selectors' => array(
+				'label'       => __( 'Background Color', 'ryv-eligibility-tool' ),
+				'type'        => \Elementor\Controls_Manager::COLOR,
+				// No 'default' - see register_color_controls()'s docblock.
+				'description' => __( 'Leave blank to use the site-wide default set under RYV Forms → Global Styles.', 'ryv-eligibility-tool' ),
+				'selectors'   => array(
 					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-input-bg: {{VALUE}};',
 				),
 			)
