@@ -54,6 +54,13 @@ final class RYV_Plugin {
 	private $logs_page = null;
 
 	/**
+	 * Submissions page controller instance (admin-only).
+	 *
+	 * @var RYV_Submissions_Page|null
+	 */
+	private $submissions_page = null;
+
+	/**
 	 * Get (or create) the singleton instance.
 	 *
 	 * @return RYV_Plugin
@@ -115,6 +122,7 @@ final class RYV_Plugin {
 			require_once RYV_PLUGIN_DIR . 'admin/class-ryv-import-page.php';
 			require_once RYV_PLUGIN_DIR . 'admin/class-ryv-builder-page.php';
 			require_once RYV_PLUGIN_DIR . 'admin/class-ryv-logs-page.php';
+			require_once RYV_PLUGIN_DIR . 'admin/class-ryv-submissions-page.php';
 		}
 	}
 
@@ -134,9 +142,10 @@ final class RYV_Plugin {
 		new RYV_Elementor();
 
 		if ( is_admin() ) {
-			$this->import_page  = new RYV_Import_Page();
-			$this->builder_page = new RYV_Builder_Page();
-			$this->logs_page    = new RYV_Logs_Page();
+			$this->import_page      = new RYV_Import_Page();
+			$this->builder_page     = new RYV_Builder_Page();
+			$this->logs_page        = new RYV_Logs_Page();
+			$this->submissions_page = new RYV_Submissions_Page();
 		}
 	}
 
