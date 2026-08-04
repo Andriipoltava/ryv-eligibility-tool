@@ -152,9 +152,18 @@ export class RYVDecisionEngine {
       return node.next_node || null;
     }
 
+    // lead_capture never auto-advances, even once submitted - the only way
+    // forward is the explicit "Continue" click handled by onLeadContinue(),
+    // so a card that gets rebuilt (e.g. an ancestor answer changing and
+    // this node being reached again) waits for that click again rather than
+    // silently skipping past itself.
+    if (node.type === 'lead_capture') {
+      return null;
+    }
+
     const answer = this.answers.get(nodeId);
 
-    if (node.type === 'text' || node.type === 'textarea' || node.type === 'lead_capture') {
+    if (node.type === 'text' || node.type === 'textarea') {
       return answer ? node.next_node || null : null;
     }
 
@@ -180,7 +189,13 @@ export class RYVDecisionEngine {
       case 'textarea':
         return renderer.renderInputCard(node, this.answers.get(nodeId) || '', (value) => this.onAnswerChange(nodeId, value));
       case 'lead_capture':
-        return renderer.renderLeadCaptureCard(node, this.answers.get(nodeId) || null, (values) => this.onLeadSubmit(nodeId, values), this.labels);
+        return renderer.renderLeadCaptureCard(
+          node,
+          this.answers.get(nodeId) || null,
+          (values) => this.onLeadSubmit(nodeId, values),
+          () => this.onLeadContinue(nodeId),
+          this.labels
+        );
       case 'markup':
         return renderer.renderMarkupCard(node, isTerminal && this.showStartOver, () => this.restart(), this.labels);
       default:
@@ -219,6 +234,24 @@ export class RYVDecisionEngine {
     return submitLead(this.formId, { node_id: nodeId, form_data: values }).then(() => {
       this.onAnswerChange(nodeId, values);
     });
+  }
+
+  /**
+   * Advances past an already-submitted `lead_capture` node once its
+   * "Continue" button is clicked (see renderLeadCaptureCard) - computeNext()
+   * deliberately never does this on its own, so this is the only path that
+   * ever renders forward from one. No-op if `next_node` is unset; the
+   * renderer only shows the button at all when it's set, but this guards
+   * against a stale card from an already-rendered (and now out of date)
+   * DOM node.
+   */
+  onLeadContinue(nodeId) {
+    const node = this.nodes[nodeId];
+    if (!node || !node.next_node) return;
+
+    this.truncateFrom(this.indexOf(nodeId) + 1);
+    this.renderFrom(node.next_node, true);
+    this.logProgress();
   }
 
   // --- rendered-list bookkeeping -------------------------------------

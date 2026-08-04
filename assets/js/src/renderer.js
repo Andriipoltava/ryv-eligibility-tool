@@ -26,7 +26,8 @@ export const DEFAULT_LABELS = {
   selectPlaceholder: '— Select —',
   submit: 'Submit',
   submitting: 'Submitting…',
-  leadSubmitted: 'Thank you - your information has been submitted.',
+  continue: 'Continue',
+  leadSubmitted: 'Thank you! Your submission has been received.',
   leadError: 'Something went wrong submitting your information. Please try again.',
 };
 
@@ -290,6 +291,7 @@ function buildFieldControl(field) {
     attrs.type = FIELD_INPUT_TYPES.has(field.type) ? field.type : 'text';
   }
   if (field.required) attrs.required = 'required';
+  if (field.placeholder) attrs.placeholder = field.placeholder;
 
   const wrapLabel = el('label', { className: 'ryv-field-label' });
   wrapLabel.appendChild(el('span', { className: 'ryv-field-label-text', text: field.label || field.name }));
@@ -301,30 +303,55 @@ function buildFieldControl(field) {
 
 /**
  * `lead_capture` node: a form built entirely from `node.form_fields`
- * (label/name/type/required, authored in the builder) - what the form does
- * with a submission (`node.email_settings`: save_to_db/admin & user emails/
- * templates) is never read here, only interpreted server-side by
+ * (label/name/type/required/placeholder, authored in the builder) - what the
+ * form does with a submission (`node.email_settings`: save_to_db/admin &
+ * user emails/templates) is never read here, only interpreted server-side by
  * RYV_API::submit_lead(), since it decides backend behavior, not how the
  * form itself looks.
  *
- * @param {object} node RYV node ({ type: 'lead_capture', title, form_fields }).
+ * Unlike every other node type, this one never auto-advances on its own -
+ * once submitted, it shows `node.success_message` (falling back to
+ * `labels.leadSubmitted`) and, only if `node.next_node` is set, a "Continue"
+ * button the visitor must click themselves (see engine.js's computeNext()/
+ * onLeadContinue()). A blank `next_node` halts the flow right there, same as
+ * a terminal markup node.
+ *
+ * @param {object} node RYV node ({ type: 'lead_capture', title, form_fields, success_message, next_node }).
  * @param {Object<string,string>|null} submittedValue Set once this node has
  *   been successfully submitted (field name -> submitted value) - swaps the
- *   form out for a static confirmation message instead of re-showing empty
- *   inputs, same idea as renderInputCard() carrying forward `previousValue`.
+ *   form out for the success message (+ Continue button) instead of
+ *   re-showing empty inputs, same idea as renderInputCard() carrying
+ *   forward `previousValue`.
  * @param {(values: Object<string,string>) => Promise<any>} onSubmit Called
  *   with `{ [field.name]: trimmed value }` for every field; engine.js wires
  *   this to submitLead() followed by recording the answer. The returned
  *   promise's rejection is caught here to show an inline error and
  *   re-enable the form.
+ * @param {() => void} onContinue Called when the visitor clicks "Continue"
+ *   after a successful submission; engine.js wires this to advance to
+ *   `node.next_node`. Never called if `node.next_node` is empty.
  * @param {object} labels
  */
-export function renderLeadCaptureCard(node, submittedValue, onSubmit, labels = DEFAULT_LABELS) {
+export function renderLeadCaptureCard(node, submittedValue, onSubmit, onContinue, labels = DEFAULT_LABELS) {
   const wrap = el('div');
   if (node.title) wrap.appendChild(titleEl(node.title));
 
   if (submittedValue) {
-    wrap.appendChild(el('div', { className: 'ryv-content', text: labels.leadSubmitted }));
+    wrap.appendChild(el('div', { className: 'ryv-content', text: node.success_message || labels.leadSubmitted }));
+
+    if (node.next_node) {
+      const continueBtn = el('button', {
+        className: 'ryv-continue-btn',
+        text: labels.continue,
+        attrs: { type: 'button' },
+      });
+      continueBtn.addEventListener('click', () => {
+        continueBtn.disabled = true;
+        onContinue();
+      });
+      wrap.appendChild(continueBtn);
+    }
+
     return wrap;
   }
 

@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
-import { TextControl, SelectControl, TabPanel } from '@wordpress/components';
+import { TextControl, SelectControl, TabPanel, TextareaControl } from '@wordpress/components';
 import OptionsEditor from './OptionsEditor';
 import ClassicEditor from './ClassicEditor';
 import FormFieldsEditor from './FormFieldsEditor';
@@ -152,10 +152,21 @@ export default function NodeEditor({ node, nodeId, allNodeIds, allNodes, onChang
           >
             {(tab) =>
               'fields' === tab.name ? (
-                <FormFieldsEditor
-                  fields={node.form_fields || []}
-                  onChange={(form_fields) => onChange({ ...node, form_fields })}
-                />
+                <>
+                  <FormFieldsEditor
+                    fields={node.form_fields || []}
+                    onChange={(form_fields) => onChange({ ...node, form_fields })}
+                  />
+                  <TextareaControl
+                    label={__('Success message', 'ryv-eligibility-tool')}
+                    value={node.success_message || ''}
+                    onChange={(success_message) => onChange({ ...node, success_message })}
+                    help={__(
+                      'Shown in place of the form after a successful submission. Leave blank to use the default: "Thank you! Your submission has been received."',
+                      'ryv-eligibility-tool'
+                    )}
+                  />
+                </>
               ) : (
                 <EmailSettingsEditor
                   emailSettings={node.email_settings || {}}

@@ -53,7 +53,10 @@ export default function FormFieldsEditor({ fields, onChange }) {
   };
 
   const addField = () => {
-    onChange([...fields, { label: '', name: nextUniqueName(fields, 'field'), type: 'text', required: false }]);
+    onChange([
+      ...fields,
+      { label: '', name: nextUniqueName(fields, 'field'), type: 'text', required: false, placeholder: '' },
+    ]);
   };
 
   const moveField = (index, direction) => {
@@ -114,6 +117,12 @@ export default function FormFieldsEditor({ fields, onChange }) {
             onChange={(name) => updateField(index, { name: liveSlug(name) })}
             onBlur={() => updateField(index, { name: nextUniqueName(fields, finalizeSlug(field.name || ''), index) })}
             help={__('Used as the {field_name} placeholder in email templates.', 'ryv-eligibility-tool')}
+          />
+
+          <TextControl
+            label={__('Placeholder', 'ryv-eligibility-tool')}
+            value={field.placeholder || ''}
+            onChange={(placeholder) => updateField(index, { placeholder })}
           />
 
           <SelectControl
