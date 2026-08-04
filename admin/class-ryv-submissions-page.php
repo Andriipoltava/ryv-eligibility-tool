@@ -163,7 +163,8 @@ class RYV_Submissions_Page {
 			);
 
 			foreach ( $field_names as $key ) {
-				$line[] = isset( $decoded[ $i ][ $key ] ) ? $decoded[ $i ][ $key ] : '';
+				$value  = isset( $decoded[ $i ][ $key ] ) ? (string) $decoded[ $i ][ $key ] : '';
+				$line[] = $this->sanitize_csv_cell( $value );
 			}
 
 			fputcsv( $output, $line );
@@ -171,5 +172,26 @@ class RYV_Submissions_Page {
 
 		fclose( $output );
 		exit;
+	}
+
+	/**
+	 * OWASP CSV-injection mitigation: `form_data` values originate from the
+	 * public, unauthenticated `/ryv/v1/form/{id}/submit` endpoint, and
+	 * RYV_API::sanitize_form_data() only strips tags/whitespace - it never
+	 * strips a leading formula trigger. Left as-is, a submitted value like
+	 * `=HYPERLINK("http://evil","click")` would execute as a live formula
+	 * the moment an admin opens this export in Excel/Sheets. Prefixing with
+	 * a straight quote forces spreadsheet software to render the cell as
+	 * literal text instead of evaluating it.
+	 *
+	 * @param string $value Raw cell value.
+	 * @return string
+	 */
+	private function sanitize_csv_cell( string $value ): string {
+		if ( '' !== $value && false !== strpos( "=+-@\t\r", $value[0] ) ) {
+			return "'" . $value;
+		}
+
+		return $value;
 	}
 }
