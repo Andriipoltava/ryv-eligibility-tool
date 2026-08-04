@@ -38,6 +38,42 @@ export function fetchForm(formId) {
 }
 
 /**
+ * Submit a `lead_capture` node's form. Unlike logSubmission(), failures are
+ * surfaced (not swallowed) so renderLeadCaptureCard can show an inline error
+ * and let the visitor retry instead of silently losing their submission.
+ */
+export async function submitLead(formId, payload) {
+  const base = (settings().restUrl || DEFAULT_BASE).replace(/\/$/, '');
+  const headers = { 'Content-Type': 'application/json' };
+
+  if (settings().nonce) {
+    headers['X-WP-Nonce'] = settings().nonce;
+  }
+
+  const response = await fetch(`${base}/form/${encodeURIComponent(formId)}/submit`, {
+    method: 'POST',
+    headers,
+    credentials: 'same-origin',
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    let message = `Request failed (${response.status})`;
+    try {
+      const body = await response.json();
+      if (body && body.message) {
+        message = body.message;
+      }
+    } catch (e) {
+      // Non-JSON error body - keep the generic message.
+    }
+    throw new Error(message);
+  }
+
+  return response.json();
+}
+
+/**
  * Fire-and-forget progress log (see RYV_Submission_Log on the PHP side) -
  * failures are swallowed rather than surfaced, since a dropped log write
  * should never interrupt someone filling out the actual questionnaire.

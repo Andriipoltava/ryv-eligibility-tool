@@ -1,4 +1,4 @@
-import { fetchForm, logSubmission } from './api-client.js';
+import { fetchForm, logSubmission, submitLead } from './api-client.js';
 import * as renderer from './renderer.js';
 
 const LOADING_CARD_ID = '__loading__';
@@ -154,7 +154,7 @@ export class RYVDecisionEngine {
 
     const answer = this.answers.get(nodeId);
 
-    if (node.type === 'text' || node.type === 'textarea') {
+    if (node.type === 'text' || node.type === 'textarea' || node.type === 'lead_capture') {
       return answer ? node.next_node || null : null;
     }
 
@@ -179,6 +179,8 @@ export class RYVDecisionEngine {
       case 'text':
       case 'textarea':
         return renderer.renderInputCard(node, this.answers.get(nodeId) || '', (value) => this.onAnswerChange(nodeId, value));
+      case 'lead_capture':
+        return renderer.renderLeadCaptureCard(node, this.answers.get(nodeId) || null, (values) => this.onLeadSubmit(nodeId, values), this.labels);
       case 'markup':
         return renderer.renderMarkupCard(node, isTerminal && this.showStartOver, () => this.restart(), this.labels);
       default:
@@ -203,6 +205,19 @@ export class RYVDecisionEngine {
 
     if (next) this.renderFrom(next, true);
     this.logProgress();
+  }
+
+  /**
+   * POSTs a `lead_capture` node's values to the backend (which reads that
+   * node's `actions` config - save_to_db/email_admin/email_user - and acts
+   * on it) before recording the answer. Left un-caught here so
+   * renderLeadCaptureCard's own `.catch()` can show an inline error and
+   * leave the form re-submittable, instead of silently advancing.
+   */
+  onLeadSubmit(nodeId, values) {
+    return submitLead(this.formId, { node_id: nodeId, name: values.name, email: values.email }).then(() => {
+      this.onAnswerChange(nodeId, values);
+    });
   }
 
   // --- rendered-list bookkeeping -------------------------------------

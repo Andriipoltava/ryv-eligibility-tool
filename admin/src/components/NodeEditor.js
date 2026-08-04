@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
-import { TextControl, SelectControl } from '@wordpress/components';
+import { TextControl, SelectControl, CheckboxControl, TextareaControl } from '@wordpress/components';
 import OptionsEditor from './OptionsEditor';
 import ClassicEditor from './ClassicEditor';
 
@@ -10,6 +10,7 @@ const TYPE_OPTIONS = [
   { label: __('Text input', 'ryv-eligibility-tool'), value: 'text' },
   { label: __('Textarea', 'ryv-eligibility-tool'), value: 'textarea' },
   { label: __('Markup (display only)', 'ryv-eligibility-tool'), value: 'markup' },
+  { label: __('Form Submission', 'ryv-eligibility-tool'), value: 'lead_capture' },
   { label: __('Unsupported / needs review', 'ryv-eligibility-tool'), value: 'unsupported' },
 ];
 
@@ -136,6 +137,46 @@ export default function NodeEditor({ node, nodeId, allNodeIds, allNodes, onChang
           options={DISPLAY_STYLE_OPTIONS}
           onChange={(display_style) => onChange({ ...node, display_style })}
         />
+      )}
+
+      {node.type === 'lead_capture' && (
+        <div className="ryv-builder-field ryv-builder-lead-capture-settings">
+          <h3>{__('On submit, do the following:', 'ryv-eligibility-tool')}</h3>
+
+          <CheckboxControl
+            label={__('Save submission to the database', 'ryv-eligibility-tool')}
+            checked={!!(node.actions && node.actions.save_to_db)}
+            onChange={(save_to_db) => onChange({ ...node, actions: { ...node.actions, save_to_db } })}
+          />
+
+          <CheckboxControl
+            label={__('Email the admin', 'ryv-eligibility-tool')}
+            checked={!!(node.actions && node.actions.email_admin)}
+            onChange={(email_admin) => onChange({ ...node, actions: { ...node.actions, email_admin } })}
+          />
+
+          {node.actions && node.actions.email_admin && (
+            <TextControl
+              label={__('Admin email address', 'ryv-eligibility-tool')}
+              value={(node.actions && node.actions.admin_email_address) || ''}
+              onChange={(admin_email_address) => onChange({ ...node, actions: { ...node.actions, admin_email_address } })}
+            />
+          )}
+
+          <CheckboxControl
+            label={__('Email the user', 'ryv-eligibility-tool')}
+            checked={!!(node.actions && node.actions.email_user)}
+            onChange={(email_user) => onChange({ ...node, actions: { ...node.actions, email_user } })}
+          />
+
+          {node.actions && node.actions.email_user && (
+            <TextareaControl
+              label={__('Message to send the user (with their results)', 'ryv-eligibility-tool')}
+              value={(node.actions && node.actions.user_email_message) || ''}
+              onChange={(user_email_message) => onChange({ ...node, actions: { ...node.actions, user_email_message } })}
+            />
+          )}
+        </div>
       )}
 
       {isChoice ? (

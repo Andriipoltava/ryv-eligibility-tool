@@ -24,6 +24,12 @@ export const DEFAULT_LABELS = {
   retry: 'Try Again',
   startOver: 'Start Over',
   selectPlaceholder: '— Select —',
+  submit: 'Submit',
+  submitting: 'Submitting…',
+  leadNamePlaceholder: 'Name',
+  leadEmailPlaceholder: 'Email',
+  leadSubmitted: 'Thank you - your information has been submitted.',
+  leadError: 'Something went wrong submitting your information. Please try again.',
 };
 
 function el(tag, opts = {}, children = []) {
@@ -263,6 +269,85 @@ export function renderInputCard(node, previousValue, onChange) {
   }
 
   wrap.appendChild(input);
+  return wrap;
+}
+
+/**
+ * `lead_capture` node: a small Name/Email form. `node.actions` (save_to_db /
+ * email_admin / email_user, configured in the builder) is never read here -
+ * it's only interpreted server-side by RYV_API::submit_lead(), since it's
+ * what decides what the backend does with the submission, not how the form
+ * itself looks.
+ *
+ * @param {object} node RYV node ({ type: 'lead_capture', title }).
+ * @param {{name: string, email: string}|null} submittedValue Set once this
+ *   node has been successfully submitted - swaps the form out for a static
+ *   confirmation message instead of re-showing empty inputs, same idea as
+ *   renderInputCard() carrying forward `previousValue`.
+ * @param {(values: {name: string, email: string}) => Promise<any>} onSubmit
+ *   Called with the trimmed input values; engine.js wires this to
+ *   submitLead() followed by recording the answer. The returned promise's
+ *   rejection is caught here to show an inline error and re-enable the form.
+ * @param {object} labels
+ */
+export function renderLeadCaptureCard(node, submittedValue, onSubmit, labels = DEFAULT_LABELS) {
+  const wrap = el('div');
+  if (node.title) wrap.appendChild(titleEl(node.title));
+
+  if (submittedValue) {
+    wrap.appendChild(el('div', { className: 'ryv-content', text: labels.leadSubmitted }));
+    return wrap;
+  }
+
+  const form = el('form', { className: 'ryv-lead-form' });
+
+  const nameInput = el('input', {
+    className: 'ryv-input',
+    attrs: { type: 'text', name: 'name', autocomplete: 'name' },
+  });
+  nameInput.placeholder = labels.leadNamePlaceholder;
+
+  const emailInput = el('input', {
+    className: 'ryv-input',
+    attrs: { type: 'email', name: 'email', autocomplete: 'email', required: 'required' },
+  });
+  emailInput.placeholder = labels.leadEmailPlaceholder;
+
+  const errorBox = el('p', { className: 'ryv-lead-form-error' });
+  errorBox.style.display = 'none';
+
+  const submitBtn = el('button', {
+    className: 'ryv-continue-btn',
+    text: labels.submit,
+    attrs: { type: 'submit' },
+  });
+
+  form.appendChild(emailInput);
+  form.appendChild(nameInput);
+  form.appendChild(errorBox);
+  form.appendChild(submitBtn);
+
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+
+    if (!emailInput.checkValidity()) {
+      emailInput.reportValidity();
+      return;
+    }
+
+    errorBox.style.display = 'none';
+    submitBtn.disabled = true;
+    submitBtn.textContent = labels.submitting;
+
+    Promise.resolve(onSubmit({ name: nameInput.value.trim(), email: emailInput.value.trim() })).catch((err) => {
+      submitBtn.disabled = false;
+      submitBtn.textContent = labels.submit;
+      errorBox.textContent = (err && err.message) || labels.leadError;
+      errorBox.style.display = '';
+    });
+  });
+
+  wrap.appendChild(form);
   return wrap;
 }
 

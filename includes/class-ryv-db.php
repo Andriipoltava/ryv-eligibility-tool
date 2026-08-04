@@ -26,7 +26,7 @@ class RYV_DB {
 	/**
 	 * Bump this whenever install() changes.
 	 */
-	const DB_VERSION = '1.2';
+	const DB_VERSION = '1.3';
 
 	/**
 	 * @return string
@@ -42,6 +42,14 @@ class RYV_DB {
 	public static function edit_log_table(): string {
 		global $wpdb;
 		return $wpdb->prefix . 'ryv_edit_log';
+	}
+
+	/**
+	 * @return string
+	 */
+	public static function leads_table(): string {
+		global $wpdb;
+		return $wpdb->prefix . 'ryv_leads';
 	}
 
 	/**
@@ -66,6 +74,7 @@ class RYV_DB {
 		$charset_collate = $wpdb->get_charset_collate();
 		$submissions     = self::submissions_table();
 		$edit_log        = self::edit_log_table();
+		$leads           = self::leads_table();
 
 		// One row per (form_id, session_id): logProgress() upserts into this as
 		// the visitor answers questions, so a browse-away-mid-questionnaire
@@ -102,6 +111,25 @@ class RYV_DB {
 				user_id BIGINT UNSIGNED NOT NULL,
 				diff LONGTEXT NULL,
 				edited_at DATETIME NOT NULL,
+				PRIMARY KEY  (id),
+				KEY form_id (form_id)
+			) {$charset_collate};"
+		);
+
+		// One row per successful `lead_capture` node submission (see
+		// RYV_Leads / RYV_API::submit_lead()) - a separate table from
+		// wp_ryv_submissions since that one is an anonymous, upserted
+		// in-progress trail with no identifying fields, while this one is
+		// the deliberate, named/emailed contact record a visitor opts into.
+		dbDelta(
+			"CREATE TABLE {$leads} (
+				id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+				form_id BIGINT UNSIGNED NOT NULL,
+				node_id VARCHAR(191) NOT NULL,
+				session_id VARCHAR(64) NULL,
+				name VARCHAR(191) NULL,
+				email VARCHAR(191) NOT NULL,
+				created_at DATETIME NOT NULL,
 				PRIMARY KEY  (id),
 				KEY form_id (form_id)
 			) {$charset_collate};"

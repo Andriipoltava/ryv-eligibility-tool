@@ -12,9 +12,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Class RYV_API
  *
- * One read-only route, plus one write route for anonymous progress logging:
+ * One read-only route, plus two write routes:
  *  - GET  /ryv/v1/form/{post_id} -> the whole flat decision graph in one shot
  *  - POST /ryv/v1/form/{post_id}/log -> upsert this visitor's answer trail so far (see RYV_Submission_Log)
+ *  - POST /ryv/v1/form/{post_id}/submit -> submit a `lead_capture` node (see RYV_Leads)
  */
 class RYV_API {
 
@@ -57,6 +58,23 @@ class RYV_API {
 			array(
 				'methods'             => WP_REST_Server::CREATABLE,
 				'callback'            => array( $this, 'log_progress' ),
+				'permission_callback' => '__return_true',
+				'args'                => array(
+					'post_id' => array(
+						'validate_callback' => static function ( $value ) {
+							return is_numeric( $value );
+						},
+					),
+				),
+			)
+		);
+
+		register_rest_route(
+			self::NAMESPACE,
+			'/form/(?P<post_id>\d+)/submit',
+			array(
+				'methods'             => WP_REST_Server::CREATABLE,
+				'callback'            => array( $this, 'submit_lead' ),
 				'permission_callback' => '__return_true',
 				'args'                => array(
 					'post_id' => array(
@@ -141,6 +159,104 @@ class RYV_API {
 		$answers       = is_array( $answers_param ) ? $answers_param : array();
 
 		RYV_Submission_Log::record( $post_id, $session_id, $state_id, $current_node, $answers );
+
+		return new WP_REST_Response( array( 'ok' => true ), 200 );
+	}
+
+	/**
+	 * POST /form/{post_id}/submit - submit a `lead_capture` node.
+	 *
+	 * No auth, no nonce, same as log_progress() above: this is the public
+	 * questionnaire's own form submission, not an authenticated action. The
+	 * node's `actions` config (what to actually do with the submission) is
+	 * read straight from the schema rather than trusted from the request -
+	 * only `node_id`/`name`/`email`/`session_id` come from the client, all
+	 * sanitized before use.
+	 *
+	 * @param WP_REST_Request $request Request.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public function submit_lead( WP_REST_Request $request ) {
+		$post_id = (int) $request['post_id'];
+		$post    = $this->get_viewable_form( $post_id );
+
+		if ( ! $post ) {
+			return $this->not_found_error();
+		}
+
+		$node_id = sanitize_text_field( (string) $request->get_param( 'node_id' ) );
+
+		if ( '' === $node_id ) {
+			return new WP_Error(
+				'ryv_invalid_node',
+				__( 'A node id is required.', 'ryv-eligibility-tool' ),
+				array( 'status' => 400 )
+			);
+		}
+
+		$schema = RYV_CPT::get_schema( $post_id );
+		$node   = isset( $schema['nodes'][ $node_id ] ) ? $schema['nodes'][ $node_id ] : null;
+
+		if ( ! is_array( $node ) || 'lead_capture' !== ( $node['type'] ?? '' ) ) {
+			return new WP_Error(
+				'ryv_invalid_node',
+				__( 'This step is not a form submission step.', 'ryv-eligibility-tool' ),
+				array( 'status' => 400 )
+			);
+		}
+
+		$email = sanitize_email( (string) $request->get_param( 'email' ) );
+
+		if ( '' === $email || ! is_email( $email ) ) {
+			return new WP_Error(
+				'ryv_invalid_email',
+				__( 'A valid email address is required.', 'ryv-eligibility-tool' ),
+				array( 'status' => 400 )
+			);
+		}
+
+		$name = sanitize_text_field( (string) $request->get_param( 'name' ) );
+
+		$session_id_param = $request->get_param( 'session_id' );
+		$session_id        = is_string( $session_id_param ) && '' !== $session_id_param
+			? substr( preg_replace( '/[^a-zA-Z0-9-]/', '', $session_id_param ), 0, 64 )
+			: null;
+
+		$actions = is_array( $node['actions'] ?? null ) ? $node['actions'] : array();
+
+		if ( ! empty( $actions['save_to_db'] ) ) {
+			RYV_Leads::record( $post_id, $node_id, $session_id, $name, $email );
+		}
+
+		if ( ! empty( $actions['email_admin'] ) && ! empty( $actions['admin_email_address'] ) ) {
+			$admin_email = sanitize_email( (string) $actions['admin_email_address'] );
+
+			if ( is_email( $admin_email ) ) {
+				$subject = sprintf(
+					/* translators: %s: form title */
+					__( 'New form submission - %s', 'ryv-eligibility-tool' ),
+					$post->post_title
+				);
+				$body = sprintf(
+					"Name: %s\nEmail: %s",
+					'' !== $name ? $name : __( '(not provided)', 'ryv-eligibility-tool' ),
+					$email
+				);
+
+				wp_mail( $admin_email, $subject, $body );
+			}
+		}
+
+		if ( ! empty( $actions['email_user'] ) ) {
+			$message = isset( $actions['user_email_message'] ) ? sanitize_textarea_field( (string) $actions['user_email_message'] ) : '';
+			$subject = sprintf(
+				/* translators: %s: form title */
+				__( 'Your results - %s', 'ryv-eligibility-tool' ),
+				$post->post_title
+			);
+
+			wp_mail( $email, $subject, $message );
+		}
 
 		return new WP_REST_Response( array( 'ok' => true ), 200 );
 	}

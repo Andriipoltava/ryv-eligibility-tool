@@ -9,6 +9,7 @@ const TYPE_LABELS = {
   text: __('Text', 'ryv-eligibility-tool'),
   textarea: __('Textarea', 'ryv-eligibility-tool'),
   markup: __('Markup', 'ryv-eligibility-tool'),
+  lead_capture: __('Form Submission', 'ryv-eligibility-tool'),
   unsupported: __('Unsupported', 'ryv-eligibility-tool'),
 };
 
