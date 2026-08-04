@@ -111,18 +111,42 @@
     border-color: var(--ryv-btn-border-color-selected, var(--ryv-primary-color, #1d4ed8));
   }
 
+  /*
+   * !important on every declaration below (base + :hover): the active
+   * theme's own reset.css (e.g. hello-elementor's `[type=submit], button {
+   * background-color: transparent; border-radius: 3px; ... }`) matches a
+   * <button type="submit"> at the *same* specificity as a single class
+   * selector like .ryv-continue-btn, so without this the theme's rule wins
+   * purely because its stylesheet happens to load after ours - flattening
+   * the button to a transparent, square-cornered, theme-pink-on-hover
+   * ghost button regardless of Primary Color/Border Radius. This is the
+   * same intent as tailwind.config.js's `important: '.ryv-app-wrapper'`
+   * (the widget must never lose visually to its host theme) - that config
+   * only affects Tailwind's own generated utility classes though, so it
+   * doesn't reach hand-written @layer components CSS like this rule, and
+   * @apply itself doesn't propagate `important` from a bare class name
+   * either (confirmed: Tailwind 3.4's per-utility `!` modifier only works
+   * on classes in markup, not inside `@apply` - `@apply ryv-inline-flex!`
+   * fails to build). Spelled out as raw declarations instead, so each one
+   * can carry its own `!important`.
+   */
   .ryv-continue-btn {
-    @apply ryv-inline-flex ryv-items-center ryv-font-medium ryv-transition-opacity ryv-duration-150;
-    color: var(--ryv-continue-btn-text-color, #fff);
-    background-color: var(--ryv-continue-btn-bg, var(--ryv-primary-color, #1d4ed8));
-    border-style: solid;
-    border-width: var(--ryv-continue-btn-border-width, 0px);
-    border-color: var(--ryv-continue-btn-border-color, transparent);
-    border-radius: var(--ryv-continue-btn-border-radius, var(--ryv-radius, 0.5rem));
-    padding: var(--ryv-continue-btn-padding, 0.625rem 1.25rem);
+    display: inline-flex !important;
+    align-items: center !important;
+    font-weight: 500 !important;
+    transition-property: opacity !important;
+    transition-duration: 150ms !important;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1) !important;
+    color: var(--ryv-continue-btn-text-color, #fff) !important;
+    background-color: var(--ryv-continue-btn-bg, var(--ryv-primary-color, #1d4ed8)) !important;
+    border-style: solid !important;
+    border-width: var(--ryv-continue-btn-border-width, 0px) !important;
+    border-color: var(--ryv-continue-btn-border-color, transparent) !important;
+    border-radius: var(--ryv-continue-btn-border-radius, var(--ryv-radius, 0.5rem)) !important;
+    padding: var(--ryv-continue-btn-padding, 0.625rem 1.25rem) !important;
   }
   .ryv-continue-btn:hover {
-    background-color: var(--ryv-continue-btn-bg-hover, var(--ryv-continue-btn-bg, var(--ryv-primary-color, #1d4ed8)));
+    background-color: var(--ryv-continue-btn-bg-hover, var(--ryv-continue-btn-bg, var(--ryv-primary-color, #1d4ed8))) !important;
     opacity: var(--ryv-continue-btn-hover-opacity, 0.9);
   }
   .ryv-continue-btn:disabled {
