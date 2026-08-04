@@ -1171,7 +1171,12 @@ class RYV_Widget extends \Elementor\Widget_Base {
 	 * The form post's own title/description, printed as plain server-side
 	 * HTML *above* the .ryv-app-wrapper mount point - unlike the
 	 * questionnaire itself, this needs no JS/REST round trip, since the
-	 * widget already has the post available at render time.
+	 * widget already has the post available at render time. That also means
+	 * it bypasses RYV_API::get_viewable_form()'s visibility check, so the
+	 * same "published to everyone, draft only to whoever can edit_post this
+	 * form" rule has to be re-applied here explicitly - same rule
+	 * RYV_Shortcode::render() enforces, so an embed of a draft/unpublished
+	 * form behaves identically whether it's this widget or [ryv_form].
 	 *
 	 * @param int $form_id The `ryv_forms` post ID.
 	 */
@@ -1186,6 +1191,10 @@ class RYV_Widget extends \Elementor\Widget_Base {
 		$post = get_post( $form_id );
 
 		if ( ! $post ) {
+			return;
+		}
+
+		if ( 'publish' !== $post->post_status && ! current_user_can( 'edit_post', $form_id ) ) {
 			return;
 		}
 
