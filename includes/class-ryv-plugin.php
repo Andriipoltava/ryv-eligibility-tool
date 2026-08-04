@@ -130,6 +130,7 @@ final class RYV_Plugin {
 			require_once RYV_PLUGIN_DIR . 'admin/class-ryv-builder-page.php';
 			require_once RYV_PLUGIN_DIR . 'admin/class-ryv-logs-page.php';
 			require_once RYV_PLUGIN_DIR . 'admin/class-ryv-submissions-page.php';
+			require_once RYV_PLUGIN_DIR . 'admin/class-ryv-shortcode-hint.php';
 		}
 	}
 
@@ -155,6 +156,7 @@ final class RYV_Plugin {
 			$this->builder_page     = new RYV_Builder_Page();
 			$this->logs_page        = new RYV_Logs_Page();
 			$this->submissions_page = new RYV_Submissions_Page();
+			new RYV_Shortcode_Hint();
 		}
 	}
 

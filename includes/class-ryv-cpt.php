@@ -37,6 +37,10 @@ class RYV_CPT {
 	public function __construct() {
 		add_action( 'init', array( $this, 'register_post_type' ) );
 		add_action( 'init', array( $this, 'register_meta' ) );
+
+		add_filter( 'manage_edit-' . self::POST_TYPE . '_columns', array( $this, 'add_shortcode_column' ) );
+		add_action( 'manage_' . self::POST_TYPE . '_posts_custom_column', array( $this, 'render_shortcode_column' ), 10, 2 );
+		add_action( 'admin_footer', array( $this, 'print_list_table_copy_script' ) );
 	}
 
 	/**
@@ -124,6 +128,80 @@ class RYV_CPT {
 				},
 			)
 		);
+	}
+
+	/**
+	 * Insert a "Shortcode" column into the ryv_forms list table right after
+	 * Title, so `[ryv_form id="X"]` is discoverable without opening the
+	 * builder - the person embedding a form into an ordinary post/page is
+	 * often not the same person who built it.
+	 *
+	 * @param array<string,string> $columns Existing column id => label map.
+	 * @return array<string,string>
+	 */
+	public function add_shortcode_column( array $columns ): array {
+		$new = array();
+
+		foreach ( $columns as $key => $label ) {
+			$new[ $key ] = $label;
+
+			if ( 'title' === $key ) {
+				$new['ryv_shortcode'] = __( 'Shortcode', 'ryv-eligibility-tool' );
+			}
+		}
+
+		return $new;
+	}
+
+	/**
+	 * Render the Shortcode column's cell.
+	 *
+	 * @param string $column  Column id.
+	 * @param int    $post_id Row's post ID.
+	 */
+	public function render_shortcode_column( string $column, int $post_id ) {
+		if ( 'ryv_shortcode' !== $column ) {
+			return;
+		}
+
+		$shortcode = '[ryv_form id="' . $post_id . '"]';
+
+		printf(
+			'<code>%1$s</code> <button type="button" class="button button-small ryv-copy-shortcode" data-shortcode="%2$s">%3$s</button>',
+			esc_html( $shortcode ),
+			esc_attr( $shortcode ),
+			esc_html__( 'Copy', 'ryv-eligibility-tool' )
+		);
+	}
+
+	/**
+	 * Tiny click-delegated clipboard handler for the Shortcode column's
+	 * Copy buttons - only printed on the ryv_forms list table itself
+	 * (get_current_screen(), not the admin_footer hook's own hook_suffix,
+	 * since every post type's list table shares the same 'edit.php'
+	 * hook_suffix).
+	 */
+	public function print_list_table_copy_script() {
+		$screen = get_current_screen();
+
+		if ( ! $screen || 'edit' !== $screen->base || self::POST_TYPE !== $screen->post_type ) {
+			return;
+		}
+		?>
+		<script>
+		document.addEventListener( 'click', function ( event ) {
+			var btn = event.target.closest( '.ryv-copy-shortcode' );
+			if ( ! btn ) {
+				return;
+			}
+			navigator.clipboard.writeText( btn.dataset.shortcode ).then( function () {
+				var original = btn.textContent;
+				btn.textContent = '<?php echo esc_js( __( 'Copied!', 'ryv-eligibility-tool' ) ); ?>';
+				setTimeout( function () { btn.textContent = original; }, 1500 );
+			} );
+		} );
+		</script>
+		<?php
 	}
 
 	/**

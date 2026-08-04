@@ -31,6 +31,25 @@
   margin-bottom: 1.5rem;
 }
 
+.ryv-builder-shortcode {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.ryv-builder-shortcode-label {
+  font-weight: 600;
+  color: #1d2327;
+}
+
+.ryv-builder-shortcode code {
+  background: #f0f0f1;
+  border: 1px solid #ccd0d4;
+  border-radius: 4px;
+  padding: 3px 8px;
+}
+
 .ryv-builder-meta-saving {
   font-size: 12px;
   font-style: italic;

@@ -3,6 +3,7 @@ import { __ } from '@wordpress/i18n';
 import { Button, TextControl, TextareaControl, SelectControl, Notice, Spinner } from '@wordpress/components';
 import NodeList from './components/NodeList';
 import NodeEditor from './components/NodeEditor';
+import ShortcodeSnippet from './components/ShortcodeSnippet';
 import { fetchForm, saveForm, createForm, updateFormStatus, updateFormMeta } from './api';
 
 const STATUS_OPTIONS = [
@@ -207,6 +208,8 @@ export default function App() {
           </Button>
         </div>
       </div>
+
+      <ShortcodeSnippet postId={postId} />
 
       <TextareaControl
         className="ryv-builder-description-input"
