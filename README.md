@@ -1,13 +1,28 @@
-# RYV Eligibility Tool
+# Dynamic Eligibility & Questionnaire Flow Tool
 
-A custom WordPress plugin for [Restore Your Vote](https://restoreyourvote.org): a decision-tree
-questionnaire that determines US voting eligibility by state and felony-conviction history. It
-replaces a legacy Drupal Webform implementation. Rendering is a vanilla-JS frontend mounted by a
-custom Elementor widget (or the `[ryv_form]` shortcode); all logic for a form lives as one flat
-JSON graph in postmeta, not in nested field repeaters.
+A flexible, high-performance WordPress plugin for building dynamic decision-tree questionnaires,
+eligibility tests, and multi-step forms.
 
-**Hard runtime dependency: [Elementor](https://elementor.com/) must be active.** The plugin
-no-ops with an admin notice if it isn't.
+Featuring a modern React-based admin SPA, dynamic lead capture with customizable form fields and
+email notifications, a clean REST API, CSV exports, and global design settings. Rendering is
+handled seamlessly via a vanilla-JS frontend engine embedded through a custom Elementor widget or
+a standard WordPress shortcode.
+
+**Hard runtime dependency:** [Elementor](https://elementor.com/) must be active. The plugin
+gracefully no-ops with an admin notice if it isn't.
+
+Plugin slug: `ryv-eligibility-tool`. Built for [Restore Your Vote](https://restoreyourvote.org)
+to determine US voting eligibility by state and felony-conviction history, replacing a legacy
+Drupal Webform implementation — but the decision-tree engine itself is domain-agnostic; nothing
+in the schema format assumes voting eligibility specifically.
+
+---
+
+## Author
+
+* **Developer:** Andrii Omelianenko
+
+---
 
 ## Requirements
 
@@ -15,32 +30,64 @@ no-ops with an admin notice if it isn't.
 - PHP 8.0+
 - Elementor (any recent version)
 
+---
+
 ## Installation
 
-1. Place this directory in `wp-content/plugins/`.
-2. Run `composer install` (pulls in `symfony/yaml`, used by the YAML importer).
-3. Activate the plugin from **Plugins** in wp-admin.
-4. A new **RYV Forms** menu appears. Import a form (see below), then drag the **RYV Eligibility
-   Tool** widget onto any Elementor page, or embed it anywhere with `[ryv_form id="123"]`.
+1. Place the plugin directory into your `wp-content/plugins/` folder.
+2. Run `composer install` in the plugin root directory to pull in required dependencies (such as
+   `symfony/yaml` for the YAML importer).
+3. Activate the plugin from the **Plugins** menu in your WordPress admin dashboard.
+4. A new **RYV Forms** menu will appear in the sidebar.
 
-## Features
+---
 
-- **Flat decision-graph builder** — a React admin SPA (under **RYV Forms → [a form]**) replaces
-  the default post editor for authoring/editing a form's question graph, with node search/filter
-  for large forms (400+ nodes).
-- **Drupal Webform YAML importer** — bulk-imports real production Drupal exports
-  (`webform.webform.*.yml`), reconstructing branching logic from `#states` visibility gates and
-  flagging anything it can't confidently translate.
-- **Elementor widget + `[ryv_form id]` shortcode** — two ways to embed a form; both render the
-  same frontend decision engine.
-- **Global Styles** (**RYV Forms → Global Styles**) — plugin-wide default colors/border-radius/
-  font, which every Elementor widget instance falls back to when its own Style controls are left
-  blank, while still allowing per-instance overrides.
-- **Lead capture** — `lead_capture` nodes can save submissions to the database, email an admin,
-  and/or email the visitor, with templated subject/body using submitted field values.
-- **Activity & submissions logging** — an anonymous, session-scoped visitor progress log, a
-  builder edit log (who changed what, with a structural diff), and a Submissions admin page with
-  CSV export.
+## Usage
+
+### 1. Creating & Editing Forms
+* Go to **RYV Forms** in your admin panel and click **Add New**.
+* Use the visual SPA builder to structure your decision tree (add questions, markup blocks,
+  choices, or lead capture forms). It's a flat node list with search/filter, not a drag-and-drop
+  canvas — built to stay usable on forms with 400+ nodes.
+* You can also bulk-import a real Drupal Webform YAML export instead of building from scratch (see
+  **RYV Forms → Import**); branching is reconstructed automatically from its `#states` visibility
+  gates, and anything the importer can't confidently translate is flagged for manual review rather
+  than silently dropped.
+* Configure global design defaults under **RYV Forms → Global Styles**.
+
+### 2. Displaying Forms on the Frontend
+You can embed your questionnaire anywhere on your site using two methods:
+
+* **Elementor Widget:** Search for the **RYV Eligibility Tool** widget in the Elementor editor and
+  drag it onto any page. Select your form from the dropdown.
+* **Shortcode:** Paste the shortcode anywhere on your site (Gutenberg, classic editor, or page
+  builders):
+  ```text
+  [ryv_form id="123"]
+  ```
+
+Both methods render the exact same frontend decision engine and mount point, so styling and
+behavior are identical regardless of which one you use.
+
+### 3. Customizing Design
+* **Global Styles** (**RYV Forms → Global Styles**): set plugin-wide default colors, border
+  radius, and font. Every Elementor widget instance falls back to these when its own Style tab
+  controls are left blank.
+* **Per-instance overrides:** any Style tab control you *do* set on a specific widget instance
+  always wins over Global Styles for that one embed — nothing you configure globally locks out a
+  one-off design change.
+
+### 4. Lead Capture & Notifications
+Add a `lead_capture` node anywhere in a form's flow to collect visitor input mid-questionnaire:
+* Define custom form fields (text, email, textarea) per node.
+* Optionally save submissions to the database, email an admin, and/or email the visitor — each
+  with a templated subject/body that can reference the submitted field values.
+
+### 5. Activity Log & Submissions
+* **RYV Forms → Activity Log:** who changed what and when, with a structural diff of each save.
+* **RYV Forms → Submissions:** every recorded lead capture, with CSV export.
+
+---
 
 ## Development
 
