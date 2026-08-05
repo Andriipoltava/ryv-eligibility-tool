@@ -104,6 +104,17 @@ export default function NodeEditor({ node, nodeId, allNodeIds, allNodes, onChang
         )}
       />
 
+      <TextareaControl
+        label={__('Description', 'ryv-eligibility-tool')}
+        value={node.description || ''}
+        onChange={(description) => onChange({ ...node, description })}
+        rows={2}
+        help={__(
+          'Optional helper text shown below the title, above the options/input. Same HTML trust level as Title.',
+          'ryv-eligibility-tool'
+        )}
+      />
+
       <TextControl
         label={__('Group', 'ryv-eligibility-tool')}
         value={node.group || ''}

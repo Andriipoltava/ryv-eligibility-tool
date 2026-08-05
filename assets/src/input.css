@@ -32,6 +32,15 @@
     @apply ryv-text-lg ryv-font-semibold ryv-mb-4 ryv-text-ryv-text;
   }
 
+  /* NodeEditor.js's "Description" field - optional helper text between the title and the options/input. */
+  .ryv-question-description {
+    @apply ryv-text-sm ryv-mb-4 ryv-leading-relaxed;
+    color: var(--ryv-secondary-color, #64748b);
+  }
+  .ryv-question-description a {
+    @apply ryv-underline ryv-text-ryv-primary;
+  }
+
   .ryv-content {
     @apply ryv-text-ryv-text ryv-mb-4 ryv-leading-relaxed;
   }

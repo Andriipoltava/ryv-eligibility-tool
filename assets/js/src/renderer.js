@@ -77,6 +77,21 @@ function titleEl(title) {
 }
 
 /**
+ * A node's `description` (NodeEditor.js's "Description" field) is optional
+ * helper text below the title - same trusted-HTML boundary as `title`, so
+ * rendered via innerHTML the same way. Returns null when unset, so callers
+ * can skip appending it entirely rather than adding an empty element.
+ */
+function descriptionEl(description) {
+  if (!description) return null;
+
+  const p = document.createElement('p');
+  p.className = 'ryv-question-description';
+  p.innerHTML = description;
+  return p;
+}
+
+/**
  * Append `card` to `container`. New cards fade/slide in; cards being
  * rebuilt in place (an edited answer) skip the animation so the page
  * doesn't jump while you're still looking at what you just clicked.
@@ -309,6 +324,7 @@ function renderSingleChoiceOptions(wrap, options, selectedValue, onSelect, displ
 export function renderQuestionCard(node, selectedValues, onChange, nodeId, labels = DEFAULT_LABELS) {
   const wrap = cardWrap(node);
   wrap.appendChild(titleEl(node.title));
+  if (node.description) wrap.appendChild(descriptionEl(node.description));
 
   const isMulti = node.type === 'checkbox';
   const selected = new Set(selectedValues || []);
@@ -370,6 +386,7 @@ export function renderQuestionCard(node, selectedValues, onChange, nodeId, label
 export function renderInputCard(node, previousValue, onChange) {
   const wrap = cardWrap(node);
   wrap.appendChild(titleEl(node.title));
+  if (node.description) wrap.appendChild(descriptionEl(node.description));
 
   const tag = node.type === 'textarea' ? 'textarea' : 'input';
   const input = el(tag, {
@@ -468,6 +485,7 @@ function buildFieldControl(field) {
 export function renderLeadCaptureCard(node, submittedValue, onSubmit, onContinue, labels = DEFAULT_LABELS) {
   const wrap = cardWrap(node);
   if (node.title) wrap.appendChild(titleEl(node.title));
+  if (node.description) wrap.appendChild(descriptionEl(node.description));
 
   if (submittedValue) {
     wrap.appendChild(el('div', { className: 'ryv-content', text: node.success_message || labels.leadSubmitted }));
@@ -560,6 +578,9 @@ export function renderMarkupCard(node, isTerminal, onRestart, labels = DEFAULT_L
   const wrap = el('div');
   if (node.title) {
     wrap.appendChild(titleEl(node.title));
+  }
+  if (node.description) {
+    wrap.appendChild(descriptionEl(node.description));
   }
 
   const contentClass = node.wrapper_class ? `ryv-content ${node.wrapper_class}` : 'ryv-content';
