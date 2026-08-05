@@ -46,6 +46,18 @@ function el(tag, opts = {}, children = []) {
   return node;
 }
 
+/**
+ * A card's outer container, with the admin-configured `node.wrapper_class`
+ * applied if set - NodeEditor.js's generic "CSS Class" field, or (for
+ * `markup` nodes specifically) a YAML import's `#wrapper_attributes.class`
+ * (see RYV_YAML_Parser::extract_wrapper_classes()). Same trust boundary as
+ * `node.content`/`node.title` - only ever written by an admin with
+ * manage_options, never user input.
+ */
+function cardWrap(node) {
+  return el('div', node.wrapper_class ? { className: node.wrapper_class } : {});
+}
+
 export function createList() {
   return el('div', { className: 'ryv-list' });
 }
@@ -295,7 +307,7 @@ function renderSingleChoiceOptions(wrap, options, selectedValue, onSelect, displ
  * @param {object} labels
  */
 export function renderQuestionCard(node, selectedValues, onChange, nodeId, labels = DEFAULT_LABELS) {
-  const wrap = el('div');
+  const wrap = cardWrap(node);
   wrap.appendChild(titleEl(node.title));
 
   const isMulti = node.type === 'checkbox';
@@ -356,7 +368,7 @@ export function renderQuestionCard(node, selectedValues, onChange, nodeId, label
 }
 
 export function renderInputCard(node, previousValue, onChange) {
-  const wrap = el('div');
+  const wrap = cardWrap(node);
   wrap.appendChild(titleEl(node.title));
 
   const tag = node.type === 'textarea' ? 'textarea' : 'input';
@@ -454,7 +466,7 @@ function buildFieldControl(field) {
  * @param {object} labels
  */
 export function renderLeadCaptureCard(node, submittedValue, onSubmit, onContinue, labels = DEFAULT_LABELS) {
-  const wrap = el('div');
+  const wrap = cardWrap(node);
   if (node.title) wrap.appendChild(titleEl(node.title));
 
   if (submittedValue) {
@@ -532,12 +544,17 @@ export function renderLeadCaptureCard(node, submittedValue, onSubmit, onContinue
  * imported (or a schema edited) by an admin with `manage_options`, the same
  * trust boundary WordPress applies to post content - not user input.
  *
- * `node.wrapper_class` (from Drupal's `#wrapper_attributes.class` - see
- * RYV_YAML_Parser::extract_wrapper_classes()) carries the same trust
- * boundary and is already allowlist-sanitized server-side (only
- * 'text-restrict-height'/'message--path-end' ever reach the schema), so
- * it's applied directly here rather than re-validated - see
- * assets/src/input.css for what each one actually does.
+ * `node.wrapper_class` carries the same trust boundary and is applied
+ * directly rather than re-validated, whether it came from a YAML import
+ * (allowlist-sanitized server-side - see
+ * RYV_YAML_Parser::extract_wrapper_classes(), only 'text-restrict-height'/
+ * 'message--path-end' ever reach the schema that way) or was typed directly
+ * into NodeEditor.js's free-text "CSS Class" field (no allowlist there -
+ * same trust level as `content`/`title` above, so no extra validation adds
+ * real safety). Applied to the `.ryv-content` div specifically, not the
+ * outer card wrap like every other card type (see cardWrap()) - e.g.
+ * `text-restrict-height` needs to scope to just the scrollable content, not
+ * the title above it too.
  */
 export function renderMarkupCard(node, isTerminal, onRestart, labels = DEFAULT_LABELS) {
   const wrap = el('div');

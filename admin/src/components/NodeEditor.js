@@ -120,6 +120,16 @@ export default function NodeEditor({ node, nodeId, allNodeIds, allNodes, onChang
         ))}
       </datalist>
 
+      <TextControl
+        label={__('CSS Class', 'ryv-eligibility-tool')}
+        value={node.wrapper_class || ''}
+        onChange={(wrapper_class) => onChange({ ...node, wrapper_class })}
+        help={__(
+          'Optional, space-separated custom class(es) added to this question\'s container on the frontend - e.g. "text-restrict-height" or "message--path-end", the same classes a YAML import can set automatically from Drupal\'s wrapper_attributes.',
+          'ryv-eligibility-tool'
+        )}
+      />
+
       {node.type === 'markup' && (
         <div className="ryv-builder-field">
           <label className="components-base-control__label">{__('Content (HTML)', 'ryv-eligibility-tool')}</label>
