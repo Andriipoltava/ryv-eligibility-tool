@@ -68,6 +68,13 @@ final class RYV_Plugin {
 	private $submissions_page = null;
 
 	/**
+	 * Help page controller instance (admin-only).
+	 *
+	 * @var RYV_Help_Page|null
+	 */
+	private $help_page = null;
+
+	/**
 	 * Get (or create) the singleton instance.
 	 *
 	 * @return RYV_Plugin
@@ -140,6 +147,7 @@ final class RYV_Plugin {
 			require_once RYV_PLUGIN_DIR . 'admin/class-ryv-logs-page.php';
 			require_once RYV_PLUGIN_DIR . 'admin/class-ryv-submissions-page.php';
 			require_once RYV_PLUGIN_DIR . 'admin/class-ryv-shortcode-hint.php';
+			require_once RYV_PLUGIN_DIR . 'admin/class-ryv-help-page.php';
 		}
 	}
 
@@ -167,6 +175,7 @@ final class RYV_Plugin {
 			$this->logs_page        = new RYV_Logs_Page();
 			$this->submissions_page = new RYV_Submissions_Page();
 			new RYV_Shortcode_Hint();
+			$this->help_page = new RYV_Help_Page();
 		}
 	}
 

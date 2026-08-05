@@ -41,6 +41,19 @@ change.** It's the cache-busting query string on every enqueued asset - without
 a bump, browsers that already loaded the plugin keep serving the old file
 indefinitely. This has bitten real testing sessions more than once.
 
+That bump alone isn't sufficient for the frontend engine, though:
+`wp_enqueue_script()` only cache-busts `assets/js/decision-engine.js` itself -
+every relative `import` it (and `engine.js` in turn) makes is a URL the
+browser resolves and caches **on its own**, and Apache serves these static
+`.js` files with `Last-Modified` but no `Cache-Control`, so heuristic
+freshness can let a browser keep serving an old cached copy of `engine.js`/
+`renderer.js`/`api-client.js` indefinitely - surviving even a hard reload in
+practice. `decision-engine.js` and `engine.js` version-stamp their own
+relative imports with a literal `?ver=X.Y.Z` query string for exactly this
+reason (e.g. `from './src/engine.js?ver=0.8.7'`) - **bump every one of these
+to match `RYV_VERSION` whenever it bumps**, or an edit to any of those three
+files can silently fail to reach a visitor who already loaded the form once.
+
 ## Architecture
 
 ### Data model: one flat decision graph per form
@@ -162,6 +175,51 @@ conditions, unmapped `#type`s, optgroups) is never silently dropped - it's
 imported as-is and reported in `warnings`, surfaced to the admin in
 `admin/views/import-page.php`.
 
+**Two independent nodes can legitimately gate on the exact same
+`source=value`** - `#states` is a "become visible" flag, not an exclusive
+router, so both could be visible at once in the original Drupal form (real
+example: Alabama's `al_moral_turpitude_felonies`, a Yes/No/Maybe/FOS
+question, and `al_mt_list`, its reference felony list, both gate on
+`al_felony_conviction=Yes` and render as one step on the live site - the
+question with its own buttons, the list shown right below them as
+supporting material, not a separate click-through step). This flat DAG has
+no way to show two independent nodes "at once," but a markup node's content
+can be *pointed at* from the colliding choice node instead of trying to
+route to it as a next step - which also sidesteps a real structural dead
+end, since a choice node's options are usually all already individually
+routed elsewhere, leaving no free "default" slot to chain a second step into
+anyway. `build_subtree()` handles this by appending the losing markup
+node's id onto the winning choice node's `reference_node_ids` (an ordered
+array, not a single slot - more than one markup node can collide onto the
+same question this way, and each is appended in document order) rather than
+copying its content: `reference_node_ids` is a list of *pointers*, resolved
+at render time by `appendReferenceContent()` in `renderer.js`, so editing
+the markup node's own content later (in the builder or a re-import) never
+needs a separate sync step. The builder exposes this as a "Reference Content
+Nodes" list on choice nodes (`admin/src/components/ReferenceNodesEditor.js`)
+with up/down reordering, since render order there is meaningful and
+user-controlled, unlike `OptionsEditor.js`'s options which are never
+reordered.
+
+A **`visible` rule alongside an `invisible` one on the same element** is a
+narrower, unsafe-to-guess case of the same "declarative, not exclusive"
+`#states` model: safely inverting `invisible` into "visible unless X" would
+require knowing every other possible answer to X's source question, which
+this parser doesn't attempt (real examples: `alabama_splc_project`,
+`az_on_the_ground`, `fl_am4` - reference blurbs meant to disappear once a
+felony question is answered, gated `visible` on the state and `invisible` on
+that question's answer values). `extract_visibility_condition()` only ever
+reads the `visible` half, so the `invisible` half would otherwise be
+silently dropped with no trace at all - unlike the *invisible-only* case
+(nothing to route on, `warnings`-only), *both present* additionally sets
+`node.hidden = true` on the resulting node: it stays in the graph and
+reachable via its `visible` gate, but `engine.js`'s `renderFrom()` skips
+giving it a card at all (still passing straight through to its own
+`next_node`, so the chain keeps moving) unless an admin flips the builder's
+"Hidden" toggle back off after reviewing the original YAML. Hiding by
+default is the deliberately conservative choice here: safe over showing
+content past the point it should have disappeared.
+
 Since one file now represents the *entire* flat graph, importing into a form
 that already has content **replaces its whole schema** rather than merging one
 state's worth of nodes - `admin/class-ryv-import-page.php` requires an
@@ -209,6 +267,33 @@ it - which would otherwise re-fire the commit handler a second time with the
 same value. The `lastCommitted` guard exists specifically for this; don't
 remove it without re-solving that race.
 
+**Every `.ryv-card` creates its own CSS stacking context** (from the
+`transform` its enter transition applies - CSS Transforms treats a
+transformed element as if it were positioned, for stacking purposes, even
+though the class never sets `position` itself), which is a trap for anything
+absolutely-positioned inside one card that needs to visually float above a
+*later* card - a `z-index` set on that inner element only wins comparisons
+within its own card's stacking context, not against a sibling card's, so a
+later card with no explicit `z-index` of its own still paints over it purely
+by DOM order. This bit the searchable dropdown's own popup
+(`renderSearchableSelect()`'s `.ryv-select2-menu`): its open state now
+toggles a `.ryv-card-elevated` class (`z-index: 20`) on the *ancestor card*
+itself via `setCardElevated()`, not just the menu - that's what actually
+lets it paint above every card rendered after it. Any future
+absolutely-positioned popover/menu inside a card needs the same treatment,
+not just a bigger `z-index` on the popover itself.
+
+`node.help` (optional, on any node - a YAML import sets it automatically
+from Drupal's `#help`) renders as a small "?" icon after the title
+(`titleEl()`'s `help` param, `buildHelpTooltip()` in `renderer.js`) that
+reveals `help`'s trusted HTML on hover/focus, matching
+campaignlegal.org/restoreyourvote's own Tippy.js-based tooltip - not a
+click-to-toggle. A short (150ms) close delay on `mouseleave`/`blur`,
+canceled if the pointer re-enters either the icon or the tooltip itself, is
+what lets `help` content containing a link (real example: "Please email us
+if you have any questions.") stay clickable instead of vanishing the instant
+the cursor leaves the icon.
+
 **Elementor editor preview**: the widget's DOM doesn't exist yet at the exact
 moment `decision-engine.js`'s deferred module script runs inside Elementor's
 editor iframe (Elementor renders widget markup on its own schedule), and
@@ -253,6 +338,16 @@ survived Tailwind's purge because it *also* happened to be referenced in a
 scanned JS file (`renderer.js` builds class names as strings); a class used
 purely server-side (like the header title/description below) gets silently
 stripped from the compiled CSS if its PHP file isn't in this list.
+
+Every `var(--x, <default>)` fallback in `input.css` (colors, borders,
+padding, the select2 dropdown's arrow/menu, the "?" help tooltip, the
+`text-restrict-height`/`message--path-end` verbatim-class treatments below)
+is deliberately set to match campaignlegal.org/restoreyourvote - the real,
+live production form this plugin targets - measured directly via
+`getComputedStyle()` on that site, not eyeballed from a screenshot. Treat it
+as the reference design for any future default-styling change: an untouched
+widget instance should look like that site without an admin ever opening the
+Style tab.
 
 Not every Style control is CSS-var-bridged the same way: most non-typography
 properties write a custom property onto `{{WRAPPER}} .ryv-app-wrapper` (read
@@ -315,12 +410,35 @@ build step at WP plugin deploy time. Note the CSS output is named
 convention), not `index.css` - `class-ryv-builder-page.php`'s `enqueue()`
 depends on that exact name.
 
+`NodeEditor.js` exposes the graph-level concepts above as plain form
+controls, not just `content`/`options`: `ReferenceNodesEditor.js` (a choice
+node's ordered "Reference Content Nodes" list, described under the YAML
+importer above) and a "Hidden" `ToggleControl` (Markup/Unsupported nodes
+only - hiding a choice/text/lead_capture node would strand a visitor with no
+way to ever answer it, so the control simply doesn't apply there).
+
+### Help admin page (`admin/class-ryv-help-page.php`)
+
+A static, read-only documentation page (`admin/views/help-page.php`) under
+**RYV Forms → Help**, last in the submenu - plain-language usage
+instructions (creating a form, the builder's fields, YAML import, embedding,
+styling, lead capture, activity log/submissions) aimed at the
+`manage_options` admins who actually run this plugin day to day, not at a
+future developer reading this file. No dynamic data, no state, no
+capability beyond `manage_options` for consistency with every other
+`admin/*-page.php` controller - keep it that way; if it ever needs to render
+something dynamic it's no longer just documentation.
+
 ## Status
 
 Implemented: CPT + postmeta schema (flat DAG), YAML importer/parser, REST
 API, frontend decision engine, Elementor widget (content + style controls,
 including title/description), admin builder SPA, visitor/admin activity
-logging. All phases from the original plan are built, plus the later flat-DAG
-rewrite (states-keyed → single universal graph) and its lazy migration path
-for existing forms. Verified against both real production YAML exports and
-live browser testing (Elementor editor included, not just code review).
+logging, Help admin page. All phases from the original plan are built, plus
+the later flat-DAG rewrite (states-keyed → single universal graph) and its
+lazy migration path for existing forms, plus a later pass reconciling the
+whole frontend's default look 1:1 against campaignlegal.org/restoreyourvote
+(colors/typography/dropdown/buttons/help-tooltip) and adding the
+`reference_node_ids`/`hidden` gate-collision handling described above.
+Verified against both real production YAML exports and live browser testing
+(Elementor editor included, not just code review).

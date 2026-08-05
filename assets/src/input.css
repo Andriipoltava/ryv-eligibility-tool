@@ -27,15 +27,89 @@
   .ryv-card-enter {
     @apply ryv-opacity-0 ryv-translate-y-2;
   }
+  /*
+   * Toggled by renderSearchableSelect() in renderer.js while its dropdown
+   * menu is open - see the comment on setCardElevated() there for why a
+   * `.ryv-select2-menu`'s own z-index alone can't float it above a LATER
+   * card (every `.ryv-card` has a `transform`, which creates its own
+   * stacking context - a later sibling with no explicit z-index still
+   * paints on top of an earlier one purely by DOM order otherwise).
+   */
+  .ryv-card-elevated {
+    position: relative;
+    z-index: 20;
+  }
 
+  /*
+   * font-size/weight/color below match campaignlegal.org/restoreyourvote's
+   * own question legends exactly (22px/700/#002a41, measured via
+   * getComputedStyle on the live site) - bold and primary-colored, not the
+   * lighter body-text weight/color this used before.
+   */
   .ryv-question-title {
-    @apply ryv-text-lg ryv-font-semibold ryv-mb-4 ryv-text-ryv-text;
+    @apply ryv-font-bold ryv-mb-4 ryv-flex ryv-items-center ryv-gap-2;
+    font-size: var(--ryv-question-title-size, 1.375rem);
+    color: var(--ryv-question-title-color, var(--ryv-primary-color, #002a41));
+  }
+
+  /*
+   * NodeEditor.js's "Tooltip (Help Text)" field (node.help - a YAML import
+   * sets it automatically from Drupal's #help) - a "?" icon right after the
+   * title that reveals the help text on hover/focus. See renderer.js's
+   * buildHelpTooltip(). Icon/tooltip sizing, color and the dark "Tippy.js"
+   * look below match campaignlegal.org/restoreyourvote exactly - it uses
+   * Tippy.js itself (data-placement="top" on a `.tippy-box`, measured via
+   * getComputedStyle on the live site: 14px grey circle trigger, #333
+   * tooltip with a matching arrow, 4px radius, 350px max-width).
+   */
+  .ryv-help {
+    @apply ryv-relative ryv-inline-flex ryv-flex-shrink-0;
+  }
+  .ryv-help-icon {
+    @apply ryv-inline-flex ryv-items-center ryv-justify-center ryv-rounded-full ryv-cursor-pointer ryv-p-0 ryv-font-semibold ryv-leading-none;
+    box-sizing: border-box;
+    width: 0.875rem;
+    height: 0.875rem;
+    font-size: 0.75rem;
+    color: var(--ryv-help-icon-color, #fff);
+    background-color: var(--ryv-help-icon-bg, #bbb);
+    border-style: solid;
+    border-width: 2px;
+    border-color: var(--ryv-help-icon-bg, #bbb);
+  }
+  .ryv-help-icon:hover {
+    background-color: var(--ryv-help-icon-bg-hover, var(--ryv-primary-color, #002a41));
+    border-color: var(--ryv-help-icon-bg-hover, var(--ryv-primary-color, #002a41));
+  }
+  .ryv-help-icon:focus-visible {
+    @apply ryv-outline-none ryv-ring-2 ryv-ring-ryv-primary;
+  }
+  .ryv-help-tooltip {
+    @apply ryv-absolute ryv-z-10 ryv-text-sm ryv-font-normal ryv-leading-relaxed;
+    bottom: calc(100% + 0.625rem);
+    left: 50%;
+    transform: translateX(-50%);
+    width: max-content;
+    max-width: 21.875rem;
+    padding: var(--ryv-help-tooltip-padding, 0.3125rem 0.5625rem);
+    color: var(--ryv-help-tooltip-text-color, #fff);
+    background-color: var(--ryv-help-tooltip-bg, #333);
+    border-radius: var(--ryv-help-tooltip-border-radius, 0.25rem);
+  }
+  .ryv-help-tooltip::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 6px solid transparent;
+    border-top-color: var(--ryv-help-tooltip-bg, #333);
   }
 
   /* NodeEditor.js's "Description" field - optional helper text between the title and the options/input. */
   .ryv-question-description {
     @apply ryv-text-sm ryv-mb-4 ryv-leading-relaxed;
-    color: var(--ryv-secondary-color, #64748b);
+    color: var(--ryv-secondary-color, #454545);
   }
   .ryv-question-description a {
     @apply ryv-underline ryv-text-ryv-primary;
@@ -82,42 +156,54 @@
    * Holds the .ryv-option-btn list for both the state picker and any
    * radio/checkbox question rendered as buttons - a flex container so the
    * Elementor widget's layout controls (direction/wrap/gap) can arrange the
-   * buttons in a column (default, current look) or a wrapping row, without
-   * touching the question title that sits outside this wrapper.
+   * buttons in a wrapping row (default, matches campaignlegal.org/
+   * restoreyourvote's side-by-side pill buttons) or a stacked column,
+   * without touching the question title that sits outside this wrapper.
    */
   .ryv-options-list {
     display: flex;
-    flex-direction: var(--ryv-btn-direction, column);
-    flex-wrap: var(--ryv-btn-wrap, nowrap);
-    gap: var(--ryv-btn-gap, 0.5rem);
+    flex-direction: var(--ryv-btn-direction, row);
+    flex-wrap: var(--ryv-btn-wrap, wrap);
+    gap: var(--ryv-btn-gap, 0.3125rem);
   }
 
+  /*
+   * Fill/border/radius/typography below match campaignlegal.org/
+   * restoreyourvote (the real, live production form this parser/renderer
+   * targets) exactly - measured via getComputedStyle on the live site:
+   * flat filled buttons, square corners, bold 18px text, 1px border at
+   * every state (selection is fill/text-color only, not a thicker border).
+   * `width: auto` (not 100%) matches its default side-by-side layout - a
+   * flex child still stretches to fill a Column-layout container's width
+   * via the parent's default `align-items: stretch` (see .ryv-options-list
+   * above), so Column keeps its previous full-width look with no separate
+   * rule needed. Still fully overridable per-instance via the Elementor
+   * widget's own Style-tab controls, same as every other var(--x, <default>)
+   * here.
+   */
   .ryv-option-btn {
-    @apply ryv-text-left ryv-transition-colors ryv-duration-150;
-    width: var(--ryv-btn-width, 100%);
+    @apply ryv-text-left ryv-font-bold ryv-transition-colors ryv-duration-150;
+    width: var(--ryv-btn-width, auto);
+    font-size: var(--ryv-btn-font-size, 1.125rem);
     color: var(--ryv-btn-text-color, var(--ryv-text-color, #1f2937));
-    background-color: var(--ryv-btn-bg, var(--ryv-bg-color, #fff));
+    background-color: var(--ryv-btn-bg, #ececec);
     border-style: solid;
     border-width: var(--ryv-btn-border-width, 1px);
-    border-color: var(--ryv-btn-border-color, #d1d5db);
-    border-radius: var(--ryv-btn-border-radius, var(--ryv-radius, 0.5rem));
-    padding: var(--ryv-btn-padding, 0.75rem 1rem);
+    border-color: var(--ryv-btn-border-color, #ececec);
+    border-radius: var(--ryv-btn-border-radius, var(--ryv-radius, 0));
+    padding: var(--ryv-btn-padding, 0.5rem 1.125rem);
   }
   .ryv-option-btn:hover {
-    /* var(--ryv-btn-bg, ...) is resolved independently per-declaration (it's
-       the actual custom property, not "whatever the base rule fell back to"),
-       so --ryv-bg-color has to be threaded through here too, or a global
-       background would visibly flash back to #fff on hover. */
-    background-color: var(--ryv-btn-bg-hover, var(--ryv-btn-bg, var(--ryv-bg-color, #fff)));
-    border-color: var(--ryv-btn-border-color-hover, var(--ryv-primary-color, #1d4ed8));
+    background-color: var(--ryv-btn-bg-hover, var(--ryv-btn-bg, #ececec));
+    border-color: var(--ryv-btn-border-color-hover, var(--ryv-primary-color, #002a41));
   }
   .ryv-option-btn:focus-visible {
     @apply ryv-outline-none ryv-ring-2 ryv-ring-ryv-primary;
   }
   .ryv-option-btn[aria-pressed='true'] {
-    border-width: 2px;
-    background-color: var(--ryv-btn-bg-selected, #f9fafb);
-    border-color: var(--ryv-btn-border-color-selected, var(--ryv-primary-color, #1d4ed8));
+    @apply ryv-font-normal;
+    background-color: var(--ryv-btn-bg-selected, #cadae3);
+    border-color: var(--ryv-btn-border-color-selected, var(--ryv-primary-color, #002a41));
   }
 
   /*
@@ -147,15 +233,15 @@
     transition-duration: 150ms !important;
     transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1) !important;
     color: var(--ryv-continue-btn-text-color, #fff) !important;
-    background-color: var(--ryv-continue-btn-bg, var(--ryv-primary-color, #1d4ed8)) !important;
+    background-color: var(--ryv-continue-btn-bg, var(--ryv-primary-color, #002a41)) !important;
     border-style: solid !important;
     border-width: var(--ryv-continue-btn-border-width, 0px) !important;
     border-color: var(--ryv-continue-btn-border-color, transparent) !important;
-    border-radius: var(--ryv-continue-btn-border-radius, var(--ryv-radius, 0.5rem)) !important;
+    border-radius: var(--ryv-continue-btn-border-radius, var(--ryv-radius, 0)) !important;
     padding: var(--ryv-continue-btn-padding, 0.625rem 1.25rem) !important;
   }
   .ryv-continue-btn:hover {
-    background-color: var(--ryv-continue-btn-bg-hover, var(--ryv-continue-btn-bg, var(--ryv-primary-color, #1d4ed8))) !important;
+    background-color: var(--ryv-continue-btn-bg-hover, var(--ryv-continue-btn-bg, var(--ryv-primary-color, #002a41))) !important;
     opacity: var(--ryv-continue-btn-hover-opacity, 0.9);
   }
   .ryv-continue-btn:disabled {
@@ -169,7 +255,7 @@
     border-style: solid;
     border-width: var(--ryv-input-border-width, 1px);
     border-color: var(--ryv-input-border-color, #d1d5db);
-    border-radius: var(--ryv-input-border-radius, var(--ryv-radius, 0.5rem));
+    border-radius: var(--ryv-input-border-radius, var(--ryv-radius, 0));
     padding: var(--ryv-input-padding, 0.625rem 1rem);
   }
   .ryv-input:hover {
@@ -187,7 +273,7 @@
   }
   .ryv-radio-input {
     @apply ryv-h-4 ryv-w-4;
-    accent-color: var(--ryv-radio-accent-color, var(--ryv-primary-color, #1d4ed8));
+    accent-color: var(--ryv-radio-accent-color, var(--ryv-primary-color, #002a41));
   }
   .ryv-radio-input:focus-visible {
     @apply ryv-outline-none ryv-ring-2 ryv-ring-ryv-primary;
@@ -199,10 +285,11 @@
     color: var(--ryv-select-text-color, var(--ryv-text-color, #1f2937));
     background-color: var(--ryv-select-bg, var(--ryv-bg-color, #fff));
     border-style: solid;
-    border-width: var(--ryv-select-border-width, 1px);
-    border-color: var(--ryv-select-border-color, #d1d5db);
-    border-radius: var(--ryv-select-border-radius, var(--ryv-radius, 0.5rem));
-    padding: var(--ryv-select-padding, 0.625rem 1rem);
+    border-width: var(--ryv-select-border-width, 2px);
+    border-color: var(--ryv-select-border-color, #afb0b1);
+    border-radius: var(--ryv-select-border-radius, var(--ryv-radius, 0));
+    padding: var(--ryv-select-padding, 1rem);
+    font-size: var(--ryv-select-font-size, 1.125rem);
   }
   .ryv-select:hover {
     border-color: var(--ryv-select-border-color-hover, var(--ryv-select-border-color, #d1d5db));
@@ -229,10 +316,31 @@
     color: var(--ryv-select-text-color, var(--ryv-text-color, #1f2937));
     background-color: var(--ryv-select-bg, var(--ryv-bg-color, #fff));
     border-style: solid;
-    border-width: var(--ryv-select-border-width, 1px);
-    border-color: var(--ryv-select-border-color, #d1d5db);
-    border-radius: var(--ryv-select-border-radius, var(--ryv-radius, 0.5rem));
-    padding: var(--ryv-select-padding, 0.625rem 1rem);
+    border-width: var(--ryv-select-border-width, 2px);
+    border-color: var(--ryv-select-border-color, #afb0b1);
+    border-radius: var(--ryv-select-border-radius, var(--ryv-radius, 0));
+    padding: var(--ryv-select-padding, 1rem);
+    padding-right: 2.75rem;
+    font-size: var(--ryv-select-font-size, 1.125rem);
+  }
+  /*
+   * A plain <select> gets its arrow for free from the browser - this is a
+   * plain text <input> standing in for one (see renderSearchableSelect()),
+   * so campaignlegal.org/restoreyourvote's own dropdown chevron has to be
+   * drawn by hand. Purely decorative (aria-hidden via pointer-events: none
+   * - clicks pass straight through to the input beneath it).
+   */
+  .ryv-select2::after {
+    content: '';
+    position: absolute;
+    right: 1.125rem;
+    top: 50%;
+    width: 0.5rem;
+    height: 0.5rem;
+    border-right: 2px solid var(--ryv-select-arrow-color, var(--ryv-primary-color, #002a41));
+    border-bottom: 2px solid var(--ryv-select-arrow-color, var(--ryv-primary-color, #002a41));
+    transform: translateY(-70%) rotate(45deg);
+    pointer-events: none;
   }
   .ryv-select2-input:focus-visible {
     @apply ryv-outline-none ryv-ring-2 ryv-ring-ryv-primary;
@@ -242,14 +350,15 @@
     max-height: var(--ryv-select2-menu-max-height, 16rem);
     background-color: var(--ryv-select-bg, var(--ryv-bg-color, #fff));
     border-style: solid;
-    border-width: var(--ryv-select-border-width, 1px);
-    border-color: var(--ryv-select-border-color, #d1d5db);
-    border-radius: var(--ryv-select-border-radius, var(--ryv-radius, 0.5rem));
+    border-width: var(--ryv-select-border-width, 2px);
+    border-color: var(--ryv-select-border-color, #afb0b1);
+    border-radius: var(--ryv-select-border-radius, var(--ryv-radius, 0));
   }
   .ryv-select2-option {
     @apply ryv-cursor-pointer;
     color: var(--ryv-select-text-color, var(--ryv-text-color, #1f2937));
-    padding: var(--ryv-select-padding, 0.625rem 1rem);
+    padding: var(--ryv-select-padding, 1rem);
+    font-size: var(--ryv-select-font-size, 1.125rem);
   }
   .ryv-select2-option:hover,
   .ryv-select2-option.is-highlighted {
@@ -260,7 +369,7 @@
   }
   .ryv-select2-empty {
     @apply ryv-text-sm;
-    color: var(--ryv-secondary-color, #64748b);
+    color: var(--ryv-secondary-color, #454545);
     padding: var(--ryv-select-padding, 0.625rem 1rem);
   }
 
@@ -274,18 +383,41 @@
    * at equal specificity, so a real theme-level rule for either class name
    * is free to take precedence over this default.
    */
+  /*
+   * campaignlegal.org/restoreyourvote renders this as a bordered, shaded
+   * scroll box (light grey fill, grey border matching the dropdown's own
+   * border color, generous text) - measured via getComputedStyle on the
+   * live site (200px max-height, #f4f5f5 bg, 1px #afb0b1 border, 10px
+   * padding, 18px navy text), not just a bare max-height/overflow rule.
+   */
   .text-restrict-height {
-    max-height: var(--ryv-text-restrict-height, 16rem);
+    max-height: var(--ryv-text-restrict-height, 12.5rem);
     overflow-y: auto;
+    padding: var(--ryv-text-restrict-height-padding, 0.625rem);
+    background-color: var(--ryv-text-restrict-height-bg, #f4f5f5);
+    border-style: solid;
+    border-width: var(--ryv-text-restrict-height-border-width, 1px);
+    border-color: var(--ryv-text-restrict-height-border-color, #afb0b1);
+    color: var(--ryv-text-restrict-height-color, var(--ryv-primary-color, #002a41));
+    font-size: var(--ryv-text-restrict-height-font-size, 1.125rem);
   }
 
+  /*
+   * campaignlegal.org/restoreyourvote's terminal-result box (e.g. "You can
+   * vote!") - measured via getComputedStyle on the live site: no border,
+   * the same light-blue fill as a selected option button, generous padding
+   * (55px/44px), 18px navy text. Not a bordered/transparent callout like
+   * this used to default to.
+   */
   .message--path-end {
-    padding: var(--ryv-path-end-padding, 1rem);
+    padding: var(--ryv-path-end-padding, 3.4375rem 2.75rem);
     border-style: solid;
-    border-width: var(--ryv-path-end-border-width, 1px);
-    border-color: var(--ryv-path-end-border-color, var(--ryv-primary-color, #1d4ed8));
-    border-radius: var(--ryv-path-end-border-radius, var(--ryv-radius, 0.5rem));
-    background-color: var(--ryv-path-end-bg, transparent);
+    border-width: var(--ryv-path-end-border-width, 0px);
+    border-color: var(--ryv-path-end-border-color, transparent);
+    border-radius: var(--ryv-path-end-border-radius, var(--ryv-radius, 0));
+    background-color: var(--ryv-path-end-bg, #cadae3);
+    color: var(--ryv-path-end-color, var(--ryv-primary-color, #002a41));
+    font-size: var(--ryv-path-end-font-size, 1.125rem);
   }
 
   .ryv-error-box {

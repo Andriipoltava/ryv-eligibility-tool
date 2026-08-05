@@ -1,4 +1,14 @@
-import { initAll } from './src/engine.js';
+// The `?ver=` query strings below are NOT decorative - wp_enqueue_script()
+// only cache-busts THIS file (the one registered with RYV_VERSION); every
+// relative import a module makes is a URL the browser resolves and caches
+// on its own, and Apache serves these static .js files with Last-Modified
+// but no Cache-Control, so heuristic freshness lets a browser keep serving
+// an old cached copy indefinitely - surviving even a hard reload in
+// practice. Bump every one of these to match RYV_VERSION whenever it bumps
+// (same rule as ryv-eligibility-tool.php's own version comment), or edits
+// to engine.js/renderer.js/api-client.js can silently fail to reach anyone
+// who already loaded the form once.
+import { initAll } from './src/engine.js?ver=0.8.7';
 
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => initAll());

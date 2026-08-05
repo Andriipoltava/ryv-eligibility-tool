@@ -56,19 +56,21 @@ class RYV_Settings_Page {
 	 * Field defaults.
 	 *
 	 * primary_color/text_color match the hardcoded fallbacks already baked
-	 * into assets/src/input.css (`var(--ryv-primary-color, #1d4ed8)` etc.),
-	 * so saving this page unmodified changes nothing visually. bg_color/
-	 * border_radius/font_family default to '' (omitted entirely from the
-	 * generated CSS - see build_css()) rather than to a value, since those
-	 * three are genuinely new overrides with no prior equivalent; defaulting
-	 * them to a concrete value would repaint every existing site's forms the
-	 * moment this feature ships, before any admin opted in.
+	 * into assets/src/input.css (`var(--ryv-primary-color, #002a41)` etc. -
+	 * the navy/flat-button palette matches campaignlegal.org/restoreyourvote,
+	 * the real production site this form targets), so saving this page
+	 * unmodified changes nothing visually. bg_color/border_radius/font_family
+	 * default to '' (omitted entirely from the generated CSS - see
+	 * build_css()) rather than to a value, since those three are genuinely
+	 * new overrides with no prior equivalent; defaulting them to a concrete
+	 * value would repaint every existing site's forms the moment this
+	 * feature ships, before any admin opted in.
 	 *
 	 * @return array<string,string>
 	 */
 	public static function defaults(): array {
 		return array(
-			'primary_color' => '#1d4ed8',
+			'primary_color' => '#002a41',
 			'text_color'    => '#1f2937',
 			'bg_color'      => '',
 			'border_radius' => '',

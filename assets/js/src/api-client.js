@@ -15,6 +15,13 @@ async function request(path) {
   const response = await fetch(`${base}${path}`, {
     headers,
     credentials: 'same-origin',
+    // Form schemas can be edited by an admin at any time, and the browser
+    // has no way to know that from response headers alone (the REST route
+    // sends none of the usual freshness validators) - without this, a
+    // visitor who already loaded the form once in this browser session can
+    // keep getting served that stale copy indefinitely instead of the
+    // latest published schema.
+    cache: 'no-store',
   });
 
   if (!response.ok) {

@@ -1,5 +1,8 @@
-import { fetchForm, logSubmission, submitLead } from './api-client.js';
-import * as renderer from './renderer.js';
+// See the matching comment in ../decision-engine.js - these query strings
+// are the only thing cache-busting these nested imports; bump them with
+// every RYV_VERSION change.
+import { fetchForm, logSubmission, submitLead } from './api-client.js?ver=0.8.7';
+import * as renderer from './renderer.js?ver=0.8.7';
 
 const LOADING_CARD_ID = '__loading__';
 const ERROR_CARD_ID = '__error__';
@@ -135,7 +138,11 @@ export class RYVDecisionEngine {
 
       const next = this.computeNext(current, node);
       const isTerminal = !next && (node.type === 'markup' || node.type === 'unsupported');
-      this.appendCard(current, this.buildCard(current, node, isTerminal), animate);
+      // `node.hidden` (see RYV_YAML_Parser's "visible_and_invisible" case)
+      // still routes through normally - it's just never given a card, so a
+      // hidden markup node's own next_node keeps the chain moving
+      // transparently instead of dead-ending the flow.
+      this.appendCard(current, node.hidden ? null : this.buildCard(current, node, isTerminal), animate);
 
       if (!next) return;
       current = next;
@@ -183,7 +190,8 @@ export class RYVDecisionEngine {
           this.answers.get(nodeId) || [],
           (values) => this.onAnswerChange(nodeId, values),
           nodeId,
-          this.labels
+          this.labels,
+          this.nodes
         );
       case 'text':
       case 'textarea':
@@ -216,7 +224,7 @@ export class RYVDecisionEngine {
     const node = this.nodes[nodeId];
     const next = this.computeNext(nodeId, node);
     const isTerminal = !next && (node.type === 'markup' || node.type === 'unsupported');
-    this.appendCard(nodeId, this.buildCard(nodeId, node, isTerminal), false);
+    this.appendCard(nodeId, node.hidden ? null : this.buildCard(nodeId, node, isTerminal), false);
 
     if (next) this.renderFrom(next, true);
     this.logProgress();
@@ -258,6 +266,11 @@ export class RYVDecisionEngine {
 
   appendCard(id, element, animate = true) {
     this.renderedOrder.push(id);
+    // `element` is null for a `node.hidden` node - still tracked in
+    // renderedOrder (truncateFrom()/indexOf() need it to find its place in
+    // the sequence when an earlier answer changes) but never inserted into
+    // cardElements/the DOM, since there's nothing to remove later either.
+    if (!element) return;
     this.cardElements.set(id, element);
     renderer.appendCard(this.list, element, animate);
   }

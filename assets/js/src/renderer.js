@@ -68,12 +68,91 @@ export function createList() {
  * both gated to `manage_options`/`edit_post`. Rendered via innerHTML rather
  * than textContent so inline tags (<em>, <strong>, ...) actually format
  * instead of showing as literal text.
+ *
+ * `help` (NodeEditor.js's "Tooltip (Help Text)" field, or a YAML import's
+ * Drupal `#help` - see RYV_YAML_Parser::build_node()) is optional and gets
+ * a "?" icon appended right after the title text - see buildHelpTooltip().
+ *
+ * @param {string} title
+ * @param {string|null} help
  */
-function titleEl(title) {
+function titleEl(title, help) {
   const h2 = document.createElement('h2');
   h2.className = 'ryv-question-title';
-  h2.innerHTML = title || '';
+
+  const text = document.createElement('span');
+  text.innerHTML = title || '';
+  h2.appendChild(text);
+
+  if (help) {
+    h2.appendChild(buildHelpTooltip(help));
+  }
+
   return h2;
+}
+
+/**
+ * A "?" icon that reveals a small tooltip box with `help`'s (trusted) HTML
+ * on hover/focus - matches how campaignlegal.org/restoreyourvote's own
+ * Drupal webform_help icon behaves (a Tippy.js tooltip, `trigger:
+ * 'mouseenter focus'` - hover for mouse users, focus for keyboard ones,
+ * never a click-to-toggle). A short close delay (see `closeTimer` below)
+ * is standard tooltip UX: it survives the brief gap while the pointer
+ * crosses from the icon onto the tooltip itself, so `help` HTML containing
+ * a link (real example: "Please email us if you have any questions.") stays
+ * clickable instead of vanishing the instant the mouse leaves the icon.
+ *
+ * @param {string} help
+ * @returns {HTMLElement}
+ */
+function buildHelpTooltip(help) {
+  const wrap = el('span', { className: 'ryv-help' });
+
+  const tooltipId = `ryv-help-tooltip-${Math.random().toString(36).slice(2)}`;
+  const button = el('button', {
+    className: 'ryv-help-icon',
+    text: '?',
+    attrs: { type: 'button', 'aria-describedby': tooltipId, 'aria-label': 'Help' },
+  });
+
+  const tooltip = el('span', { className: 'ryv-help-tooltip', attrs: { id: tooltipId, role: 'tooltip' } });
+  tooltip.innerHTML = help;
+  tooltip.hidden = true;
+
+  let closeTimer = null;
+
+  const show = () => {
+    if (closeTimer) {
+      clearTimeout(closeTimer);
+      closeTimer = null;
+    }
+    tooltip.hidden = false;
+  };
+
+  const scheduleHide = () => {
+    closeTimer = window.setTimeout(() => {
+      tooltip.hidden = true;
+      closeTimer = null;
+    }, 150);
+  };
+
+  button.addEventListener('mouseenter', show);
+  button.addEventListener('mouseleave', scheduleHide);
+  button.addEventListener('focus', show);
+  button.addEventListener('blur', scheduleHide);
+  tooltip.addEventListener('mouseenter', show);
+  tooltip.addEventListener('mouseleave', scheduleHide);
+
+  button.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+      tooltip.hidden = true;
+      button.blur();
+    }
+  });
+
+  wrap.appendChild(button);
+  wrap.appendChild(tooltip);
+  return wrap;
 }
 
 /**
@@ -163,16 +242,33 @@ function renderSearchableSelect(wrap, options, selectedValue, onSelect, labels =
   let visibleOptions = [];
   let highlightedIndex = -1;
 
+  // Every `.ryv-card` gets its own stacking context (see .ryv-card's
+  // `transform`, which CSS Transforms treats as `position: relative` for
+  // stacking purposes even though the class never sets `position`) - so a
+  // LATER card, having no explicit z-index of its own, still paints over
+  // an EARLIER card's contents purely by DOM order, no matter what z-index
+  // this dropdown's own menu carries: z-index only wins comparisons within
+  // the stacking context it's actually created in, and this menu's context
+  // is scoped to its own card, not the sibling list. Bumping the whole
+  // ancestor card's z-index while its menu is open is what actually lets
+  // it float above every card rendered after it.
+  function setCardElevated(elevated) {
+    const card = container.closest('.ryv-card');
+    if (card) card.classList.toggle('ryv-card-elevated', elevated);
+  }
+
   function closeMenu() {
     menu.hidden = true;
     container.setAttribute('aria-expanded', 'false');
     highlightedIndex = -1;
+    setCardElevated(false);
   }
 
   function openMenu(query) {
     const q = query.trim().toLowerCase();
     visibleOptions = q ? options.filter((option) => option.label.toLowerCase().includes(q)) : options;
 
+    setCardElevated(true);
     menu.innerHTML = '';
     if (!visibleOptions.length) {
       menu.appendChild(el('div', { className: 'ryv-select2-empty', text: labels.select2NoResults }));
@@ -322,10 +418,12 @@ function renderSingleChoiceOptions(wrap, options, selectedValue, onSelect, displ
  *   immediately, no separate Continue step. An empty array means the answer was cleared.
  * @param {string} nodeId Node id, used to give the radio-input group a unique `name`.
  * @param {object} labels
+ * @param {object} [allNodes] Full `{ id: node }` graph - only needed to resolve `node.reference_node_id`
+ *   (see appendReferenceContent()). Optional so callers that never merge reference content can omit it.
  */
-export function renderQuestionCard(node, selectedValues, onChange, nodeId, labels = DEFAULT_LABELS) {
+export function renderQuestionCard(node, selectedValues, onChange, nodeId, labels = DEFAULT_LABELS, allNodes = null) {
   const wrap = cardWrap(node);
-  wrap.appendChild(titleEl(node.title));
+  wrap.appendChild(titleEl(node.title, node.help));
   if (node.description) wrap.appendChild(descriptionEl(node.description));
 
   const isMulti = node.type === 'checkbox';
@@ -346,6 +444,7 @@ export function renderQuestionCard(node, selectedValues, onChange, nodeId, label
       !!node.select2,
       node.placeholder || null
     );
+    appendReferenceContent(wrap, node, allNodes);
     return wrap;
   }
 
@@ -383,12 +482,44 @@ export function renderQuestionCard(node, selectedValues, onChange, nodeId, label
   });
 
   wrap.appendChild(list);
+  appendReferenceContent(wrap, node, allNodes);
   return wrap;
+}
+
+/**
+ * `node.reference_node_ids` on a question node (radio/checkbox) is an
+ * ordered list of other nodes - typically `markup` nodes - whose content
+ * should render inline below this question's own options, in the same
+ * card, in list order, rather than as their own separate steps. Set by
+ * RYV_YAML_Parser::build_subtree() when a markup node and a choice node
+ * shared the exact same #states condition and the question's own options
+ * left no free slot to route to the markup node on its own (see its
+ * docblock - confirmed against the real, live site: e.g. Alabama's felony
+ * checklist renders right below its question's own Yes/No/Maybe/FOS
+ * buttons, not as a separate click-through step). Each entry is a pointer,
+ * not a copy - a referenced node's own `content`/`wrapper_class` stay the
+ * single source of truth (editable in the builder like any other markup
+ * node), so this always reflects the latest edit with nothing to keep in
+ * sync. Trusted HTML, same boundary as `title`/`content` elsewhere.
+ */
+function appendReferenceContent(wrap, node, allNodes) {
+  const ids = node.reference_node_ids;
+  if (!ids || !ids.length || !allNodes) return;
+
+  ids.forEach((id) => {
+    const refNode = allNodes[id];
+    if (!refNode || !refNode.content) return;
+
+    const className = refNode.wrapper_class ? `ryv-content ${refNode.wrapper_class}` : 'ryv-content';
+    const content = el('div', { className });
+    content.innerHTML = refNode.content;
+    wrap.appendChild(content);
+  });
 }
 
 export function renderInputCard(node, previousValue, onChange) {
   const wrap = cardWrap(node);
-  wrap.appendChild(titleEl(node.title));
+  wrap.appendChild(titleEl(node.title, node.help));
   if (node.description) wrap.appendChild(descriptionEl(node.description));
 
   const tag = node.type === 'textarea' ? 'textarea' : 'input';
@@ -487,7 +618,7 @@ function buildFieldControl(field) {
  */
 export function renderLeadCaptureCard(node, submittedValue, onSubmit, onContinue, labels = DEFAULT_LABELS) {
   const wrap = cardWrap(node);
-  if (node.title) wrap.appendChild(titleEl(node.title));
+  if (node.title) wrap.appendChild(titleEl(node.title, node.help));
   if (node.description) wrap.appendChild(descriptionEl(node.description));
 
   if (submittedValue) {
@@ -580,7 +711,7 @@ export function renderLeadCaptureCard(node, submittedValue, onSubmit, onContinue
 export function renderMarkupCard(node, isTerminal, onRestart, labels = DEFAULT_LABELS) {
   const wrap = el('div');
   if (node.title) {
-    wrap.appendChild(titleEl(node.title));
+    wrap.appendChild(titleEl(node.title, node.help));
   }
   if (node.description) {
     wrap.appendChild(descriptionEl(node.description));

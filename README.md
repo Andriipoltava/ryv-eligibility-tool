@@ -49,11 +49,18 @@ in the schema format assumes voting eligibility specifically.
 * Use the visual SPA builder to structure your decision tree (add questions, markup blocks,
   choices, or lead capture forms). It's a flat node list with search/filter, not a drag-and-drop
   canvas — built to stay usable on forms with 400+ nodes.
+* A question can point at one or more Markup nodes as **Reference Content** — supporting material
+  (a list, a note, a disclaimer) shown right below its own answer options, in a user-controlled
+  order, without making that material a separate step. A Markup/Unsupported node can also be
+  marked **Hidden** to keep it in the graph (still routed through) without ever showing it on the
+  frontend.
 * You can also bulk-import a real Drupal Webform YAML export instead of building from scratch (see
   **RYV Forms → Import**); branching is reconstructed automatically from its `#states` visibility
   gates, and anything the importer can't confidently translate is flagged for manual review rather
   than silently dropped.
 * Configure global design defaults under **RYV Forms → Global Styles**.
+* **RYV Forms → Help** has a full plain-language walkthrough of the builder, importing, embedding,
+  and styling — the day-to-day reference for anyone running the plugin, not just this file.
 
 ### 2. Displaying Forms on the Frontend
 You can embed your questionnaire anywhere on your site using two methods:
@@ -115,7 +122,9 @@ WordPress plugins don't get a build step at deploy time. `node_modules/` is giti
 
 **`RYV_VERSION` in `ryv-eligibility-tool.php` must be bumped on any JS/CSS change.** It's the
 cache-busting query string on every enqueued asset — without a bump, browsers that already loaded
-the plugin keep serving the old file indefinitely.
+the plugin keep serving the old file indefinitely. The frontend engine's own relative imports
+(`assets/js/decision-engine.js` → `engine.js` → `renderer.js`/`api-client.js`) carry a matching
+`?ver=X.Y.Z` in the import specifier itself and need bumping too — see `CLAUDE.md` for why.
 
 ## Architecture
 

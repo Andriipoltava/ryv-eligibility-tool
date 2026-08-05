@@ -140,6 +140,7 @@ class RYV_Widget extends \Elementor\Widget_Base {
 		$this->register_dropdown_style_controls();
 		$this->register_input_style_controls();
 		$this->register_radio_style_controls();
+		$this->register_help_tooltip_style_controls();
 	}
 
 	/**
@@ -228,7 +229,7 @@ class RYV_Widget extends \Elementor\Widget_Base {
 
 	/**
 	 * Colors -> CSS custom properties on .ryv-app-wrapper, consumed by
-	 * assets/src/input.css (e.g. `var(--ryv-primary-color, #1d4ed8)`).
+	 * assets/src/input.css (e.g. `var(--ryv-primary-color, #002a41)`).
 	 *
 	 * primary_color/text_color deliberately have no 'default': Elementor's
 	 * CSS generator (Core\Files\CSS\Base::get_style_control_value()) treats
@@ -240,7 +241,7 @@ class RYV_Widget extends \Elementor\Widget_Base {
 	 * instead of this widget instance's own higher-specificity selector),
 	 * or to input.css's own hardcoded fallback if Global Styles was never
 	 * configured either. A *default* value here (like the old hardcoded
-	 * '#1d4ed8') would instead have Elementor emit that literal color on
+	 * '#002a41') would instead have Elementor emit that literal color on
 	 * every single instance unconditionally, permanently outranking Global
 	 * Styles regardless of whether the admin ever touched the control.
 	 * secondary_color keeps its own default since Global Styles has no
@@ -272,7 +273,7 @@ class RYV_Widget extends \Elementor\Widget_Base {
 			array(
 				'label'     => __( 'Secondary Color', 'ryv-eligibility-tool' ),
 				'type'      => \Elementor\Controls_Manager::COLOR,
-				'default'   => '#64748b',
+				'default'   => '#454545',
 				'selectors' => array(
 					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-secondary-color: {{VALUE}};',
 				),
@@ -471,7 +472,9 @@ class RYV_Widget extends \Elementor\Widget_Base {
 			array(
 				'label'   => __( 'Layout', 'ryv-eligibility-tool' ),
 				'type'    => \Elementor\Controls_Manager::SELECT,
-				'default' => 'column',
+				// campaignlegal.org/restoreyourvote's own default look -
+				// side-by-side pill buttons, not stacked full-width ones.
+				'default' => 'row',
 				'options' => array(
 					'column' => __( 'Column (stacked, one per row)', 'ryv-eligibility-tool' ),
 					'row'    => __( 'Row (side by side)', 'ryv-eligibility-tool' ),
@@ -1160,6 +1163,135 @@ class RYV_Widget extends \Elementor\Widget_Base {
 				),
 				'selectors'  => array(
 					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-radio-gap: {{SIZE}}{{UNIT}};',
+				),
+			)
+		);
+
+		$this->end_controls_section();
+	}
+
+	/**
+	 * The optional "?" tooltip icon after a question's title (node.help - a
+	 * YAML import sets it automatically from Drupal's #help) and the popover
+	 * it toggles (.ryv-help-icon / .ryv-help-tooltip - see renderer.js's
+	 * buildHelpTooltip()).
+	 */
+	private function register_help_tooltip_style_controls() {
+		$this->start_controls_section(
+			'help_tooltip_style_section',
+			array(
+				'label' => __( 'Help Tooltip', 'ryv-eligibility-tool' ),
+				'tab'   => \Elementor\Controls_Manager::TAB_STYLE,
+			)
+		);
+
+		$this->add_group_control(
+			\Elementor\Group_Control_Typography::get_type(),
+			array(
+				'name'     => 'help_tooltip_typography',
+				'label'    => __( 'Tooltip Typography', 'ryv-eligibility-tool' ),
+				'selector' => '{{WRAPPER}} .ryv-help-tooltip',
+			)
+		);
+
+		$this->add_control(
+			'help_icon_heading',
+			array(
+				'label' => __( 'Icon', 'ryv-eligibility-tool' ),
+				'type'  => \Elementor\Controls_Manager::HEADING,
+			)
+		);
+
+		$this->add_control(
+			'help_icon_color',
+			array(
+				'label'     => __( 'Icon Color', 'ryv-eligibility-tool' ),
+				'type'      => \Elementor\Controls_Manager::COLOR,
+				'default'   => '#ffffff',
+				'selectors' => array(
+					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-help-icon-color: {{VALUE}};',
+				),
+			)
+		);
+
+		$this->add_control(
+			'help_icon_bg_color',
+			array(
+				'label'       => __( 'Icon Background Color', 'ryv-eligibility-tool' ),
+				'type'        => \Elementor\Controls_Manager::COLOR,
+				'description' => __( 'Leave blank to use the Secondary Color set under Colors.', 'ryv-eligibility-tool' ),
+				'selectors'   => array(
+					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-help-icon-bg: {{VALUE}};',
+				),
+			)
+		);
+
+		$this->add_control(
+			'help_icon_bg_color_hover',
+			array(
+				'label'       => __( 'Icon Background Color (Hover)', 'ryv-eligibility-tool' ),
+				'type'        => \Elementor\Controls_Manager::COLOR,
+				'description' => __( 'Leave blank to use the Primary Color set under Colors.', 'ryv-eligibility-tool' ),
+				'selectors'   => array(
+					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-help-icon-bg-hover: {{VALUE}};',
+				),
+			)
+		);
+
+		$this->add_control(
+			'help_tooltip_heading',
+			array(
+				'label'     => __( 'Tooltip', 'ryv-eligibility-tool' ),
+				'type'      => \Elementor\Controls_Manager::HEADING,
+				'separator' => 'before',
+			)
+		);
+
+		$this->add_control(
+			'help_tooltip_text_color',
+			array(
+				'label'       => __( 'Text Color', 'ryv-eligibility-tool' ),
+				'type'        => \Elementor\Controls_Manager::COLOR,
+				'description' => __( 'Leave blank to use the site-wide default set under RYV Forms → Global Styles.', 'ryv-eligibility-tool' ),
+				'selectors'   => array(
+					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-help-tooltip-text-color: {{VALUE}};',
+				),
+			)
+		);
+
+		$this->add_control(
+			'help_tooltip_bg_color',
+			array(
+				'label'       => __( 'Background Color', 'ryv-eligibility-tool' ),
+				'type'        => \Elementor\Controls_Manager::COLOR,
+				'description' => __( 'Leave blank to use the site-wide default set under RYV Forms → Global Styles.', 'ryv-eligibility-tool' ),
+				'selectors'   => array(
+					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-help-tooltip-bg: {{VALUE}};',
+				),
+			)
+		);
+
+		$this->add_responsive_control(
+			'help_tooltip_padding',
+			array(
+				'label'      => __( 'Padding', 'ryv-eligibility-tool' ),
+				'type'       => \Elementor\Controls_Manager::DIMENSIONS,
+				'size_units' => array( 'px', 'em', 'rem', '%' ),
+				'selectors'  => array(
+					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-help-tooltip-padding: {{TOP}}{{UNIT}} {{RIGHT}}{{UNIT}} {{BOTTOM}}{{UNIT}} {{LEFT}}{{UNIT}};',
+				),
+			)
+		);
+
+		$this->add_control(
+			'help_tooltip_border_radius',
+			array(
+				'label'       => __( 'Border Radius', 'ryv-eligibility-tool' ),
+				'type'        => \Elementor\Controls_Manager::DIMENSIONS,
+				'description' => __( 'Leave blank to use the site-wide default set under RYV Forms → Global Styles.', 'ryv-eligibility-tool' ),
+				'size_units'  => array( 'px', 'em', 'rem', '%' ),
+				'selectors'   => array(
+					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-help-tooltip-border-radius: {{TOP}}{{UNIT}} {{RIGHT}}{{UNIT}} {{BOTTOM}}{{UNIT}} {{LEFT}}{{UNIT}};',
 				),
 			)
 		);

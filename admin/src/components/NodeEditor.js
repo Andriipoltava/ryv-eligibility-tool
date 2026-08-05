@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
-import { TextControl, SelectControl, TabPanel, TextareaControl } from '@wordpress/components';
+import { TextControl, SelectControl, TabPanel, TextareaControl, ToggleControl } from '@wordpress/components';
 import OptionsEditor from './OptionsEditor';
+import ReferenceNodesEditor from './ReferenceNodesEditor';
 import ClassicEditor from './ClassicEditor';
 import FormFieldsEditor from './FormFieldsEditor';
 import EmailSettingsEditor from './EmailSettingsEditor';
@@ -58,6 +59,11 @@ export default function NodeEditor({ node, nodeId, allNodeIds, allNodes, onChang
     ...allNodeIds.filter((id) => id !== nodeId).map((id) => ({ label: id, value: id })),
   ];
 
+  const referenceNodeOptions = [
+    { label: __('— None —', 'ryv-eligibility-tool'), value: '' },
+    ...allNodeIds.filter((id) => id !== nodeId).map((id) => ({ label: id, value: id })),
+  ];
+
   const commitId = () => {
     const cleaned = idDraft.trim().toLowerCase().replace(/[^a-z0-9_-]+/g, '_');
 
@@ -105,6 +111,17 @@ export default function NodeEditor({ node, nodeId, allNodeIds, allNodes, onChang
       />
 
       <TextareaControl
+        label={__('Tooltip (Help Text)', 'ryv-eligibility-tool')}
+        value={node.help || ''}
+        onChange={(help) => onChange({ ...node, help })}
+        rows={2}
+        help={__(
+          'Optional - shown as a "?" icon right after the title; clicking it reveals this text. Same HTML trust level as Title. A YAML import sets this automatically from Drupal\'s #help.',
+          'ryv-eligibility-tool'
+        )}
+      />
+
+      <TextareaControl
         label={__('Description', 'ryv-eligibility-tool')}
         value={node.description || ''}
         onChange={(description) => onChange({ ...node, description })}
@@ -140,6 +157,18 @@ export default function NodeEditor({ node, nodeId, allNodeIds, allNodes, onChang
           'ryv-eligibility-tool'
         )}
       />
+
+      {(node.type === 'markup' || node.type === 'unsupported') && (
+        <ToggleControl
+          label={__('Hidden', 'ryv-eligibility-tool')}
+          checked={!!node.hidden}
+          onChange={(hidden) => onChange({ ...node, hidden })}
+          help={__(
+            'When on, this node is skipped entirely on the frontend - no card is shown - but the flow still passes through it to its own "Next question" target, so routing keeps working. A YAML import turns this on automatically when an element had both a "visible" and an "invisible" Drupal condition that couldn\'t be safely combined (the invisible half was ignored rather than guessed) - review the original YAML and turn this off if the element should actually show.',
+            'ryv-eligibility-tool'
+          )}
+        />
+      )}
 
       {node.type === 'markup' && (
         <div className="ryv-builder-field">
@@ -213,11 +242,19 @@ export default function NodeEditor({ node, nodeId, allNodeIds, allNodes, onChang
       )}
 
       {isChoice ? (
-        <OptionsEditor
-          options={node.options || []}
-          nextNodeOptions={nextNodeOptions}
-          onChange={(options) => onChange({ ...node, options })}
-        />
+        <>
+          <OptionsEditor
+            options={node.options || []}
+            nextNodeOptions={nextNodeOptions}
+            onChange={(options) => onChange({ ...node, options })}
+          />
+
+          <ReferenceNodesEditor
+            referenceNodeIds={node.reference_node_ids || []}
+            referenceNodeOptions={referenceNodeOptions}
+            onChange={(reference_node_ids) => onChange({ ...node, reference_node_ids })}
+          />
+        </>
       ) : (
         <SelectControl
           label={__('Next question', 'ryv-eligibility-tool')}

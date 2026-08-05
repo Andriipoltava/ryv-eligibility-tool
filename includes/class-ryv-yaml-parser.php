@@ -250,7 +250,6 @@ class RYV_YAML_Parser {
 		$nodes               = array();
 		$gates_by_source     = array(); // source_id => [ value => target_id ].
 		$declared_conditions = array(); // node id => [ [source_id, value], ... ], regardless of gate-slot collisions - see below.
-		$collision_loser     = array(); // winner node id => the node id it just overwrote for the same source/value slot.
 
 		foreach ( $ordered as $item ) {
 			$id   = $item['id'];
@@ -268,6 +267,36 @@ class RYV_YAML_Parser {
 
 			if ( ! empty( $def['#states'] ) && is_array( $def['#states'] ) ) {
 				$conditions = $this->extract_visibility_condition( $def['#states'], $id, $warnings, $review );
+
+				// A `visible`/`visible-slide` rule alongside an `invisible`/
+				// `invisible-slide` one (e.g. RYV's real Alabama/Arizona/
+				// Florida exports: a reference blurb visible for its state
+				// but meant to disappear once the felony question is
+				// answered) can't be resolved into this parser's single-gate
+				// model - extract_visibility_condition() above only ever
+				// reads the `visible` half, so the `invisible` half would
+				// otherwise be silently dropped with no trace at all (unlike
+				// the invisible-only case, which at least warns). Hiding the
+				// element by default is the safe default: it stays present
+				// in the graph and reachable via its `visible` gate (an
+				// admin can flip it back on in the builder), rather than
+				// risking showing content past the point it should have
+				// disappeared.
+				$has_visible_rule   = isset( $def['#states']['visible'] ) || isset( $def['#states']['visible-slide'] );
+				$has_invisible_rule = isset( $def['#states']['invisible'] ) || isset( $def['#states']['invisible-slide'] );
+
+				if ( $has_visible_rule && $has_invisible_rule ) {
+					$nodes[ $id ]['hidden'] = true;
+
+					$warnings[] = "Element '{$id}': has both a 'visible'/'visible-slide' and an 'invisible'/'invisible-slide' condition - the invisible half can't be safely inverted into gate logic (would need every other possible answer to its source question), so this element was imported hidden by default. Review it in the builder and toggle it visible if it should show.";
+					$review[]   = $this->build_review_entry(
+						$id,
+						'visible_and_invisible',
+						'hidden_by_default',
+						$conditions ?? array(),
+						'Both visible and invisible conditions present - kept hidden by default since the invisible half could not be safely inverted into gate logic. Review manually and toggle "Hidden" off in the builder if this should show.'
+					);
+				}
 
 				// Recorded regardless of whether this element goes on to WIN
 				// its gate slot(s) below - a leaf that loses a duplicate-gate
@@ -295,33 +324,52 @@ class RYV_YAML_Parser {
 					// Two independent leaves can legitimately gate on the exact
 					// same source/value in Drupal - #states is a "become
 					// visible" flag, not an exclusive router, so both could be
-					// visible at once in the original form. This flat DAG can
-					// only ever route one option value to one next_node, so the
-					// later element in document order silently wins and the
-					// earlier one's target becomes unreachable - same ambiguity
-					// the container-gate duplicate check above already flags,
-					// extended here to the equally-real leaf/leaf case (see e.g.
-					// RYV's real Virginia export: 'virginia_oos' and
-					// 'has_your_right_to_vote_been_restored...' both gate on
-					// where_was_your_felony_conviction_s = "Federal court").
+					// visible at once in the original form. Confirmed against
+					// the real, live production site (campaignlegal.org/
+					// restoreyourvote): Alabama's al_moral_turpitude_felonies
+					// (a Yes/No/Maybe/FOS question) and al_mt_list (its
+					// reference felony list) both gate on
+					// al_felony_conviction=Yes and render as ONE step - the
+					// question with its own answer buttons, the list shown
+					// right below them as supporting reference material, not
+					// as a separate step to click through. This flat DAG has
+					// no way to show two independent nodes "at once" the way
+					// this repo's card-per-node engine works, but the
+					// question node can point at the markup node instead of
+					// trying to route to it as a next step - which also
+					// sidesteps a real structural dead end: a choice node's
+					// options (Yes/No/Maybe/FOS here) are usually all already
+					// individually routed elsewhere, leaving no free
+					// "default" slot to chain a second step into anyway.
+					// `reference_node_ids` is a list of pointers, not a copy
+					// or a single slot - a choice node can accumulate more
+					// than one colliding markup node this way (each appended
+					// in document order), and each markup node keeps its own
+					// content as the one place it's edited (in the builder or
+					// a re-import); the renderer resolves every pointer at
+					// render time, in order (see appendReferenceContent() in
+					// renderer.js). The identical pattern repeats throughout
+					// this document (no_cerv_felonies/al_no_cerv_list and
+					// nine more instances across other states), always the
+					// same shape: a markup (no-options) node colliding with a
+					// choice node.
 					if ( isset( $gates_by_source[ $source_id ][ $value ] ) ) {
 						$earlier_id = $gates_by_source[ $source_id ][ $value ];
-						$warnings[] = "Element '{$id}': duplicate #states gate for '{$source_id} = {$value}' - element '{$earlier_id}' claimed it first and lost this gate to '{$id}'; '{$id}' now routes to it as a fallback when it has nowhere else to go (verify this chained order - '{$id}' then '{$earlier_id}' - is actually correct for this pair).";
+						$this_is_markup    = 'markup' === $nodes[ $id ]['type'];
+						$earlier_is_choice = ! empty( $nodes[ $earlier_id ]['options'] );
 
-						// Empirically (RYV's real Alabama export:
-						// al_mt_list, a reference felony list, overwrites
-						// al_moral_turpitude_felonies, the actual follow-up
-						// question, for al_felony_conviction=Yes - and the
-						// identical pattern repeats for al_no_cerv_list/
-						// no_cerv_felonies), a duplicate-condition pair like
-						// this is consistently "reference content, then the
-						// question it's needed to answer" - not two
-						// unrelated elements that happen to collide. Record
-						// the loser so the winner's own routing below can
-						// chain to it as a fallback, instead of leaving the
-						// winner a dead end AND the loser permanently
-						// orphaned.
-						$collision_loser[ $id ] = $earlier_id;
+						if ( $this_is_markup && $earlier_is_choice ) {
+							$warnings[] = "Element '{$id}': shares its #states condition ('{$source_id} = {$value}') with '{$earlier_id}', a question whose own options leave no free slot to route to '{$id}' as a separate step - '{$earlier_id}' now points to '{$id}' as reference material shown below its options (matches how the two render together in the original form).";
+
+							$nodes[ $earlier_id ]['reference_node_ids'][] = $id;
+
+							// $earlier_id keeps the gate slot it already holds -
+							// deliberately NOT overwriting gates_by_source here,
+							// unlike the plain "later wins" case below.
+							continue;
+						}
+
+						$warnings[] = "Element '{$id}': duplicate #states gate for '{$source_id} = {$value}' - element '{$earlier_id}' claimed it first and becomes unreachable via this gate, overwritten by '{$id}'.";
 					}
 
 					$gates_by_source[ $source_id ][ $value ] = $id;
@@ -396,16 +444,6 @@ class RYV_YAML_Parser {
 		foreach ( $ids as $index => $id ) {
 			$gated_targets = $gates_by_source[ $id ] ?? array();
 			$default_next  = $this->find_default_next( $ids, $groups, $index, $gated_targets, $incoming_gates );
-
-			// $id just won a duplicate-#states-gate collision (see above)
-			// and has nowhere else to go - chain to the element it
-			// overwrote rather than leaving both a dead end for $id and the
-			// loser permanently unreachable. Only fires when $default_next
-			// is otherwise null, so this never overrides an already-correct
-			// forward continuation.
-			if ( null === $default_next && isset( $collision_loser[ $id ] ) ) {
-				$default_next = $collision_loser[ $id ];
-			}
 
 			if ( ! empty( $nodes[ $id ]['options'] ) ) {
 				foreach ( $nodes[ $id ]['options'] as &$option ) {
@@ -616,6 +654,16 @@ class RYV_YAML_Parser {
 			'source_type' => $drupal_type,
 			'options'     => array(),
 		);
+
+		// Drupal's #help is a short explanatory blurb for the field, shown
+		// as a tooltip - not the field's body content (that's #markup/#text
+		// below), and not #description either (Drupal has both; RYV's real
+		// exports only ever use #help, e.g. al_moral_turpitude_felonies:
+		// "Please pay attention to the degree of your conviction..."). Same
+		// trusted-HTML boundary as title/content - only ever admin-authored.
+		if ( ! empty( $def['#help'] ) ) {
+			$node['help'] = (string) $def['#help'];
+		}
 
 		// Display-only elements (markup/processed_text) carry their body in
 		// #markup or #text, not #title - #title is often unset for these.
