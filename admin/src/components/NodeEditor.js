@@ -162,6 +162,18 @@ export default function NodeEditor({ node, nodeId, allNodeIds, allNodes, onChang
         />
       )}
 
+      {node.type === 'radio' && node.display_style === 'dropdown' && (
+        <TextControl
+          label={__('Placeholder', 'ryv-eligibility-tool')}
+          value={node.placeholder || ''}
+          onChange={(placeholder) => onChange({ ...node, placeholder })}
+          help={__(
+            'Shown before an option is chosen, for this question only. Leave blank to use the form-wide default ("— Select —", or whatever the Elementor widget\'s Labels tab sets it to).',
+            'ryv-eligibility-tool'
+          )}
+        />
+      )}
+
       {node.type === 'lead_capture' && (
         <div className="ryv-builder-field ryv-builder-lead-capture-settings">
           <TabPanel

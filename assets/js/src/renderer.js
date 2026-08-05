@@ -145,14 +145,15 @@ export function renderErrorCard(message, onRetry, labels = DEFAULT_LABELS) {
  * @param {string|null} selectedValue
  * @param {(value: string) => void} onSelect
  * @param {object} labels
+ * @param {string|null} placeholder Per-question override (node.placeholder, NodeEditor.js's "Placeholder" field) - falls back to labels.selectPlaceholder when unset.
  */
-function renderSearchableSelect(wrap, options, selectedValue, onSelect, labels = DEFAULT_LABELS) {
+function renderSearchableSelect(wrap, options, selectedValue, onSelect, labels = DEFAULT_LABELS, placeholder = null) {
   const container = el('div', { className: 'ryv-select2', attrs: { role: 'combobox', 'aria-expanded': 'false' } });
   const currentOption = () => options.find((option) => option.value === selectedValue);
 
   const input = el('input', {
     className: 'ryv-select2-input',
-    attrs: { type: 'text', role: 'searchbox', autocomplete: 'off', placeholder: labels.selectPlaceholder },
+    attrs: { type: 'text', role: 'searchbox', autocomplete: 'off', placeholder: placeholder || labels.selectPlaceholder },
   });
   input.value = currentOption() ? currentOption().label : '';
 
@@ -259,16 +260,17 @@ function renderSearchableSelect(wrap, options, selectedValue, onSelect, labels =
  *   single-choice cards on the same page don't cross-select each other.
  * @param {object} labels
  * @param {boolean} searchable When displayStyle is 'dropdown', use the search-enabled combobox instead of a native <select> (node.select2).
+ * @param {string|null} placeholder Per-question override (node.placeholder) - falls back to labels.selectPlaceholder when unset.
  */
-function renderSingleChoiceOptions(wrap, options, selectedValue, onSelect, displayStyle, radioGroupName, labels = DEFAULT_LABELS, searchable = false) {
+function renderSingleChoiceOptions(wrap, options, selectedValue, onSelect, displayStyle, radioGroupName, labels = DEFAULT_LABELS, searchable = false, placeholder = null) {
   if (displayStyle === 'dropdown') {
     if (searchable) {
-      renderSearchableSelect(wrap, options, selectedValue, onSelect, labels);
+      renderSearchableSelect(wrap, options, selectedValue, onSelect, labels, placeholder);
       return;
     }
 
     const select = el('select', { className: 'ryv-select' });
-    select.appendChild(el('option', { text: labels.selectPlaceholder, attrs: { value: '', disabled: true } }));
+    select.appendChild(el('option', { text: placeholder || labels.selectPlaceholder, attrs: { value: '', disabled: true } }));
     options.forEach((option) => {
       const opt = el('option', { text: option.label, attrs: { value: option.value } });
       if (option.value === selectedValue) opt.setAttribute('selected', 'selected');
@@ -341,7 +343,8 @@ export function renderQuestionCard(node, selectedValues, onChange, nodeId, label
       node.display_style,
       `ryv-node-${nodeId}`,
       labels,
-      !!node.select2
+      !!node.select2,
+      node.placeholder || null
     );
     return wrap;
   }

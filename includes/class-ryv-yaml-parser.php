@@ -248,7 +248,8 @@ class RYV_YAML_Parser {
 		}
 
 		$nodes           = array();
-		$gates_by_source = array(); // source_id => [ value => target_id ].
+		$gates_by_source     = array(); // source_id => [ value => target_id ].
+		$declared_conditions = array(); // node id => [ [source_id, value], ... ], regardless of gate-slot collisions - see below.
 
 		foreach ( $ordered as $item ) {
 			$id   = $item['id'];
@@ -266,6 +267,25 @@ class RYV_YAML_Parser {
 
 			if ( ! empty( $def['#states'] ) && is_array( $def['#states'] ) ) {
 				$conditions = $this->extract_visibility_condition( $def['#states'], $id, $warnings, $review );
+
+				// Recorded regardless of whether this element goes on to WIN
+				// its gate slot(s) below - a leaf that loses a duplicate-gate
+				// collision (see the warning just below) still explicitly
+				// declared "I only apply for source=value" in its own YAML,
+				// and find_default_next()'s sibling-branch check needs that
+				// even when this element isn't actually reachable via that
+				// condition anymore (see e.g. RYV's real Alabama export:
+				// al_moral_turpitude_felonies loses its al_felony_conviction
+				// ='Yes' slot to al_mt_list, but is still only ever meant to
+				// be seen for that same answer, not al_votes's 'No').
+				if ( ! empty( $conditions ) ) {
+					$declared_conditions[ $id ] = array_map(
+						static function ( $condition ) {
+							return array( $condition['source_id'], $condition['value'] );
+						},
+						$conditions
+					);
+				}
 
 				foreach ( $conditions ?? array() as $condition ) {
 					$source_id = $condition['source_id'];
@@ -332,9 +352,34 @@ class RYV_YAML_Parser {
 			$ordered
 		);
 
+		// Inverse of $gates_by_source: node id => every [source_id, value]
+		// condition it's reachable under. Lets find_default_next() require
+		// a node's default continuation to share ITS OWN reachability
+		// condition, not just land on the next thing in document order -
+		// see that method's docblock for why (Alabama's al_votes/
+		// al_moral_turpitude_felonies is the real example that surfaced
+		// this).
+		$incoming_gates = array();
+		foreach ( $gates_by_source as $source_id => $values ) {
+			foreach ( $values as $value => $target_id ) {
+				$incoming_gates[ $target_id ][] = array( $source_id, (string) $value );
+			}
+		}
+
+		// Merge in $declared_conditions too - a node that lost a duplicate-
+		// gate collision has no entry in $gates_by_source's resolved map
+		// (something else won its slot), so it would otherwise look
+		// "ungated" to the sibling-branch check below despite its own YAML
+		// explicitly declaring the condition it's meant to apply under.
+		foreach ( $declared_conditions as $node_id => $conditions ) {
+			foreach ( $conditions as $condition ) {
+				$incoming_gates[ $node_id ][] = $condition;
+			}
+		}
+
 		foreach ( $ids as $index => $id ) {
 			$gated_targets = $gates_by_source[ $id ] ?? array();
-			$default_next  = $this->find_default_next( $ids, $groups, $index, $gated_targets );
+			$default_next  = $this->find_default_next( $ids, $groups, $index, $gated_targets, $incoming_gates );
 
 			if ( ! empty( $nodes[ $id ]['options'] ) ) {
 				foreach ( $nodes[ $id ]['options'] as &$option ) {
@@ -998,32 +1043,92 @@ class RYV_YAML_Parser {
 
 	/**
 	 * Find the next element in document order that isn't exclusively
-	 * reached via one of this element's own conditional gates, without
-	 * crossing into a different top-level group (see flatten()'s $group -
+	 * reached via one of this element's own conditional gates, and doesn't
+	 * cross into a different top-level group (see flatten()'s $group -
 	 * this is what keeps one state's default fallthrough from spilling
 	 * into the next state's content once every state shares one document).
 	 *
-	 * @param string[] $ids           Document-ordered node ids.
-	 * @param string[] $groups        Parallel array: each id's top-level group.
-	 * @param int      $current_index Index of the current node within $ids.
-	 * @param array    $gated_targets value => target_id map for this node's options.
+	 * If the current node is itself only reachable under a specific
+	 * condition (`$incoming_gates` has an entry for it - e.g. Alabama's
+	 * al_votes, gated on al_felony_conviction='No'), its default
+	 * continuation must share that exact condition too, or the search
+	 * stops immediately rather than continuing to scan forward - Drupal
+	 * forms are authored in roughly linear per-branch order, so once the
+	 * very next same-group element belongs to a different condition, every
+	 * following element is virtually certain to be part of that OTHER
+	 * branch (or one nested even deeper inside it) too. Without this,
+	 * al_votes's "you can vote!" result would silently fall through into
+	 * felony-related content several branches away, meant for a completely
+	 * different answer - the same "don't spill into unrelated content"
+	 * problem the $group bounding above already solves ACROSS states,
+	 * happening WITHIN one state's own group instead. A node with no
+	 * condition of its own (the common case - most content has no #states
+	 * at all) keeps the original unrestricted forward search, since there's
+	 * no "my condition" to compare against.
+	 *
+	 * @param string[] $ids            Document-ordered node ids.
+	 * @param string[] $groups         Parallel array: each id's top-level group.
+	 * @param int      $current_index  Index of the current node within $ids.
+	 * @param array    $gated_targets  value => target_id map for this node's own options.
+	 * @param array    $incoming_gates node id => [ [source_id, value], ... ] - every condition it's reachable under, across the whole graph.
 	 * @return string|null
 	 */
-	private function find_default_next( array $ids, array $groups, int $current_index, array $gated_targets ): ?string {
-		$excluded  = array_values( $gated_targets );
-		$count     = count( $ids );
-		$my_group  = $groups[ $current_index ];
+	private function find_default_next( array $ids, array $groups, int $current_index, array $gated_targets, array $incoming_gates ): ?string {
+		$excluded = array_values( $gated_targets );
+		$count    = count( $ids );
+		$my_group = $groups[ $current_index ];
+		$my_gates = $incoming_gates[ $ids[ $current_index ] ] ?? array();
 
 		for ( $j = $current_index + 1; $j < $count; $j++ ) {
 			if ( $groups[ $j ] !== $my_group ) {
 				return null;
 			}
 
-			if ( ! in_array( $ids[ $j ], $excluded, true ) ) {
-				return $ids[ $j ];
+			$candidate       = $ids[ $j ];
+			$candidate_gates = $incoming_gates[ $candidate ] ?? array();
+
+			if ( in_array( $candidate, $excluded, true ) ) {
+				continue;
 			}
+
+			// Only block when the candidate has a KNOWN condition of its own
+			// that fails to overlap with mine - a candidate with none at all
+			// (truly unconditional, OR its own #states existed but failed to
+			// resolve into a gate, e.g. an unsupported compound AND rule -
+			// see resolve_condition_dict()) carries no signal either way, so
+			// it stays a safe default rather than being wrongly excluded for
+			// "not proving" it belongs to my branch. Real example: Arizona's
+			// arizona_paid_all_required_fines_and_restitutions has an
+			// unresolvable 2-condition AND rule (already flagged in
+			// `review`), so it has no gate of its own and relies entirely on
+			// this default fallthrough to be reachable at all.
+			if ( ! empty( $my_gates ) && ! empty( $candidate_gates ) && ! $this->shares_condition( $candidate_gates, $my_gates ) ) {
+				return null;
+			}
+
+			return $candidate;
 		}
 
 		return null;
+	}
+
+	/**
+	 * True if $candidate_gates and $my_gates share at least one identical
+	 * [source_id, value] pair.
+	 *
+	 * @param array $candidate_gates [ [source_id, value], ... ] the candidate node is reachable under.
+	 * @param array $my_gates        [ [source_id, value], ... ] the current node is reachable under.
+	 * @return bool
+	 */
+	private function shares_condition( array $candidate_gates, array $my_gates ): bool {
+		foreach ( $candidate_gates as $candidate_gate ) {
+			foreach ( $my_gates as $my_gate ) {
+				if ( $candidate_gate === $my_gate ) {
+					return true;
+				}
+			}
+		}
+
+		return false;
 	}
 }

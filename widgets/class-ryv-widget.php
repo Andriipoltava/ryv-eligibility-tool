@@ -318,6 +318,16 @@ class RYV_Widget extends \Elementor\Widget_Base {
 		$this->add_group_control(
 			\Elementor\Group_Control_Typography::get_type(),
 			array(
+				'name'     => 'description_typography',
+				'label'    => __( 'Description', 'ryv-eligibility-tool' ),
+				'description' => __( 'The optional helper text set per-question in the Description field (builder → node editor), shown between the title and the options/input.', 'ryv-eligibility-tool' ),
+				'selector' => '{{WRAPPER}} .ryv-question-description',
+			)
+		);
+
+		$this->add_group_control(
+			\Elementor\Group_Control_Typography::get_type(),
+			array(
 				'name'     => 'results_typography',
 				'label'    => __( 'Results', 'ryv-eligibility-tool' ),
 				'selector' => '{{WRAPPER}} .ryv-content',
@@ -808,7 +818,15 @@ class RYV_Widget extends \Elementor\Widget_Base {
 	}
 
 	/**
-	 * Native <select> used by display_style: 'dropdown' (.ryv-select).
+	 * display_style: 'dropdown' - either a native <select> (.ryv-select), or,
+	 * when the source question also has select2: true (see
+	 * RYV_YAML_Parser::build_node()), the search-enabled combobox
+	 * (.ryv-select2-input/.ryv-select2-menu - see renderer.js's
+	 * renderSearchableSelect()). Both variants read the same --ryv-select-*
+	 * custom properties below, so one set of controls styles either; only
+	 * Typography needs its own selector added per-variant, since Elementor's
+	 * typography group generates literal CSS rules rather than a custom
+	 * property.
 	 */
 	private function register_dropdown_style_controls() {
 		$this->start_controls_section(
@@ -824,7 +842,7 @@ class RYV_Widget extends \Elementor\Widget_Base {
 			array(
 				'name'     => 'dropdown_typography',
 				'label'    => __( 'Typography', 'ryv-eligibility-tool' ),
-				'selector' => '{{WRAPPER}} .ryv-select',
+				'selector' => '{{WRAPPER}} .ryv-select, {{WRAPPER}} .ryv-select2-input, {{WRAPPER}} .ryv-select2-option',
 			)
 		);
 
@@ -935,6 +953,18 @@ class RYV_Widget extends \Elementor\Widget_Base {
 		$this->end_controls_tab();
 
 		$this->end_controls_tabs();
+
+		$this->add_control(
+			'dropdown_select2_highlight_bg',
+			array(
+				'label'       => __( 'Highlighted Option Background', 'ryv-eligibility-tool' ),
+				'type'        => \Elementor\Controls_Manager::COLOR,
+				'description' => __( 'Only affects the search-enabled dropdown (a question with Select2 enabled in the source form) - the background of the option under the cursor or keyboard focus in its results list.', 'ryv-eligibility-tool' ),
+				'selectors'   => array(
+					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-select2-highlight-bg: {{VALUE}};',
+				),
+			)
+		);
 
 		$this->end_controls_section();
 	}

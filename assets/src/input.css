@@ -253,7 +253,7 @@
   }
   .ryv-select2-option:hover,
   .ryv-select2-option.is-highlighted {
-    background-color: var(--ryv-btn-bg-selected, #f9fafb);
+    background-color: var(--ryv-select2-highlight-bg, var(--ryv-btn-bg-selected, #f9fafb));
   }
   .ryv-select2-option[aria-selected='true'] {
     font-weight: 600;
