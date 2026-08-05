@@ -247,9 +247,10 @@ class RYV_YAML_Parser {
 			}
 		}
 
-		$nodes           = array();
+		$nodes               = array();
 		$gates_by_source     = array(); // source_id => [ value => target_id ].
 		$declared_conditions = array(); // node id => [ [source_id, value], ... ], regardless of gate-slot collisions - see below.
+		$collision_loser     = array(); // winner node id => the node id it just overwrote for the same source/value slot.
 
 		foreach ( $ordered as $item ) {
 			$id   = $item['id'];
@@ -305,7 +306,22 @@ class RYV_YAML_Parser {
 					// where_was_your_felony_conviction_s = "Federal court").
 					if ( isset( $gates_by_source[ $source_id ][ $value ] ) ) {
 						$earlier_id = $gates_by_source[ $source_id ][ $value ];
-						$warnings[] = "Element '{$id}': duplicate #states gate for '{$source_id} = {$value}' - element '{$earlier_id}' claimed it first and becomes unreachable via this gate, overwritten by '{$id}'.";
+						$warnings[] = "Element '{$id}': duplicate #states gate for '{$source_id} = {$value}' - element '{$earlier_id}' claimed it first and lost this gate to '{$id}'; '{$id}' now routes to it as a fallback when it has nowhere else to go (verify this chained order - '{$id}' then '{$earlier_id}' - is actually correct for this pair).";
+
+						// Empirically (RYV's real Alabama export:
+						// al_mt_list, a reference felony list, overwrites
+						// al_moral_turpitude_felonies, the actual follow-up
+						// question, for al_felony_conviction=Yes - and the
+						// identical pattern repeats for al_no_cerv_list/
+						// no_cerv_felonies), a duplicate-condition pair like
+						// this is consistently "reference content, then the
+						// question it's needed to answer" - not two
+						// unrelated elements that happen to collide. Record
+						// the loser so the winner's own routing below can
+						// chain to it as a fallback, instead of leaving the
+						// winner a dead end AND the loser permanently
+						// orphaned.
+						$collision_loser[ $id ] = $earlier_id;
 					}
 
 					$gates_by_source[ $source_id ][ $value ] = $id;
@@ -380,6 +396,16 @@ class RYV_YAML_Parser {
 		foreach ( $ids as $index => $id ) {
 			$gated_targets = $gates_by_source[ $id ] ?? array();
 			$default_next  = $this->find_default_next( $ids, $groups, $index, $gated_targets, $incoming_gates );
+
+			// $id just won a duplicate-#states-gate collision (see above)
+			// and has nowhere else to go - chain to the element it
+			// overwrote rather than leaving both a dead end for $id and the
+			// loser permanently unreachable. Only fires when $default_next
+			// is otherwise null, so this never overrides an already-correct
+			// forward continuation.
+			if ( null === $default_next && isset( $collision_loser[ $id ] ) ) {
+				$default_next = $collision_loser[ $id ];
+			}
 
 			if ( ! empty( $nodes[ $id ]['options'] ) ) {
 				foreach ( $nodes[ $id ]['options'] as &$option ) {
