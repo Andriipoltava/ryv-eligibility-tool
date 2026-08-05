@@ -47,6 +47,96 @@ if ( ! defined( 'ABSPATH' ) ) {
 					</ul>
 				<?php endif; ?>
 			</div>
+
+			<?php if ( ! empty( $result['health'] ) ) : ?>
+				<?php
+				$broken_count   = count( $result['health']['broken_links'] );
+				$orphaned_count = count( $result['health']['orphaned_nodes'] );
+				$is_healthy     = 0 === $broken_count && 0 === $orphaned_count;
+				?>
+				<div class="notice <?php echo $is_healthy ? 'notice-success' : 'notice-warning'; ?>" style="margin-top: 0;">
+					<p>
+						<strong><?php esc_html_e( 'Graph health check:', 'ryv-eligibility-tool' ); ?></strong>
+						<?php if ( $is_healthy ) : ?>
+							<?php
+							printf(
+								/* translators: %d: total node count */
+								esc_html__( '0 broken links found, %d node(s) all reachable - tree integrity is healthy.', 'ryv-eligibility-tool' ),
+								(int) $result['health']['total_nodes']
+							);
+							?>
+						<?php else : ?>
+							<?php
+							printf(
+								/* translators: 1: broken link count, 2: orphaned node count */
+								esc_html__( '%1$d broken link(s), %2$d orphaned (unreachable) node(s) found - see below.', 'ryv-eligibility-tool' ),
+								(int) $broken_count,
+								(int) $orphaned_count
+							);
+							?>
+						<?php endif; ?>
+					</p>
+
+					<?php if ( $broken_count > 0 ) : ?>
+						<p><strong><?php esc_html_e( 'Broken links:', 'ryv-eligibility-tool' ); ?></strong></p>
+						<ul style="list-style: disc; margin-left: 1.5em; max-height: 14em; overflow-y: auto;">
+							<?php foreach ( $result['health']['broken_links'] as $link ) : ?>
+								<li>
+									<code><?php echo esc_html( $link['node_id'] ); ?></code>
+									<?php if ( null !== $link['option_value'] ) : ?>
+										<?php /* translators: %s: option value */ ?>
+										(<?php printf( esc_html__( 'option "%s"', 'ryv-eligibility-tool' ), esc_html( $link['option_value'] ) ); ?>)
+									<?php endif; ?>
+									&rarr; <code><?php echo esc_html( $link['target'] ); ?></code>
+									<?php esc_html_e( '(does not exist)', 'ryv-eligibility-tool' ); ?>
+								</li>
+							<?php endforeach; ?>
+						</ul>
+					<?php endif; ?>
+
+					<?php if ( $orphaned_count > 0 ) : ?>
+						<p>
+							<strong><?php esc_html_e( 'Orphaned (unreachable) nodes:', 'ryv-eligibility-tool' ); ?></strong>
+							<code><?php echo esc_html( implode( ', ', $result['health']['orphaned_nodes'] ) ); ?></code>
+						</p>
+					<?php endif; ?>
+				</div>
+			<?php endif; ?>
+
+			<?php if ( ! empty( $result['review'] ) ) : ?>
+				<div class="notice notice-warning" style="margin-top: 0;">
+					<p>
+						<strong>
+							<?php
+							printf(
+								/* translators: %d: flagged element count */
+								esc_html__( 'Review Imported Elements (%d flagged)', 'ryv-eligibility-tool' ),
+								count( $result['review'] )
+							);
+							?>
+						</strong>
+					</p>
+					<p class="description">
+						<?php esc_html_e( 'These elements had a compound #states rule (multiple conditions combined with AND) that can\'t be represented as a single branch, so they were imported as linear/unconditional. Click "Edit in builder" to jump straight to that node and wire up its next_node manually.', 'ryv-eligibility-tool' ); ?>
+					</p>
+					<?php foreach ( $result['review'] as $item ) : ?>
+						<details style="margin: 0.5em 0;">
+							<summary style="cursor: pointer;">
+								<code><?php echo esc_html( $item['element_id'] ); ?></code>
+								&mdash; <?php echo esc_html( $item['summary'] ); ?>
+							</summary>
+							<div style="margin: 0.5em 0 0.5em 1.5em;">
+								<p><?php echo esc_html( $item['note'] ); ?></p>
+								<p>
+									<a href="<?php echo esc_url( add_query_arg( 'ryv_node', $item['element_id'], get_edit_post_link( $result['post_id'] ) ) ); ?>">
+										<?php esc_html_e( 'Edit in builder →', 'ryv-eligibility-tool' ); ?>
+									</a>
+								</p>
+							</div>
+						</details>
+					<?php endforeach; ?>
+				</div>
+			<?php endif; ?>
 		<?php else : ?>
 			<div class="notice notice-error is-dismissible">
 				<p><?php echo esc_html( $result['message'] ); ?></p>

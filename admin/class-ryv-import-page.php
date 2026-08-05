@@ -32,6 +32,16 @@ class RYV_Import_Page {
 	const RESULT_TRANSIENT_PREFIX = 'ryv_import_result_';
 
 	/**
+	 * Postmeta key holding the imported form's flagged-elements review list
+	 * (RYV_YAML_Parser's `review`, see its docblock) - kept on the post
+	 * itself, not just the transient, so it survives past the immediate
+	 * post-import page load (e.g. revisiting the import results isn't
+	 * possible once the transient expires, but the data a "review these
+	 * nodes" workflow needs still should be).
+	 */
+	const REVIEW_META_KEY = '_ryv_import_warnings';
+
+	/**
 	 * Hook slug for this submenu page.
 	 */
 	const PAGE_SLUG = 'ryv-import-yaml';
@@ -92,15 +102,26 @@ class RYV_Import_Page {
 			// before doing anything destructive.
 			$this->assert_replace_confirmed( $post_id );
 
-			RYV_CPT::save_schema(
-				$post_id,
-				array(
-					'entry_node' => $result['entry_node'],
-					'nodes'      => $result['nodes'],
-				)
+			$schema = array(
+				'entry_node' => $result['entry_node'],
+				'nodes'      => $result['nodes'],
 			);
 
+			RYV_CPT::save_schema( $post_id, $schema );
+
 			$this->apply_title_and_description( $post_id, $result, $is_new );
+
+			// Persisted on the post itself (not just the transient below) so
+			// it's still there if an admin comes back to this form later,
+			// e.g. from a "review flagged nodes" link days after the import.
+			$review = $result['review'];
+			if ( empty( $review ) ) {
+				delete_post_meta( $post_id, self::REVIEW_META_KEY );
+			} else {
+				update_post_meta( $post_id, self::REVIEW_META_KEY, $review );
+			}
+
+			$health = RYV_Graph_Validator::analyze( $schema );
 
 			$this->store_result(
 				array(
@@ -111,6 +132,8 @@ class RYV_Import_Page {
 					'description' => $result['description'],
 					'warnings'    => $result['warnings'],
 					'skipped'     => $result['skipped'],
+					'review'      => $review,
+					'health'      => $health,
 				)
 			);
 		} catch ( \Throwable $e ) {

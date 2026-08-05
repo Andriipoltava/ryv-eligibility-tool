@@ -31,10 +31,24 @@ use Symfony\Component\Yaml\Yaml;
  * $container_gates side channel - see that method's docblock for exactly
  * why a side channel rather than mutating the leaf.
  *
- * Anything the translator can't confidently resolve (compound #states
- * conditions, unmapped element types, optgroups, etc.) is still imported -
- * never silently dropped - but flagged in `warnings` for manual follow-up in
- * the form builder.
+ * Anything the translator can't confidently resolve (unmapped element types,
+ * optgroups, etc.) is still imported - never silently dropped - but flagged
+ * in `warnings` for manual follow-up in the form builder.
+ *
+ * Compound `#states` rules (Drupal's array-of-conditions-plus-'and'/'or'-
+ * operator form, or a dict with more than one selector key) get the same
+ * treatment, with one refinement: a rule that's a pure OR chain - even one
+ * spanning several different upstream questions - maps exactly onto this
+ * parser's existing single-edge-per-option gate model (see
+ * resolve_condition_list()), so those are fully resolved into real gates,
+ * not just flagged. Only a rule that requires two conditions to hold AT THE
+ * SAME TIME (AND, anywhere in the chain) falls back to linear placement,
+ * because a single graph edge can only ever depend on the ONE upstream
+ * node's own answer that leads to it - see resolve_condition_dict()'s
+ * docblock for why that's a real modeling limit, not just an unimplemented
+ * case. Every unresolved rule's full condition list is captured
+ * structurally in `review` (see parse()), not just as a warning string, so
+ * an admin can see exactly what to wire up by hand.
  */
 class RYV_YAML_Parser {
 
@@ -108,17 +122,24 @@ class RYV_YAML_Parser {
 	 *     @type array        $nodes      node_id => { type, title, content, source_type, options[], next_node? }.
 	 *     @type string[]     $warnings   Ambiguous/unsupported constructs, for manual follow-up.
 	 *     @type string[]     $skipped    Element keys dropped entirely (e.g. submit actions).
+	 *     @type array[]      $review     Structured detail for every element left linear because of an
+	 *                                    unresolvable compound `#states` rule - see build_review_entry().
+	 *                                    A strict subset of `warnings` (every entry here also has a
+	 *                                    matching warning string); this is the machine-readable form of
+	 *                                    the same fact, for rendering an actual review UI instead of
+	 *                                    just a string dump.
 	 * }
 	 */
 	public function parse( array $parsed ): array {
 		$warnings = array();
 		$skipped  = array();
+		$review   = array();
 
 		$title       = isset( $parsed['title'] ) && is_string( $parsed['title'] ) ? $parsed['title'] : null;
 		$description = isset( $parsed['description'] ) && is_string( $parsed['description'] ) ? $parsed['description'] : null;
 
 		$elements_root = $this->resolve_elements_root( $parsed );
-		$subtree       = $this->build_subtree( $elements_root, $warnings, $skipped );
+		$subtree       = $this->build_subtree( $elements_root, $warnings, $skipped, $review );
 
 		return array(
 			'title'       => $title,
@@ -127,6 +148,7 @@ class RYV_YAML_Parser {
 			'nodes'       => $subtree['nodes'],
 			'warnings'    => $warnings,
 			'skipped'     => $skipped,
+			'review'      => $review,
 		);
 	}
 
@@ -156,12 +178,13 @@ class RYV_YAML_Parser {
 	 * @param array    $elements Element definitions keyed by machine name.
 	 * @param string[] $warnings Accumulator.
 	 * @param string[] $skipped  Accumulator.
+	 * @param array[]  $review   Accumulator - see parse()'s docblock.
 	 * @return array{entry_node:?string,nodes:array}
 	 */
-	private function build_subtree( array $elements, array &$warnings, array &$skipped ): array {
+	private function build_subtree( array $elements, array &$warnings, array &$skipped, array &$review ): array {
 		$ordered         = array();
 		$container_gates = array(); // "source_id|value" => target_id, from container-level #states gates (see flatten()).
-		$this->flatten( $elements, $ordered, $warnings, $skipped, $container_gates, null, null );
+		$this->flatten( $elements, $ordered, $warnings, $skipped, $review, $container_gates, null, null );
 
 		// Two different branches of the document could in principle produce
 		// the same sanitized id (a generic Drupal machine name reused
@@ -201,9 +224,9 @@ class RYV_YAML_Parser {
 			$nodes[ $id ] = $node;
 
 			if ( ! empty( $def['#states'] ) && is_array( $def['#states'] ) ) {
-				$condition = $this->extract_visibility_condition( $def['#states'], $id, $warnings );
+				$conditions = $this->extract_visibility_condition( $def['#states'], $id, $warnings, $review );
 
-				if ( null !== $condition ) {
+				foreach ( $conditions ?? array() as $condition ) {
 					$gates_by_source[ $condition['source_id'] ][ $condition['value'] ] = $id;
 				}
 			}
@@ -343,11 +366,15 @@ class RYV_YAML_Parser {
 	 * @param array      $ordered         Accumulator: list of [ id, def, group ].
 	 * @param string[]   $warnings        Accumulator.
 	 * @param string[]   $skipped         Accumulator.
+	 * @param array[]    $review          Accumulator - see parse()'s docblock.
 	 * @param array      $container_gates Accumulator: "source_id|value" => target node id.
-	 * @param array|null $inherited_gate  Gate propagated down from an enclosing container, if any.
+	 * @param array[]|null $inherited_gate Gate condition list propagated down from an enclosing container,
+	 *                                     if any - a list because a container's own gate can itself be a
+	 *                                     resolved OR chain (see extract_visibility_condition()), not just
+	 *                                     ever a single condition.
 	 * @param string|null $group          Group inherited from an enclosing call, or null at the true top level.
 	 */
-	private function flatten( array $elements, array &$ordered, array &$warnings, array &$skipped, array &$container_gates, ?array $inherited_gate, ?string $group ): void {
+	private function flatten( array $elements, array &$ordered, array &$warnings, array &$skipped, array &$review, array &$container_gates, ?array $inherited_gate, ?string $group ): void {
 		$gate_consumed = false;
 
 		foreach ( $elements as $key => $def ) {
@@ -386,7 +413,7 @@ class RYV_YAML_Parser {
 				}
 
 				$own_gate = ( ! empty( $def['#states'] ) && is_array( $def['#states'] ) )
-					? $this->extract_visibility_condition( $def['#states'], $key, $warnings )
+					? $this->extract_visibility_condition( $def['#states'], $key, $warnings, $review )
 					: null;
 
 				// This container's own gate (if any) is more specific/nearer
@@ -396,18 +423,25 @@ class RYV_YAML_Parser {
 				$gate_to_pass = $own_gate ?? ( $gate_consumed ? null : $inherited_gate );
 				$before_count = count( $ordered );
 
-				$this->flatten( $children, $ordered, $warnings, $skipped, $container_gates, $gate_to_pass, $item_group );
+				$this->flatten( $children, $ordered, $warnings, $skipped, $review, $container_gates, $gate_to_pass, $item_group );
 
 				if ( null !== $gate_to_pass ) {
 					if ( count( $ordered ) > $before_count ) {
 						$entry_id = $ordered[ $before_count ]['id'];
-						$slot     = $gate_to_pass['source_id'] . '|' . $gate_to_pass['value'];
 
-						if ( isset( $container_gates[ $slot ] ) ) {
-							$warnings[] = "Container '{$key}': duplicate gate for the same source/value as an earlier container - it overwrites the earlier target.";
+						// $gate_to_pass is a list because a resolved OR chain
+						// (see extract_visibility_condition()) can carry
+						// several source/value pairs, not just one - every
+						// one of them routes to this same first leaf.
+						foreach ( $gate_to_pass as $condition ) {
+							$slot = $condition['source_id'] . '|' . $condition['value'];
+
+							if ( isset( $container_gates[ $slot ] ) ) {
+								$warnings[] = "Container '{$key}': duplicate gate for the same source/value as an earlier container - it overwrites the earlier target.";
+							}
+
+							$container_gates[ $slot ] = $entry_id;
 						}
-
-						$container_gates[ $slot ] = $entry_id;
 					} else {
 						$warnings[] = "Container '{$key}' produced no leaf nodes - its gate has nowhere to route to.";
 					}
@@ -501,23 +535,32 @@ class RYV_YAML_Parser {
 	}
 
 	/**
-	 * Translate a Drupal `#states` block into a single-condition gate, if
-	 * it matches the one supported shape:
-	 *   visible: { ':input[name="source_id"]': { value: 'x' } }
+	 * Translate a Drupal `#states` block into a resolved list of gate
+	 * conditions, if the rule's logic can be represented that way.
 	 * `visible-slide` is treated identically to `visible` - it's the same
 	 * condition, just with an animated reveal, and RYV widely uses it for
-	 * per-state / per-answer branching.
+	 * per-state / per-answer branching. 'invisible'/'invisible-slide' are
+	 * still not translated (that would need a true "else" branch, not just
+	 * another gate) - flagged only when they're the sole directive present.
 	 *
-	 * Anything more complex (multiple conditions, AND/OR arrays, 'invisible',
-	 * operators other than a plain value match) is flagged and ignored -
-	 * the element falls back to unconditional linear placement.
+	 * `visible` itself comes in two shapes:
+	 *   - a dict, `{ selector: condition, ... }` - one key is the plain
+	 *     single-condition case; more than one key is Drupal's implicit AND.
+	 *   - a sequential list alternating condition-dicts with 'and'/'or'
+	 *     operator strings, Drupal's explicit-join form.
+	 * See resolve_condition_dict()/resolve_condition_list() for what each
+	 * shape can and can't become.
 	 *
 	 * @param array    $states     The element's #states array.
 	 * @param string   $element_id Owning element id, for warning messages.
 	 * @param string[] $warnings   Accumulator.
-	 * @return array{source_id:string,value:string}|null
+	 * @param array[]  $review     Accumulator - see parse()'s docblock.
+	 * @return array<int,array{source_id:string,value:string}>|null List of
+	 *         resolved conditions (every one of them an independent OR
+	 *         branch onto the same target), or null if the rule couldn't be
+	 *         resolved into gates at all.
 	 */
-	private function extract_visibility_condition( array $states, string $element_id, array &$warnings ): ?array {
+	private function extract_visibility_condition( array $states, string $element_id, array &$warnings, array &$review ): ?array {
 		if ( isset( $states['visible'] ) ) {
 			$visible = $states['visible'];
 		} elseif ( isset( $states['visible-slide'] ) ) {
@@ -529,29 +572,218 @@ class RYV_YAML_Parser {
 			return null;
 		}
 
-		if ( ! is_array( $visible ) || 1 !== count( $visible ) ) {
-			$warnings[] = "Element '{$element_id}': #states.visible has a compound/multi-condition rule - not supported, kept as unconditional/linear.";
+		if ( ! is_array( $visible ) || empty( $visible ) ) {
+			$warnings[] = "Element '{$element_id}': #states.visible is not a recognizable condition - kept as unconditional/linear.";
 			return null;
 		}
 
-		$selector  = array_key_first( $visible );
-		$condition = $visible[ $selector ];
+		if ( $this->is_sequential_list( $visible ) ) {
+			return $this->resolve_condition_list( $visible, $element_id, $warnings, $review );
+		}
 
-		if ( ! preg_match( '/name="([^"\]]+)"/', (string) $selector, $matches ) ) {
-			$warnings[] = "Element '{$element_id}': could not parse #states selector '{$selector}' - kept as unconditional/linear.";
+		return $this->resolve_condition_dict( $visible, $element_id, $warnings, $review );
+	}
+
+	/**
+	 * Resolve `#states.visible`'s dict shape: `{ selector: condition, ... }`.
+	 * A single key is the plain, always-supported case. More than one key is
+	 * Drupal Form API's implicit AND ("if there's more than one, all must be
+	 * met") - and that's exactly what this parser's graph model can't
+	 * express: `build_subtree()` gives an option exactly one `next_node`,
+	 * chosen by that option's own value on ONE upstream node. An AND across
+	 * two DIFFERENT upstream questions would need the engine to check a
+	 * second node's answer too, which nothing here (or in the frontend
+	 * decision engine - see CLAUDE.md's "UX model" section) does. So this
+	 * case is deliberately left linear, with every condition it did manage
+	 * to parse captured in `review` so an admin can wire it up by hand.
+	 *
+	 * @param array    $dict       The `visible` dict.
+	 * @param string   $element_id Owning element id, for warning/review entries.
+	 * @param string[] $warnings   Accumulator.
+	 * @param array[]  $review     Accumulator.
+	 * @return array<int,array{source_id:string,value:string}>|null
+	 */
+	private function resolve_condition_dict( array $dict, string $element_id, array &$warnings, array &$review ): ?array {
+		$parsed = array();
+
+		foreach ( $dict as $selector => $condition ) {
+			$fail_reason = null;
+			$parsed_condition = $this->parse_single_condition( (string) $selector, $condition, $fail_reason );
+
+			if ( null === $parsed_condition ) {
+				$message    = 'unparseable_selector' === $fail_reason
+					? "could not parse #states selector '{$selector}'"
+					: "#states condition on '{$selector}' is not a simple value match";
+				$warnings[] = "Element '{$element_id}': {$message} - kept as unconditional/linear.";
+				$review[]   = $this->build_review_entry( $element_id, 'unparseable', null, $parsed, "Selector '{$selector}' could not be parsed as a simple value-match condition." );
+				return null;
+			}
+
+			$parsed[] = $parsed_condition;
+		}
+
+		if ( 1 === count( $parsed ) ) {
+			return $parsed;
+		}
+
+		$warnings[] = "Element '{$element_id}': #states.visible requires " . count( $parsed ) . ' condition(s) to ALL match at once (AND) - not representable as a single branch, kept as unconditional/linear.';
+		$review[]   = $this->build_review_entry( $element_id, 'and', 'and', $parsed, 'All listed conditions must match simultaneously - requires joining answers from more than one question.' );
+
+		return null;
+	}
+
+	/**
+	 * Resolve `#states.visible`'s sequential-list shape: alternating
+	 * condition-dicts and 'and'/'or' operator strings, e.g.
+	 *   [ {sel1: {value: a}}, or, {sel2: {value: b}}, or, {sel1: {value: c}} ]
+	 * A rule that's a PURE OR chain - even across several different source
+	 * questions - is fully resolvable: each condition just becomes its own
+	 * independent gate onto the same target, which is exactly what
+	 * build_subtree() already does with one gate per option/source. Any
+	 * 'and' anywhere in the chain reintroduces the cross-question join
+	 * problem described in resolve_condition_dict() and falls back to
+	 * linear, with the full parsed condition list logged to `review`.
+	 *
+	 * @param array    $list       The `visible` list.
+	 * @param string   $element_id Owning element id, for warning/review entries.
+	 * @param string[] $warnings   Accumulator.
+	 * @param array[]  $review     Accumulator.
+	 * @return array<int,array{source_id:string,value:string}>|null
+	 */
+	private function resolve_condition_list( array $list, string $element_id, array &$warnings, array &$review ): ?array {
+		$conditions = array();
+		$operators  = array();
+
+		foreach ( $list as $item ) {
+			if ( is_string( $item ) ) {
+				$op = strtolower( trim( $item ) );
+
+				if ( ! in_array( $op, array( 'and', 'or' ), true ) ) {
+					$warnings[] = "Element '{$element_id}': unrecognized #states list operator '{$item}' - kept as unconditional/linear.";
+					$review[]   = $this->build_review_entry( $element_id, 'unsupported_operator', null, $conditions, "Unrecognized operator token '{$item}' in a compound rule." );
+					return null;
+				}
+
+				$operators[] = $op;
+				continue;
+			}
+
+			if ( ! is_array( $item ) || 1 !== count( $item ) ) {
+				$warnings[] = "Element '{$element_id}': #states.visible list contains a nested/compound condition - not supported, kept as unconditional/linear.";
+				$review[]   = $this->build_review_entry( $element_id, 'nested_unsupported', null, $conditions, 'A list item was itself a nested condition group rather than a single selector condition.' );
+				return null;
+			}
+
+			$selector    = array_key_first( $item );
+			$fail_reason = null;
+			$condition   = $this->parse_single_condition( (string) $selector, $item[ $selector ], $fail_reason );
+
+			if ( null === $condition ) {
+				$message    = 'unparseable_selector' === $fail_reason
+					? "could not parse selector '{$selector}'"
+					: "condition on '{$selector}' is not a simple value match";
+				$warnings[] = "Element '{$element_id}': {$message} inside a compound #states rule - kept as unconditional/linear.";
+				$review[]   = $this->build_review_entry( $element_id, 'unparseable', null, $conditions, "Selector '{$selector}' inside the compound rule could not be parsed." );
+				return null;
+			}
+
+			$conditions[] = $condition;
+		}
+
+		if ( empty( $conditions ) ) {
+			$warnings[] = "Element '{$element_id}': #states.visible list had no usable conditions - kept as unconditional/linear.";
+			$review[]   = $this->build_review_entry( $element_id, 'empty', null, array(), 'No parseable conditions were found in the list.' );
+			return null;
+		}
+
+		$unique_ops = array_values( array_unique( $operators ) );
+
+		// Zero or one operator token between >=1 conditions, and every token
+		// (if any) is 'or' - a pure OR chain, fully resolvable.
+		if ( count( $conditions ) < 2 || ( array( 'or' ) === $unique_ops ) ) {
+			return $conditions;
+		}
+
+		$reason     = ( array( 'and' ) === $unique_ops ) ? 'and' : 'mixed';
+		$op_summary = 'mixed' === $reason ? "'and'/'or'" : "'and'";
+		$warnings[] = "Element '{$element_id}': #states.visible combines " . count( $conditions ) . " conditions with {$op_summary} - not supported, kept as unconditional/linear.";
+		$review[]   = $this->build_review_entry( $element_id, $reason, $reason, $conditions, 'Conditions could not all be joined into a single branch because at least one was combined with AND.' );
+
+		return null;
+	}
+
+	/**
+	 * Parse one `{ ':input[name="x"]': { value: 'y' } }`-shaped condition.
+	 *
+	 * @param string      $selector    The selector key, e.g. `:input[name="x"]`.
+	 * @param mixed       $condition   The selector's value, expected `{ value: ... }`.
+	 * @param string|null $fail_reason Out param: 'unparseable_selector' or 'not_simple_value_match' on failure.
+	 * @return array{source_id:string,value:string}|null
+	 */
+	private function parse_single_condition( string $selector, $condition, ?string &$fail_reason = null ): ?array {
+		if ( ! preg_match( '/name="([^"\]]+)"/', $selector, $matches ) ) {
+			$fail_reason = 'unparseable_selector';
 			return null;
 		}
 
 		$source_id = rtrim( $matches[1], '[]' );
 
-		if ( ! is_array( $condition ) || ! isset( $condition['value'] ) ) {
-			$warnings[] = "Element '{$element_id}': #states condition on '{$source_id}' is not a simple value match - kept as unconditional/linear.";
+		if ( ! is_array( $condition ) || ! isset( $condition['value'] ) || ! is_scalar( $condition['value'] ) ) {
+			$fail_reason = 'not_simple_value_match';
 			return null;
 		}
 
 		return array(
 			'source_id' => sanitize_key( $source_id ),
 			'value'     => (string) $condition['value'],
+		);
+	}
+
+	/**
+	 * True if $arr is a sequential (Drupal YAML list) array rather than an
+	 * associative (dict) one - distinguishes `#states.visible`'s two shapes.
+	 * A `#states` selector key is never purely numeric, so integer-keyed
+	 * `array_keys() === range(0, n-1)` reliably means "this is a list."
+	 *
+	 * @param array $arr
+	 * @return bool
+	 */
+	private function is_sequential_list( array $arr ): bool {
+		if ( empty( $arr ) ) {
+			return true;
+		}
+
+		return array_keys( $arr ) === range( 0, count( $arr ) - 1 );
+	}
+
+	/**
+	 * Build one structured `review` entry - the machine-readable record of
+	 * exactly what a compound rule required, for a real review UI rather
+	 * than a warning string an admin has to parse by eye.
+	 *
+	 * @param string      $element_id Element left linear because of this rule.
+	 * @param string      $reason     Short machine tag: 'and' | 'mixed' | 'unparseable' | 'unsupported_operator' | 'nested_unsupported' | 'empty'.
+	 * @param string|null $operator   'and' | 'mixed' | null (null when there's no meaningful join, e.g. a parse failure).
+	 * @param array[]     $conditions Whatever conditions were successfully parsed, `{source_id, value}` each.
+	 * @param string      $note       One-sentence human explanation of why this couldn't become a branch.
+	 * @return array
+	 */
+	private function build_review_entry( string $element_id, string $reason, ?string $operator, array $conditions, string $note ): array {
+		$parts = array();
+		foreach ( $conditions as $condition ) {
+			$parts[] = "{$condition['source_id']} = '{$condition['value']}'";
+		}
+
+		$joiner  = 'and' === $operator ? ' AND ' : ( 'mixed' === $operator ? ' [and/or] ' : ' OR ' );
+		$summary = $parts ? implode( $joiner, $parts ) : '(no parseable conditions)';
+
+		return array(
+			'element_id' => $element_id,
+			'reason'     => $reason,
+			'operator'   => $operator,
+			'conditions' => $conditions,
+			'summary'    => $summary,
+			'note'       => $note,
 		);
 	}
 

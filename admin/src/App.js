@@ -46,8 +46,15 @@ export default function App() {
         setDescription(data.description || '');
         savedMetaRef.current = { title: data.title, description: data.description || '' };
         setStatus(data.status || 'draft');
-        setSchema(data.schema && data.schema.nodes ? data.schema : emptySchema());
-        setSelectedNodeId(null);
+        const loadedSchema = data.schema && data.schema.nodes ? data.schema : emptySchema();
+        setSchema(loadedSchema);
+
+        // Deep link from the YAML import review notice ("Edit in builder →"
+        // links to ?ryv_node=<id>) - land straight on the flagged node
+        // instead of making the admin hunt for it in a 400+-node list.
+        const requestedNodeId = new URLSearchParams(window.location.search).get('ryv_node');
+        setSelectedNodeId(requestedNodeId && loadedSchema.nodes[requestedNodeId] ? requestedNodeId : null);
+
         setError(null);
       })
       .catch((err) => setError(err.message))
