@@ -237,7 +237,7 @@ export default function App() {
       <div className="ryv-builder-body">
         <NodeList graph={schema} selectedNodeId={selectedNodeId} onSelect={setSelectedNodeId} onChange={updateGraph} />
 
-        {selectedNodeId && schema.nodes[selectedNodeId] && (
+        {selectedNodeId && schema.nodes[selectedNodeId] ? (
           <NodeEditor
             node={schema.nodes[selectedNodeId]}
             nodeId={selectedNodeId}
@@ -251,6 +251,15 @@ export default function App() {
               }))
             }
           />
+        ) : (
+          <div className="ryv-builder-empty-state">
+            <span className="dashicons dashicons-forms" aria-hidden="true" />
+            <p>
+              {Object.keys(schema.nodes).length
+                ? __('Select a question from the list to edit it, or add a new one to get started.', 'ryv-eligibility-tool')
+                : __('This form has no questions yet - click "+ Add Question" to create the first one.', 'ryv-eligibility-tool')}
+            </p>
+          </div>
         )}
       </div>
     </div>

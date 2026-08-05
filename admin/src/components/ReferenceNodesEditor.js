@@ -46,31 +46,35 @@ export default function ReferenceNodesEditor({ referenceNodeIds, referenceNodeOp
 
       {ids.map((id, index) => (
         // eslint-disable-next-line react/no-array-index-key -- rows are reordered in place via move(), not keyed by id
-        <div className="ryv-builder-option-row" key={index}>
+        <div className="ryv-builder-reference-node-row" key={index}>
+          <span className="ryv-builder-reference-node-position">{index + 1}</span>
+
           <SelectControl
+            className="ryv-builder-reference-node-select"
             label={__('Node', 'ryv-eligibility-tool')}
+            hideLabelFromVision
             value={id || ''}
             options={referenceNodeOptions}
             onChange={(value) => updateAt(index, value)}
           />
-          <Button
-            variant="secondary"
-            isSmall
-            onClick={() => move(index, -1)}
-            disabled={index === 0}
-            label={__('Move up', 'ryv-eligibility-tool')}
-          >
-            ↑
-          </Button>
-          <Button
-            variant="secondary"
-            isSmall
-            onClick={() => move(index, 1)}
-            disabled={index === ids.length - 1}
-            label={__('Move down', 'ryv-eligibility-tool')}
-          >
-            ↓
-          </Button>
+
+          <span className="ryv-builder-reference-node-reorder">
+            <Button
+              icon="arrow-up-alt2"
+              isSmall
+              onClick={() => move(index, -1)}
+              disabled={index === 0}
+              label={__('Move up', 'ryv-eligibility-tool')}
+            />
+            <Button
+              icon="arrow-down-alt2"
+              isSmall
+              onClick={() => move(index, 1)}
+              disabled={index === ids.length - 1}
+              label={__('Move down', 'ryv-eligibility-tool')}
+            />
+          </span>
+
           <ConfirmButton
             label={__('Delete', 'ryv-eligibility-tool')}
             confirmLabel={__('Confirm?', 'ryv-eligibility-tool')}

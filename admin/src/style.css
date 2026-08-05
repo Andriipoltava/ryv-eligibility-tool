@@ -108,6 +108,33 @@
   align-items: start;
 }
 
+.ryv-builder-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 0.5rem;
+  min-height: 240px;
+  padding: 2rem;
+  background: #fff;
+  border: 1px dashed #c3c4c7;
+  border-radius: 6px;
+  color: #646970;
+}
+
+.ryv-builder-empty-state .dashicons {
+  width: 32px;
+  height: 32px;
+  font-size: 32px;
+  color: #c3c4c7;
+}
+
+.ryv-builder-empty-state p {
+  margin: 0;
+  max-width: 320px;
+}
+
 .ryv-builder-node-groups {
   margin: 0.5rem 0;
 }
@@ -117,6 +144,7 @@
   border-radius: 4px;
   background: #fff;
   margin-bottom: 6px;
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.03);
 }
 
 .ryv-builder-node-group summary {
@@ -128,6 +156,11 @@
   cursor: pointer;
   font-weight: 600;
   list-style: none;
+  border-radius: 4px;
+}
+
+.ryv-builder-node-group summary:hover {
+  background: #f6f7f7;
 }
 
 .ryv-builder-node-group summary::-webkit-details-marker {
@@ -173,13 +206,21 @@
   align-items: center;
   gap: 0.25rem;
   border: 1px solid #ccd0d4;
+  border-left: 3px solid transparent;
   border-radius: 4px;
   margin-bottom: 4px;
   background: #fff;
+  transition: background-color 0.1s ease-in-out, border-color 0.1s ease-in-out;
+}
+
+.ryv-builder-node-list li:hover {
+  background: #f6f7f7;
 }
 
 .ryv-builder-node-list li.is-active {
+  background: #f0f6fc;
   border-color: #2271b1;
+  border-left-color: #2271b1;
 }
 
 .ryv-builder-node-list li button:first-child {
@@ -197,9 +238,43 @@
 }
 
 .ryv-builder-node-type {
-  font-size: 11px;
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 600;
   text-transform: uppercase;
-  color: #646970;
+  letter-spacing: 0.02em;
+  color: #50575e;
+  background: #f0f0f1;
+  border-radius: 10px;
+  padding: 1px 8px;
+  margin: 2px 0;
+}
+
+/* One accent color per node type - purely a scanning aid, same palette
+   feel as WP core's post-status badges. Keys match RYV's actual `type`
+   values (see NodeList.js's TYPE_LABELS), not the badge text, so this
+   still works if a label is ever reworded. */
+.ryv-builder-node-type--radio,
+.ryv-builder-node-type--checkbox {
+  color: #0a4b78;
+  background: #e5f1fa;
+}
+.ryv-builder-node-type--text,
+.ryv-builder-node-type--textarea {
+  color: #0a6b5e;
+  background: #e3f5f1;
+}
+.ryv-builder-node-type--markup {
+  color: #4a4d52;
+  background: #eef0f2;
+}
+.ryv-builder-node-type--lead_capture {
+  color: #6a3a9e;
+  background: #f1e8fb;
+}
+.ryv-builder-node-type--unsupported {
+  color: #8a5300;
+  background: #fcf0e0;
 }
 
 .ryv-builder-node-title {
@@ -214,8 +289,26 @@
 .ryv-builder-node-editor {
   background: #fff;
   border: 1px solid #ccd0d4;
-  border-radius: 4px;
+  border-radius: 6px;
   padding: 1.5rem;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.ryv-builder-node-editor-section-title {
+  margin: 2rem 0 1rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid #e0e0e0;
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #646970;
+}
+
+.ryv-builder-node-editor-section-title:first-child {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
 }
 
 .ryv-builder-option-row {
@@ -224,6 +317,50 @@
   gap: 0.5rem;
   align-items: flex-end;
   margin-bottom: 0.75rem;
+}
+
+.ryv-builder-reference-nodes {
+  margin-top: 1rem;
+}
+
+.ryv-builder-reference-node-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+  padding: 6px 10px;
+  background: #f9f9f9;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+}
+
+.ryv-builder-reference-node-position {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #dcdcde;
+  color: #3c434a;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.ryv-builder-reference-node-select {
+  flex: 1;
+  min-width: 0;
+}
+
+.ryv-builder-reference-node-select .components-base-control__field {
+  margin-bottom: 0;
+}
+
+.ryv-builder-reference-node-reorder {
+  display: flex;
+  flex-shrink: 0;
+  gap: 2px;
 }
 
 .ryv-builder-new {

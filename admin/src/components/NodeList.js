@@ -192,7 +192,9 @@ export default function NodeList({ graph, selectedNodeId, onSelect, onChange }) 
                           <li key={id} className={id === selectedNodeId ? 'is-active' : ''}>
                             <button type="button" onClick={() => onSelect(id)}>
                               <strong>{id}</strong>
-                              <span className="ryv-builder-node-type">{TYPE_LABELS[node.type] || node.type}</span>
+                              <span className={`ryv-builder-node-type ryv-builder-node-type--${node.type}`}>
+                                {TYPE_LABELS[node.type] || node.type}
+                              </span>
                               <span className="ryv-builder-node-title">{node.title || node.content || ''}</span>
                             </button>
                             <ConfirmButton

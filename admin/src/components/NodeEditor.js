@@ -41,6 +41,10 @@ export default function NodeEditor({ node, nodeId, allNodeIds, allNodes, onChang
   }, [nodeId]);
 
   const isChoice = node.type === 'radio' || node.type === 'checkbox';
+  // Text/Textarea/Checkbox nodes have no fields in the "Content & Behavior"
+  // section below - skip the heading entirely for them rather than showing
+  // an empty section between "Organization" and "Routing".
+  const hasContentBehaviorFields = ['markup', 'unsupported', 'radio', 'lead_capture'].includes(node.type);
 
   // Suggestions only, via <datalist> - group is a free-text field (see
   // NodeList.js's groupKeyOf(), which falls back to an id prefix or
@@ -82,6 +86,8 @@ export default function NodeEditor({ node, nodeId, allNodeIds, allNodes, onChang
 
   return (
     <div className="ryv-builder-node-editor">
+      <div className="ryv-builder-node-editor-section-title">{__('Basic Info', 'ryv-eligibility-tool')}</div>
+
       <TextControl
         label={__('Node ID', 'ryv-eligibility-tool')}
         value={idDraft}
@@ -132,6 +138,8 @@ export default function NodeEditor({ node, nodeId, allNodeIds, allNodes, onChang
         )}
       />
 
+      <div className="ryv-builder-node-editor-section-title">{__('Organization', 'ryv-eligibility-tool')}</div>
+
       <TextControl
         label={__('Group', 'ryv-eligibility-tool')}
         value={node.group || ''}
@@ -157,6 +165,10 @@ export default function NodeEditor({ node, nodeId, allNodeIds, allNodes, onChang
           'ryv-eligibility-tool'
         )}
       />
+
+      {hasContentBehaviorFields && (
+        <div className="ryv-builder-node-editor-section-title">{__('Content & Behavior', 'ryv-eligibility-tool')}</div>
+      )}
 
       {(node.type === 'markup' || node.type === 'unsupported') && (
         <ToggleControl
@@ -240,6 +252,8 @@ export default function NodeEditor({ node, nodeId, allNodeIds, allNodes, onChang
           </TabPanel>
         </div>
       )}
+
+      <div className="ryv-builder-node-editor-section-title">{__('Routing', 'ryv-eligibility-tool')}</div>
 
       {isChoice ? (
         <>
