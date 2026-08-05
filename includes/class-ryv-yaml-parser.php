@@ -118,6 +118,20 @@ class RYV_YAML_Parser {
 	);
 
 	/**
+	 * `#wrapper_attributes.class` values this parser carries through to a
+	 * `markup`-type node's `wrapper_class`, for the frontend to apply to the
+	 * rendered content container (see assets/src/input.css for their actual
+	 * styling). An allowlist rather than passing anything through verbatim -
+	 * `#wrapper_attributes` is Drupal/theme-layer styling metadata with no
+	 * guarantee any other class name has a matching, safe RYV stylesheet
+	 * rule - but this covers every value actually used in RYV's real
+	 * exports (verified: 'message--path-end' on ~270 terminal result
+	 * elements, 'text-restrict-height' on 11 long scrollable felony lists;
+	 * no other class appears in either file).
+	 */
+	const SUPPORTED_WRAPPER_CLASSES = array( 'text-restrict-height', 'message--path-end' );
+
+	/**
 	 * Read and YAML-decode a file on disk.
 	 *
 	 * @param string $file_path Absolute path to the uploaded .yml/.yaml file.
@@ -548,7 +562,75 @@ class RYV_YAML_Parser {
 			}
 		}
 
+		// A Drupal `select` is a native dropdown, not a button list - without
+		// this, every select-type element (RYV's real exports: the ~50-state
+		// picker) silently degraded to the same button-list look as
+		// `radios`/`webform_buttons` once TYPE_MAP collapses them all to the
+		// one RYV 'radio' node type. `#select2: true` additionally requests a
+		// search-enabled dropdown (see renderer.js's renderSearchableSelect())
+		// rather than a plain native `<select>` - kept as its own flag rather
+		// than a third display_style value so a select2-flagged dropdown still
+		// reads as an ordinary 'dropdown' to anything (e.g. the builder SPA's
+		// display-style picker) that doesn't know about it.
+		if ( 'select' === $drupal_type ) {
+			$node['display_style'] = 'dropdown';
+		}
+
+		if ( ! empty( $def['#select2'] ) ) {
+			$node['display_style'] = 'dropdown';
+			$node['select2']       = true;
+		}
+
+		if ( 'markup' === $type ) {
+			$wrapper_class = $this->extract_wrapper_classes( $def, $warnings, $id );
+
+			if ( '' !== $wrapper_class ) {
+				$node['wrapper_class'] = $wrapper_class;
+			}
+		}
+
 		return $node;
+	}
+
+	/**
+	 * Extract and sanitize `#wrapper_attributes.class` for a markup node -
+	 * see SUPPORTED_WRAPPER_CLASSES for why this is an allowlist rather than
+	 * a passthrough.
+	 *
+	 * @param array    $def        Raw Drupal element definition.
+	 * @param string[] $warnings   Accumulator.
+	 * @param string   $element_id Owning element id, for warning messages.
+	 * @return string Space-separated supported class names, or '' if none.
+	 */
+	private function extract_wrapper_classes( array $def, array &$warnings, string $element_id ): string {
+		$raw = $def['#wrapper_attributes']['class'] ?? null;
+
+		if ( empty( $raw ) || ! is_array( $raw ) ) {
+			return '';
+		}
+
+		$supported   = array();
+		$unsupported = array();
+
+		foreach ( $raw as $class ) {
+			$class = sanitize_html_class( (string) $class );
+
+			if ( '' === $class ) {
+				continue;
+			}
+
+			if ( in_array( $class, self::SUPPORTED_WRAPPER_CLASSES, true ) ) {
+				$supported[] = $class;
+			} else {
+				$unsupported[] = $class;
+			}
+		}
+
+		if ( ! empty( $unsupported ) ) {
+			$warnings[] = "Element '{$element_id}': wrapper_attributes class(es) '" . implode( "', '", $unsupported ) . "' are not in RYV's supported set (" . implode( ', ', self::SUPPORTED_WRAPPER_CLASSES ) . ') - dropped.';
+		}
+
+		return implode( ' ', array_unique( $supported ) );
 	}
 
 	/**
@@ -642,9 +724,37 @@ class RYV_YAML_Parser {
 		} elseif ( isset( $states['visible-slide'] ) ) {
 			$visible = $states['visible-slide'];
 		} else {
-			if ( array_key_exists( 'invisible', $states ) || array_key_exists( 'invisible-slide', $states ) ) {
-				$warnings[] = "Element '{$element_id}': unsupported #states directive (only 'visible'/'visible-slide' are translated) - kept as unconditional/linear.";
+			$invisible = $states['invisible'] ?? $states['invisible-slide'] ?? null;
+
+			if ( null !== $invisible ) {
+				// Translating "invisible when X" into a gate would mean
+				// inverting X into "visible when NOT X" - safe only when
+				// this parser also knows every OTHER possible answer to X's
+				// source question (so "not X" can become one gate per other
+				// value), which it doesn't attempt here: RYV's real
+				// examples all gate on the ~50-option state selector, and
+				// guessing "every state but this one" wrong would silently
+				// route real visitors into eligibility content meant for a
+				// different state. Best-effort-parsed purely for the review
+				// UI below - the parse result is never used for routing.
+				$discard_warnings = array();
+				$discard_review   = array();
+				$parsed_invisible = is_array( $invisible )
+					? ( $this->is_sequential_list( $invisible )
+						? $this->resolve_condition_list( $invisible, $element_id, $discard_warnings, $discard_review )
+						: $this->resolve_condition_dict( $invisible, $element_id, $discard_warnings, $discard_review ) )
+					: null;
+
+				$warnings[] = "Element '{$element_id}': only an #states.invisible rule is present (no 'visible'/'visible-slide') - inverting it into a gate isn't attempted, kept as unconditional/linear.";
+				$review[]   = $this->build_review_entry(
+					$element_id,
+					'invisible_only',
+					null,
+					$parsed_invisible ?? array(),
+					'Only an #states.invisible condition is present. This parser only translates "visible" rules into branches - safely inverting this into "visible unless X" would require knowing every other possible answer to X\'s source question.'
+				);
 			}
+
 			return null;
 		}
 
@@ -733,6 +843,23 @@ class RYV_YAML_Parser {
 		foreach ( $list as $item ) {
 			if ( is_string( $item ) ) {
 				$op = strtolower( trim( $item ) );
+
+				if ( 'xor' === $op ) {
+					// Not part of Drupal's actual #states/states.js API (only
+					// 'and'/'or' are documented operators) - RYV's real
+					// exports do contain a literal 'xor' token though, most
+					// plausibly an authoring mistake in the source Drupal
+					// form rather than a construct with defined runtime
+					// behavior. Approximating it as 'or' would be a silent,
+					// unverifiable guess at eligibility-affecting branching
+					// logic (XOR and OR only diverge when BOTH conditions
+					// hold at once, which this parser has no way to rule
+					// out), so it gets its own clearly-labeled review reason
+					// instead of a resolved gate.
+					$warnings[] = "Element '{$element_id}': #states list uses 'xor', which isn't part of Drupal's #states API - likely an authoring mistake in the source form, not translated (approximating it as 'or' could silently change eligibility routing) - kept as unconditional/linear.";
+					$review[]   = $this->build_review_entry( $element_id, 'xor', 'xor', $conditions, "Uses the 'xor' operator, which has no defined #states semantics - review the original Drupal form to confirm intent before wiring this up manually." );
+					return null;
+				}
 
 				if ( ! in_array( $op, array( 'and', 'or' ), true ) ) {
 					$warnings[] = "Element '{$element_id}': unrecognized #states list operator '{$item}' - kept as unconditional/linear.";
@@ -850,7 +977,13 @@ class RYV_YAML_Parser {
 			$parts[] = "{$condition['source_id']} = '{$condition['value']}'";
 		}
 
-		$joiner  = 'and' === $operator ? ' AND ' : ( 'mixed' === $operator ? ' [and/or] ' : ' OR ' );
+		$joiners = array(
+			'and'   => ' AND ',
+			'mixed' => ' [and/or] ',
+			'xor'   => ' XOR ',
+			'or'    => ' OR ',
+		);
+		$joiner  = $joiners[ $operator ] ?? ', ';
 		$summary = $parts ? implode( $joiner, $parts ) : '(no parseable conditions)';
 
 		return array(

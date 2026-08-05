@@ -24,6 +24,7 @@ export const DEFAULT_LABELS = {
   retry: 'Try Again',
   startOver: 'Start Over',
   selectPlaceholder: '— Select —',
+  select2NoResults: 'No matches found',
   submit: 'Submit',
   submitting: 'Submitting…',
   continue: 'Continue',
@@ -103,10 +104,123 @@ export function renderErrorCard(message, onRetry, labels = DEFAULT_LABELS) {
 }
 
 /**
+ * Dependency-free "search-enabled dropdown" - a text input that filters a
+ * listbox of options as you type, committing on click/Enter. The vanilla-JS
+ * equivalent of a Select2-enhanced `<select>` (triggered by a Drupal
+ * `#select2: true` source element - see RYV_YAML_Parser::build_node())
+ * without adding jQuery/Select2 as a new runtime dependency to an otherwise
+ * dependency-free, no-bundler frontend (see CLAUDE.md). Most useful for a
+ * long option list like RYV's real ~50-state picker, where scanning a
+ * native `<select>` is slower than typing a few letters.
+ *
+ * @param {HTMLElement} wrap Container to append into.
+ * @param {{value: string, label: string}[]} options
+ * @param {string|null} selectedValue
+ * @param {(value: string) => void} onSelect
+ * @param {object} labels
+ */
+function renderSearchableSelect(wrap, options, selectedValue, onSelect, labels = DEFAULT_LABELS) {
+  const container = el('div', { className: 'ryv-select2', attrs: { role: 'combobox', 'aria-expanded': 'false' } });
+  const currentOption = () => options.find((option) => option.value === selectedValue);
+
+  const input = el('input', {
+    className: 'ryv-select2-input',
+    attrs: { type: 'text', role: 'searchbox', autocomplete: 'off', placeholder: labels.selectPlaceholder },
+  });
+  input.value = currentOption() ? currentOption().label : '';
+
+  const menu = el('div', { className: 'ryv-select2-menu' });
+  menu.hidden = true;
+
+  let visibleOptions = [];
+  let highlightedIndex = -1;
+
+  function closeMenu() {
+    menu.hidden = true;
+    container.setAttribute('aria-expanded', 'false');
+    highlightedIndex = -1;
+  }
+
+  function openMenu(query) {
+    const q = query.trim().toLowerCase();
+    visibleOptions = q ? options.filter((option) => option.label.toLowerCase().includes(q)) : options;
+
+    menu.innerHTML = '';
+    if (!visibleOptions.length) {
+      menu.appendChild(el('div', { className: 'ryv-select2-empty', text: labels.select2NoResults }));
+    } else {
+      visibleOptions.forEach((option, index) => {
+        const optionEl = el('div', {
+          className: `ryv-select2-option${index === highlightedIndex ? ' is-highlighted' : ''}`,
+          text: option.label,
+          attrs: { role: 'option', 'aria-selected': option.value === selectedValue ? 'true' : 'false' },
+        });
+        // mousedown (not click) fires before the input's blur handler below,
+        // so selecting an option commits before closeMenu()'s revert logic
+        // would otherwise wipe out the click.
+        optionEl.addEventListener('mousedown', (event) => {
+          event.preventDefault();
+          commit(option);
+        });
+        menu.appendChild(optionEl);
+      });
+    }
+
+    menu.hidden = false;
+    container.setAttribute('aria-expanded', 'true');
+  }
+
+  function commit(option) {
+    input.value = option.label;
+    closeMenu();
+    onSelect(option.value);
+  }
+
+  input.addEventListener('focus', () => openMenu(''));
+  input.addEventListener('input', () => {
+    highlightedIndex = -1;
+    openMenu(input.value);
+  });
+  input.addEventListener('keydown', (event) => {
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      if (menu.hidden) { openMenu(input.value); return; }
+      highlightedIndex = Math.min(highlightedIndex + 1, visibleOptions.length - 1);
+      openMenu(input.value);
+    } else if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      highlightedIndex = Math.max(highlightedIndex - 1, 0);
+      openMenu(input.value);
+    } else if (event.key === 'Enter') {
+      event.preventDefault();
+      if (!menu.hidden && visibleOptions[highlightedIndex]) commit(visibleOptions[highlightedIndex]);
+    } else if (event.key === 'Escape') {
+      closeMenu();
+      input.value = currentOption() ? currentOption().label : '';
+    }
+  });
+  input.addEventListener('blur', () => {
+    // Deferred so a mousedown-selected option (see above) has already
+    // committed by the time this reverts an unmatched typed value back to
+    // the current answer - this is a single-choice field, not free text.
+    window.setTimeout(() => {
+      if (menu.hidden) return;
+      closeMenu();
+      input.value = currentOption() ? currentOption().label : '';
+    }, 100);
+  });
+
+  container.appendChild(input);
+  container.appendChild(menu);
+  wrap.appendChild(container);
+}
+
+/**
  * Shared single-select rendering for radio-type question nodes (including
  * the "select your state" node - it's an ordinary radio node, not a special
  * case): 'buttons' (default, current look), 'radio' (actual radio inputs),
- * or 'dropdown' (a native <select>). Checkbox nodes never call this - they
+ * or 'dropdown' (a native <select>, or - when `searchable` is set - the
+ * search-enabled combobox above). Checkbox nodes never call this - they
  * always render as the button list, regardless of a node's display_style.
  *
  * @param {HTMLElement} wrap Container to append into.
@@ -117,9 +231,15 @@ export function renderErrorCard(message, onRetry, labels = DEFAULT_LABELS) {
  * @param {string} radioGroupName Unique `name` for the radio inputs, so multiple
  *   single-choice cards on the same page don't cross-select each other.
  * @param {object} labels
+ * @param {boolean} searchable When displayStyle is 'dropdown', use the search-enabled combobox instead of a native <select> (node.select2).
  */
-function renderSingleChoiceOptions(wrap, options, selectedValue, onSelect, displayStyle, radioGroupName, labels = DEFAULT_LABELS) {
+function renderSingleChoiceOptions(wrap, options, selectedValue, onSelect, displayStyle, radioGroupName, labels = DEFAULT_LABELS, searchable = false) {
   if (displayStyle === 'dropdown') {
+    if (searchable) {
+      renderSearchableSelect(wrap, options, selectedValue, onSelect, labels);
+      return;
+    }
+
     const select = el('select', { className: 'ryv-select' });
     select.appendChild(el('option', { text: labels.selectPlaceholder, attrs: { value: '', disabled: true } }));
     options.forEach((option) => {
@@ -192,7 +312,8 @@ export function renderQuestionCard(node, selectedValues, onChange, nodeId, label
       (value) => onChange(value ? [value] : []),
       node.display_style,
       `ryv-node-${nodeId}`,
-      labels
+      labels,
+      !!node.select2
     );
     return wrap;
   }
@@ -410,6 +531,13 @@ export function renderLeadCaptureCard(node, submittedValue, onSubmit, onContinue
  * `node.content` is trusted HTML: it only ever comes from a YAML file
  * imported (or a schema edited) by an admin with `manage_options`, the same
  * trust boundary WordPress applies to post content - not user input.
+ *
+ * `node.wrapper_class` (from Drupal's `#wrapper_attributes.class` - see
+ * RYV_YAML_Parser::extract_wrapper_classes()) carries the same trust
+ * boundary and is already allowlist-sanitized server-side (only
+ * 'text-restrict-height'/'message--path-end' ever reach the schema), so
+ * it's applied directly here rather than re-validated - see
+ * assets/src/input.css for what each one actually does.
  */
 export function renderMarkupCard(node, isTerminal, onRestart, labels = DEFAULT_LABELS) {
   const wrap = el('div');
@@ -417,7 +545,8 @@ export function renderMarkupCard(node, isTerminal, onRestart, labels = DEFAULT_L
     wrap.appendChild(titleEl(node.title));
   }
 
-  const content = el('div', { className: 'ryv-content' });
+  const contentClass = node.wrapper_class ? `ryv-content ${node.wrapper_class}` : 'ryv-content';
+  const content = el('div', { className: contentClass });
   content.innerHTML = node.content || '';
   wrap.appendChild(content);
 

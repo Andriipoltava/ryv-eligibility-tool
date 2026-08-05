@@ -202,6 +202,83 @@
     @apply ryv-outline-none ryv-ring-2 ryv-ring-ryv-primary;
   }
 
+  /*
+   * display_style: 'dropdown' + select2: true - a dependency-free
+   * search-enabled combobox (filter-as-you-type over a listbox), the
+   * vanilla-JS equivalent of a Select2-enhanced <select> without adding
+   * jQuery/Select2 as a new frontend runtime dependency (see
+   * renderer.js's renderSearchableSelect()). Reuses the same --ryv-select-*
+   * custom properties as .ryv-select below so a Style-tab admin who already
+   * configured the plain dropdown look gets it here too, with no separate
+   * controls needed.
+   */
+  .ryv-select2 {
+    @apply ryv-relative ryv-w-full ryv-mb-4;
+  }
+  .ryv-select2-input {
+    @apply ryv-w-full;
+    color: var(--ryv-select-text-color, var(--ryv-text-color, #1f2937));
+    background-color: var(--ryv-select-bg, var(--ryv-bg-color, #fff));
+    border-style: solid;
+    border-width: var(--ryv-select-border-width, 1px);
+    border-color: var(--ryv-select-border-color, #d1d5db);
+    border-radius: var(--ryv-select-border-radius, var(--ryv-radius, 0.5rem));
+    padding: var(--ryv-select-padding, 0.625rem 1rem);
+  }
+  .ryv-select2-input:focus-visible {
+    @apply ryv-outline-none ryv-ring-2 ryv-ring-ryv-primary;
+  }
+  .ryv-select2-menu {
+    @apply ryv-absolute ryv-left-0 ryv-right-0 ryv-mt-1 ryv-overflow-y-auto ryv-z-10;
+    max-height: var(--ryv-select2-menu-max-height, 16rem);
+    background-color: var(--ryv-select-bg, var(--ryv-bg-color, #fff));
+    border-style: solid;
+    border-width: var(--ryv-select-border-width, 1px);
+    border-color: var(--ryv-select-border-color, #d1d5db);
+    border-radius: var(--ryv-select-border-radius, var(--ryv-radius, 0.5rem));
+  }
+  .ryv-select2-option {
+    @apply ryv-cursor-pointer;
+    color: var(--ryv-select-text-color, var(--ryv-text-color, #1f2937));
+    padding: var(--ryv-select-padding, 0.625rem 1rem);
+  }
+  .ryv-select2-option:hover,
+  .ryv-select2-option.is-highlighted {
+    background-color: var(--ryv-btn-bg-selected, #f9fafb);
+  }
+  .ryv-select2-option[aria-selected='true'] {
+    font-weight: 600;
+  }
+  .ryv-select2-empty {
+    @apply ryv-text-sm;
+    color: var(--ryv-secondary-color, #64748b);
+    padding: var(--ryv-select-padding, 0.625rem 1rem);
+  }
+
+  /*
+   * Verbatim Drupal `#wrapper_attributes.class` values (see
+   * RYV_YAML_Parser::SUPPORTED_WRAPPER_CLASSES) - kept unprefixed, unlike
+   * every other RYV class here, since these are the literal class names
+   * carried over from the source data for visual parity with the original
+   * Campaign Legal Center theme. No `!important` (unlike .ryv-continue-btn
+   * above) - these are additive styling hints, not fighting a theme reset
+   * at equal specificity, so a real theme-level rule for either class name
+   * is free to take precedence over this default.
+   */
+  .text-restrict-height {
+    max-height: var(--ryv-text-restrict-height, 16rem);
+    overflow-y: auto;
+  }
+
+  .message--path-end {
+    padding: var(--ryv-path-end-padding, 1rem);
+    border-style: solid;
+    border-width: var(--ryv-path-end-border-width, 1px);
+    border-color: var(--ryv-path-end-border-color, var(--ryv-primary-color, #1d4ed8));
+    border-radius: var(--ryv-path-end-border-radius, var(--ryv-radius, 0.5rem));
+    background-color: var(--ryv-path-end-bg, transparent);
+  }
+
   .ryv-error-box {
     @apply ryv-p-4 ryv-rounded-lg ryv-bg-red-50 ryv-text-red-700 ryv-border ryv-border-red-200;
   }
