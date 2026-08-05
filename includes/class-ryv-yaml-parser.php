@@ -91,6 +91,33 @@ class RYV_YAML_Parser {
 	const SKIP_TYPES = array( 'actions', 'webform_actions' );
 
 	/**
+	 * Drupal's built-in named/shared option sets this parser can resolve
+	 * directly. `#options` is normally an inline `value: label` map, but
+	 * Drupal also lets an element reference a reusable, separately-managed
+	 * set by NAME instead (`#options: yes_no`) - only the name ends up in a
+	 * webform's own YAML export; the set's actual value/label pairs live in
+	 * a different config entity (`webform_options.*.yml`) this parser never
+	 * sees. Only 'yes_no' is resolved - it's a stable Drupal core constant
+	 * (confirmed against RYV's real exports, which also spell it out inline
+	 * elsewhere as exactly `Yes: Yes, No: No`) - but this stays a lookup
+	 * table rather than one hardcoded case so a future export referencing
+	 * another core set has somewhere to go; see build_node()'s handling of
+	 * an unrecognized reference for what happens otherwise.
+	 */
+	const NAMED_OPTION_SETS = array(
+		'yes_no' => array(
+			array(
+				'value' => 'Yes',
+				'label' => 'Yes',
+			),
+			array(
+				'value' => 'No',
+				'label' => 'No',
+			),
+		),
+	);
+
+	/**
 	 * Read and YAML-decode a file on disk.
 	 *
 	 * @param string $file_path Absolute path to the uploaded .yml/.yaml file.
@@ -493,11 +520,40 @@ class RYV_YAML_Parser {
 			$node['content'] = (string) $def['#text'];
 		}
 
-		if ( ! empty( $def['#options'] ) && is_array( $def['#options'] ) ) {
-			$node['options'] = $this->normalize_options( $def['#options'], $warnings, $id );
+		if ( ! empty( $def['#options'] ) ) {
+			if ( is_array( $def['#options'] ) ) {
+				$node['options'] = $this->normalize_options( $def['#options'], $warnings, $id );
+			} elseif ( is_string( $def['#options'] ) ) {
+				$node['options'] = $this->resolve_named_option_set( $def['#options'], $warnings, $id );
+			}
 		}
 
 		return $node;
+	}
+
+	/**
+	 * Resolve a Drupal named/shared `#options` reference (see
+	 * NAMED_OPTION_SETS). Left silently unresolved, an element like this
+	 * ends up with zero options - not just unable to branch on its answer,
+	 * but structurally unable to route to a "next" node from any option at
+	 * all, which previously stranded whatever it *would* have gated (e.g. a
+	 * "you can vote!" result keyed off one specific answer) as an
+	 * unreachable orphan with no warning pointing at the actual cause - see
+	 * RYV_Graph_Validator for the diagnostic that surfaces the symptom.
+	 *
+	 * @param string   $reference  The named option set, e.g. 'yes_no'.
+	 * @param string[] $warnings   Accumulator.
+	 * @param string   $element_id Owning element id, for warning messages.
+	 * @return array List of ['value' => string, 'label' => string].
+	 */
+	private function resolve_named_option_set( string $reference, array &$warnings, string $element_id ): array {
+		if ( isset( self::NAMED_OPTION_SETS[ $reference ] ) ) {
+			return self::NAMED_OPTION_SETS[ $reference ];
+		}
+
+		$warnings[] = "Element '{$element_id}': #options references an unrecognized named option set '{$reference}' (not an inline list) - imported with no options, needs manual review in the form builder.";
+
+		return array();
 	}
 
 	/**
