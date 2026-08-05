@@ -254,7 +254,27 @@ class RYV_YAML_Parser {
 				$conditions = $this->extract_visibility_condition( $def['#states'], $id, $warnings, $review );
 
 				foreach ( $conditions ?? array() as $condition ) {
-					$gates_by_source[ $condition['source_id'] ][ $condition['value'] ] = $id;
+					$source_id = $condition['source_id'];
+					$value     = $condition['value'];
+
+					// Two independent leaves can legitimately gate on the exact
+					// same source/value in Drupal - #states is a "become
+					// visible" flag, not an exclusive router, so both could be
+					// visible at once in the original form. This flat DAG can
+					// only ever route one option value to one next_node, so the
+					// later element in document order silently wins and the
+					// earlier one's target becomes unreachable - same ambiguity
+					// the container-gate duplicate check above already flags,
+					// extended here to the equally-real leaf/leaf case (see e.g.
+					// RYV's real Virginia export: 'virginia_oos' and
+					// 'has_your_right_to_vote_been_restored...' both gate on
+					// where_was_your_felony_conviction_s = "Federal court").
+					if ( isset( $gates_by_source[ $source_id ][ $value ] ) ) {
+						$earlier_id = $gates_by_source[ $source_id ][ $value ];
+						$warnings[] = "Element '{$id}': duplicate #states gate for '{$source_id} = {$value}' - element '{$earlier_id}' claimed it first and becomes unreachable via this gate, overwritten by '{$id}'.";
+					}
+
+					$gates_by_source[ $source_id ][ $value ] = $id;
 				}
 			}
 		}
