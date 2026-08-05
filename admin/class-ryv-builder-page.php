@@ -217,6 +217,13 @@ class RYV_Builder_Page {
 				'nonce'     => wp_create_nonce( 'wp_rest' ),
 				'postId'    => $post_id ?: null,
 				'listUrl'   => esc_url( admin_url( 'edit.php?post_type=' . RYV_CPT::POST_TYPE ) ),
+				// Pre-baked (nonce included) rather than built client-side -
+				// same link RYV_Export_Page::add_row_action() puts on the
+				// list table, just surfaced here too since an admin editing
+				// a form spends most of their time in this SPA, not the
+				// list table. Null for an unsaved "new form" - nothing to
+				// export yet.
+				'exportUrl' => $post_id ? esc_url( RYV_Export_Page::export_url( $post_id ) ) : null,
 			)
 		);
 	}

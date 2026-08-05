@@ -210,6 +210,11 @@ export default function App() {
             __next40pxDefaultSize
             __nextHasNoMarginBottom
           />
+          {settings.exportUrl && (
+            <Button variant="secondary" href={settings.exportUrl}>
+              {__('Export YAML', 'ryv-eligibility-tool')}
+            </Button>
+          )}
           <Button variant="primary" onClick={handleSave} isBusy={saving} disabled={saving || !dirty}>
             {dirty ? __('Save Changes', 'ryv-eligibility-tool') : __('Saved', 'ryv-eligibility-tool')}
           </Button>

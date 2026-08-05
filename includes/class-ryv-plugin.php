@@ -40,6 +40,13 @@ final class RYV_Plugin {
 	private $import_page = null;
 
 	/**
+	 * Export action controller instance (admin-only).
+	 *
+	 * @var RYV_Export_Page|null
+	 */
+	private $export_page = null;
+
+	/**
 	 * Form builder page controller instance (admin-only).
 	 *
 	 * @var RYV_Builder_Page|null
@@ -128,6 +135,7 @@ final class RYV_Plugin {
 
 		if ( is_admin() ) {
 			require_once RYV_PLUGIN_DIR . 'admin/class-ryv-import-page.php';
+			require_once RYV_PLUGIN_DIR . 'admin/class-ryv-export-page.php';
 			require_once RYV_PLUGIN_DIR . 'admin/class-ryv-builder-page.php';
 			require_once RYV_PLUGIN_DIR . 'admin/class-ryv-logs-page.php';
 			require_once RYV_PLUGIN_DIR . 'admin/class-ryv-submissions-page.php';
@@ -154,6 +162,7 @@ final class RYV_Plugin {
 
 		if ( is_admin() ) {
 			$this->import_page      = new RYV_Import_Page();
+			$this->export_page      = new RYV_Export_Page();
 			$this->builder_page     = new RYV_Builder_Page();
 			$this->logs_page        = new RYV_Logs_Page();
 			$this->submissions_page = new RYV_Submissions_Page();
