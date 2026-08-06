@@ -311,10 +311,8 @@ class RYV_Drupal_YAML_Exporter {
 			}
 		}
 
-		if ( 'select' === $drupal_type ) {
-			// Redundant with '#type' => 'select' itself but matches real
-			// exports' own display_style-independent shape; nothing else to add.
-			unset( $def['#select2'] );
+		if ( 'select' === $drupal_type && ! empty( $node['placeholder'] ) ) {
+			$def['#empty_option'] = $node['placeholder'];
 		}
 
 		if ( ! empty( $node['select2'] ) ) {

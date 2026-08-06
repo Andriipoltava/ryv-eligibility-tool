@@ -215,6 +215,18 @@ export default function NodeEditor({ node, nodeId, allNodeIds, allNodes, onChang
         />
       )}
 
+      {node.type === 'radio' && node.display_style === 'dropdown' && (
+        <ToggleControl
+          label={__('Searchable (Select2)', 'ryv-eligibility-tool')}
+          checked={!!node.select2}
+          onChange={(select2) => onChange({ ...node, select2 })}
+          help={__(
+            'When on, this dropdown becomes a type-to-filter combobox instead of a plain native dropdown - useful for long option lists (e.g. a state picker). A YAML import turns this on automatically when the source had "#select2: true".',
+            'ryv-eligibility-tool'
+          )}
+        />
+      )}
+
       {node.type === 'lead_capture' && (
         <div className="ryv-builder-field ryv-builder-lead-capture-settings">
           <TabPanel

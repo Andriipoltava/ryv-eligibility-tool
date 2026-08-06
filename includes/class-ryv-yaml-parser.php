@@ -700,6 +700,15 @@ class RYV_YAML_Parser {
 			$node['select2']       = true;
 		}
 
+		// The dropdown's own placeholder/empty-option text (e.g. "Select a
+		// state") - maps directly onto NodeEditor.js's existing "Placeholder"
+		// field (node.placeholder), which was already wired through to the
+		// frontend (renderer.js) and the Drupal exporter before this import
+		// side existed to actually populate it from a real source YAML.
+		if ( isset( $def['#empty_option'] ) && is_scalar( $def['#empty_option'] ) ) {
+			$node['placeholder'] = (string) $def['#empty_option'];
+		}
+
 		if ( 'markup' === $type ) {
 			$wrapper_class = $this->extract_wrapper_classes( $def, $warnings, $id );
 
