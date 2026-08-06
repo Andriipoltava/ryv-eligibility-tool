@@ -217,6 +217,7 @@
     padding: var(--ryv-btn-padding, 0.5rem 1.125rem);
   }
   .ryv-option-btn:hover {
+    color: var(--ryv-btn-text-color-hover, var(--ryv-btn-text-color, var(--ryv-text-color, #1f2937)));
     background-color: var(--ryv-btn-bg-hover, var(--ryv-btn-bg, #ececec));
     border-color: var(--ryv-btn-border-color-hover, var(--ryv-primary-color, #002a41));
   }

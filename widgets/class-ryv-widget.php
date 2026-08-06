@@ -815,6 +815,17 @@ class RYV_Widget extends \Elementor\Widget_Base {
 		);
 
 		$this->add_control(
+			'button_text_color_hover',
+			array(
+				'label'     => __( 'Text Color', 'ryv-eligibility-tool' ),
+				'type'      => \Elementor\Controls_Manager::COLOR,
+				'selectors' => array(
+					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-btn-text-color-hover: {{VALUE}};',
+				),
+			)
+		);
+
+		$this->add_control(
 			'button_bg_color_hover',
 			array(
 				'label'     => __( 'Background Color', 'ryv-eligibility-tool' ),

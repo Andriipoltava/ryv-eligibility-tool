@@ -179,25 +179,31 @@ class RYV_Settings_Page {
 			'buttons'        => array(
 				'label'  => __( 'Choice Buttons', 'ryv-eligibility-tool' ),
 				'fields' => array(
-					'button_text_color'   => array(
+					'button_text_color'       => array(
 						'type'    => 'color',
 						'label'   => __( 'Text Color', 'ryv-eligibility-tool' ),
 						'css_var' => '--ryv-btn-text-color',
 						'default' => '',
 					),
-					'button_bg_color'     => array(
+					'button_text_color_hover' => array(
+						'type'    => 'color',
+						'label'   => __( 'Text Color (Hover)', 'ryv-eligibility-tool' ),
+						'css_var' => '--ryv-btn-text-color-hover',
+						'default' => '',
+					),
+					'button_bg_color'         => array(
 						'type'    => 'color',
 						'label'   => __( 'Background Color', 'ryv-eligibility-tool' ),
 						'css_var' => '--ryv-btn-bg',
 						'default' => '',
 					),
-					'button_border_color' => array(
+					'button_border_color'     => array(
 						'type'    => 'color',
 						'label'   => __( 'Border Color', 'ryv-eligibility-tool' ),
 						'css_var' => '--ryv-btn-border-color',
 						'default' => '',
 					),
-					'button_padding'      => array(
+					'button_padding'          => array(
 						'type'    => 'px',
 						'label'   => __( 'Padding', 'ryv-eligibility-tool' ),
 						'css_var' => '--ryv-btn-padding',
