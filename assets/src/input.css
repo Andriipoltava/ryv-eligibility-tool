@@ -10,11 +10,29 @@
    * had an equivalent before that page existed; see its build_css()
    * docblock for why bg_color/font_family default to '' (omitted) rather
    * than a concrete value.
+   *
+   * max-width/padding/border rules/background-color below are RYV_Widget's own
+   * "Wrapper" Style-tab section (register_wrapper_style_controls()) - every
+   * fallback here is the box model .ryv-app-wrapper already had before that
+   * section existed (36rem was Tailwind's own `max-w-xl`, used via @apply
+   * until it needed a var()-driven override; 0/transparent for
+   * padding/border since none existed at all), so an untouched widget
+   * instance looks unchanged. background-color reuses --ryv-bg-color (the
+   * same variable Global Styles writes) rather than a new variable name, so
+   * this widget instance's own higher-specificity selector overrides
+   * Global Styles exactly the way primary_color/text_color already do -
+   * see register_color_controls()'s docblock in class-ryv-widget.php.
    */
   .ryv-app-wrapper {
-    @apply ryv-relative ryv-max-w-xl ryv-mx-auto;
+    @apply ryv-relative ryv-mx-auto;
+    max-width: var(--ryv-wrapper-max-width, 36rem);
+    padding: var(--ryv-wrapper-padding, 0);
     background-color: var(--ryv-bg-color, transparent);
     font-family: var(--ryv-font, inherit);
+    border-style: solid;
+    border-width: var(--ryv-wrapper-border-width, 0);
+    border-color: var(--ryv-wrapper-border-color, transparent);
+    border-radius: var(--ryv-wrapper-border-radius, 0);
   }
 
   .ryv-list {
@@ -117,6 +135,10 @@
 
   .ryv-content {
     @apply ryv-text-ryv-text ryv-mb-4 ryv-leading-relaxed;
+  }
+
+  .ryv-options-list ~ .ryv-content {
+    margin-top: 1.5rem;;
   }
   .ryv-content a {
     @apply ryv-underline ryv-text-ryv-primary;

@@ -132,6 +132,7 @@ class RYV_Widget extends \Elementor\Widget_Base {
 		$this->end_controls_section();
 
 		$this->register_label_controls();
+		$this->register_wrapper_style_controls();
 		$this->register_color_controls();
 		$this->register_typography_controls();
 		$this->register_header_style_controls();
@@ -221,6 +222,154 @@ class RYV_Widget extends \Elementor\Widget_Base {
 				'type'        => \Elementor\Controls_Manager::TEXT,
 				'placeholder' => __( '— Select —', 'ryv-eligibility-tool' ),
 				'description' => __( 'Only used when a picker or question is set to display as a dropdown.', 'ryv-eligibility-tool' ),
+			)
+		);
+
+		$this->end_controls_section();
+	}
+
+	/**
+	 * The `.ryv-app-wrapper` element itself - max-width, padding, border,
+	 * shadow, and a per-instance background override - as opposed to every
+	 * OTHER style section here, which targets something rendered INSIDE it
+	 * (buttons, dropdown, tooltip, ...). Same CSS-custom-property technique
+	 * as the rest of this file (see register_button_style_controls()'s
+	 * docblock): every control here writes onto `.ryv-app-wrapper` itself,
+	 * consumed by assets/src/input.css's own `.ryv-app-wrapper` rule.
+	 *
+	 * `wrapper_bg_color` deliberately reuses `--ryv-bg-color` (not a new
+	 * variable) - the exact same variable RYV_Settings_Page's Global Styles
+	 * page writes at `:root, .ryv-app-wrapper` scope - so leaving it blank
+	 * falls through to Global Styles (or transparent) instead of a
+	 * hardcoded value, same reasoning as primary_color/text_color in
+	 * register_color_controls(). Every other control here has no
+	 * Global-Styles equivalent to fall through to, so each gets its own
+	 * fallback baked into input.css instead (matching the widget's current,
+	 * unstyled-wrapper look - no default value here, so an untouched
+	 * instance stays visually identical to before this section existed).
+	 */
+	private function register_wrapper_style_controls() {
+		$this->start_controls_section(
+			'wrapper_style_section',
+			array(
+				'label' => __( 'Wrapper', 'ryv-eligibility-tool' ),
+				'tab'   => \Elementor\Controls_Manager::TAB_STYLE,
+			)
+		);
+
+		$this->add_responsive_control(
+			'wrapper_max_width',
+			array(
+				'label'      => __( 'Max Width', 'ryv-eligibility-tool' ),
+				'type'       => \Elementor\Controls_Manager::SLIDER,
+				'size_units' => array( 'px', '%', 'rem' ),
+				'range'      => array(
+					'px'  => array(
+						'min' => 200,
+						'max' => 1400,
+					),
+					'%'   => array(
+						'min' => 10,
+						'max' => 100,
+					),
+					'rem' => array(
+						'min' => 10,
+						'max' => 90,
+					),
+				),
+				'description' => __( 'Leave blank for the default (36rem, ~576px).', 'ryv-eligibility-tool' ),
+				'selectors'   => array(
+					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-wrapper-max-width: {{SIZE}}{{UNIT}};',
+				),
+			)
+		);
+
+		$this->add_responsive_control(
+			'wrapper_padding',
+			array(
+				'label'      => __( 'Padding', 'ryv-eligibility-tool' ),
+				'type'       => \Elementor\Controls_Manager::DIMENSIONS,
+				'size_units' => array( 'px', 'em', 'rem', '%' ),
+				'selectors'  => array(
+					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-wrapper-padding: {{TOP}}{{UNIT}} {{RIGHT}}{{UNIT}} {{BOTTOM}}{{UNIT}} {{LEFT}}{{UNIT}};',
+				),
+			)
+		);
+
+		$this->add_control(
+			'wrapper_bg_color',
+			array(
+				'label'       => __( 'Background Color', 'ryv-eligibility-tool' ),
+				'type'        => \Elementor\Controls_Manager::COLOR,
+				'description' => __( 'Leave blank to use the site-wide default set under RYV Forms → Global Styles.', 'ryv-eligibility-tool' ),
+				'selectors'   => array(
+					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-bg-color: {{VALUE}};',
+				),
+			)
+		);
+
+		$this->add_control(
+			'wrapper_border_heading',
+			array(
+				'label'     => __( 'Border', 'ryv-eligibility-tool' ),
+				'type'      => \Elementor\Controls_Manager::HEADING,
+				'separator' => 'before',
+			)
+		);
+
+		$this->add_control(
+			'wrapper_border_width',
+			array(
+				'label'      => __( 'Border Width', 'ryv-eligibility-tool' ),
+				'type'       => \Elementor\Controls_Manager::SLIDER,
+				'size_units' => array( 'px' ),
+				'range'      => array(
+					'px' => array(
+						'min' => 0,
+						'max' => 10,
+					),
+				),
+				'selectors'  => array(
+					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-wrapper-border-width: {{SIZE}}{{UNIT}};',
+				),
+			)
+		);
+
+		$this->add_control(
+			'wrapper_border_color',
+			array(
+				'label'     => __( 'Border Color', 'ryv-eligibility-tool' ),
+				'type'      => \Elementor\Controls_Manager::COLOR,
+				'default'   => '#e5e7eb',
+				'selectors' => array(
+					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-wrapper-border-color: {{VALUE}};',
+				),
+			)
+		);
+
+		$this->add_control(
+			'wrapper_border_radius',
+			array(
+				'label'      => __( 'Border Radius', 'ryv-eligibility-tool' ),
+				'type'       => \Elementor\Controls_Manager::DIMENSIONS,
+				'size_units' => array( 'px', 'em', 'rem', '%' ),
+				'selectors'  => array(
+					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-wrapper-border-radius: {{TOP}}{{UNIT}} {{RIGHT}}{{UNIT}} {{BOTTOM}}{{UNIT}} {{LEFT}}{{UNIT}};',
+				),
+			)
+		);
+
+		// Direct box-shadow, not a custom property - same exception
+		// Group_Control_Typography already gets elsewhere in this file
+		// (e.g. register_button_style_controls()): input.css has no
+		// var()-driven box-shadow property to hook into, and a unique
+		// per-instance {{WRAPPER}} selector has no specificity fight to
+		// lose here anyway.
+		$this->add_group_control(
+			\Elementor\Group_Control_Box_Shadow::get_type(),
+			array(
+				'name'     => 'wrapper_box_shadow',
+				'selector' => '{{WRAPPER}} .ryv-app-wrapper',
 			)
 		);
 
