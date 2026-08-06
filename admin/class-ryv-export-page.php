@@ -1,12 +1,15 @@
 <?php
 /**
  * "Export YAML" admin action: streams a `ryv_forms` post's title,
- * description, and node graph as a downloadable YAML file - the inverse
- * direction of RYV_Import_Page, but a clean native RYV schema dump rather
- * than a Drupal-webform-shaped file (reversing the whole flatten()/
- * build_subtree() translation back into per-state #states-gated containers
- * is a different, much larger undertaking than "export the current
- * schema" - see class docblock note below for why this one stays one-way).
+ * description, and node graph as a downloadable, Drupal-webform-shaped YAML
+ * file - the inverse direction of RYV_Import_Page. Reconstructed (per-state
+ * #states-gated containers) by RYV_Drupal_YAML_Exporter - see that class's
+ * own docblock for exactly how faithful that reversal is and its documented
+ * limitations (it's a best-effort reversal scoped to forms originally
+ * imported via RYV_YAML_Parser and only lightly edited since, not arbitrary
+ * builder-authored graphs). This shape was chosen over a plain native-schema
+ * dump specifically because it round-trips back in through RYV_YAML_Parser
+ * too, making a flat native dump redundant as a second export option.
  *
  * @package RYV_Eligibility_Tool
  */
@@ -125,32 +128,33 @@ class RYV_Export_Page {
 	}
 
 	/**
-	 * Build the export array and stream it as a `.yml` download.
+	 * Build the Drupal-webform-shaped export via RYV_Drupal_YAML_Exporter and
+	 * stream it as a `.yml` download. Any reconstruction warnings (e.g. an
+	 * edge that can't survive the reversal - see that class's docblock) are
+	 * prepended as `#`-commented lines so they travel with the file itself
+	 * rather than needing a separate admin-notice round trip.
 	 *
 	 * @param int     $post_id Form post ID.
 	 * @param WP_Post $post    Form post.
 	 */
 	private function stream( int $post_id, WP_Post $post ): void {
-		$schema = RYV_CPT::get_schema( $post_id );
+		$schema   = RYV_CPT::get_schema( $post_id );
+		$exporter = new RYV_Drupal_YAML_Exporter();
+		$result   = $exporter->export( $schema, $post->post_title, $post->post_excerpt, $post_id );
 
-		// Native RYV schema shape, not Drupal's #-prefixed element-tree
-		// format - the exact same {title, description, entry_node, nodes}
-		// shape the builder SPA round-trips already (see
-		// RYV_Admin_API/RYV_CPT::get_schema()), just YAML instead of JSON.
-		$export = array(
-			'title'       => $post->post_title,
-			'description' => $post->post_excerpt,
-			'entry_node'  => $schema['entry_node'],
-			'nodes'       => $schema['nodes'],
-		);
+		$yaml = $result['yaml'];
 
-		// Inline level 8: block (multi-line, readable) style through
-		// node -> options -> option, only collapsing to inline flow style
-		// past that depth (nothing in this schema nests that deep) -
-		// avoids the unreadable single-line-per-node output Yaml::dump()'s
-		// low default inline level would otherwise produce for a graph
-		// this shape.
-		$yaml = Yaml::dump( $export, 8, 2 );
+		if ( ! empty( $result['warnings'] ) ) {
+			$comment_lines = array( '# Export warnings - review before relying on this file:' );
+
+			foreach ( $result['warnings'] as $warning ) {
+				foreach ( explode( "\n", $warning ) as $line ) {
+					$comment_lines[] = '# ' . $line;
+				}
+			}
+
+			$yaml = implode( "\n", $comment_lines ) . "\n#\n" . $yaml;
+		}
 
 		nocache_headers();
 		header( 'Content-Type: text/yaml; charset=utf-8' );

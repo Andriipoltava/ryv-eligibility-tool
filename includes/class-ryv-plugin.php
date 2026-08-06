@@ -121,6 +121,7 @@ final class RYV_Plugin {
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-cpt.php';
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-schema-migrator.php';
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-yaml-parser.php';
+		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-drupal-yaml-exporter.php';
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-graph-validator.php';
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-us-states.php';
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-db.php';
