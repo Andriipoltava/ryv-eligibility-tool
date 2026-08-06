@@ -32,11 +32,12 @@
     border-style: solid;
     border-width: var(--ryv-wrapper-border-width, 0);
     border-color: var(--ryv-wrapper-border-color, transparent);
-    border-radius: var(--ryv-wrapper-border-radius, 0);
+    border-radius: var(--ryv-wrapper-border-radius, var(--ryv-radius, 0));
   }
 
   .ryv-list {
-    @apply ryv-flex ryv-flex-col ryv-gap-6;
+    @apply ryv-flex ryv-flex-col;
+    gap: var(--ryv-list-gap, 1.5rem);
   }
 
   .ryv-card {
@@ -66,7 +67,7 @@
    */
   .ryv-question-title {
     @apply ryv-font-bold ryv-mb-4 ryv-flex ryv-items-center ryv-gap-2;
-    font-size: var(--ryv-question-title-size, 1.375rem);
+    font-size: var(--ryv-question-title-size, var(--ryv-font-size, 1.375rem));
     color: var(--ryv-question-title-color, var(--ryv-primary-color, #002a41));
   }
 
@@ -90,10 +91,10 @@
     height: 0.875rem;
     font-size: 0.75rem;
     color: var(--ryv-help-icon-color, #fff);
-    background-color: var(--ryv-help-icon-bg, #bbb);
+    background-color: var(--ryv-help-icon-bg, var(--ryv-secondary-color, #bbb));
     border-style: solid;
     border-width: 2px;
-    border-color: var(--ryv-help-icon-bg, #bbb);
+    border-color: var(--ryv-help-icon-bg, var(--ryv-secondary-color, #bbb));
   }
   .ryv-help-icon:hover {
     background-color: var(--ryv-help-icon-bg-hover, var(--ryv-primary-color, #002a41));
@@ -206,7 +207,7 @@
   .ryv-option-btn {
     @apply ryv-text-left ryv-font-bold ryv-transition-colors ryv-duration-150;
     width: var(--ryv-btn-width, auto);
-    font-size: var(--ryv-btn-font-size, 1.125rem);
+    font-size: var(--ryv-btn-font-size, var(--ryv-font-size, 1.125rem));
     color: var(--ryv-btn-text-color, var(--ryv-text-color, #1f2937));
     background-color: var(--ryv-btn-bg, #ececec);
     border-style: solid;
@@ -272,6 +273,7 @@
 
   .ryv-input {
     @apply ryv-w-full ryv-mb-4;
+    max-width: var(--ryv-input-max-width, none);
     color: var(--ryv-input-text-color, var(--ryv-text-color, #1f2937));
     background-color: var(--ryv-input-bg, var(--ryv-bg-color, #fff));
     border-style: solid;
@@ -304,6 +306,7 @@
   /* display_style: 'dropdown' - a single native <select>. */
   .ryv-select {
     @apply ryv-w-full ryv-mb-4;
+    max-width: var(--ryv-select-max-width, none);
     color: var(--ryv-select-text-color, var(--ryv-text-color, #1f2937));
     background-color: var(--ryv-select-bg, var(--ryv-bg-color, #fff));
     border-style: solid;
@@ -311,7 +314,7 @@
     border-color: var(--ryv-select-border-color, #afb0b1);
     border-radius: var(--ryv-select-border-radius, var(--ryv-radius, 0));
     padding: var(--ryv-select-padding, 1rem);
-    font-size: var(--ryv-select-font-size, 1.125rem);
+    font-size: var(--ryv-select-font-size, var(--ryv-font-size, 1.125rem));
   }
   .ryv-select:hover {
     border-color: var(--ryv-select-border-color-hover, var(--ryv-select-border-color, #d1d5db));
@@ -332,6 +335,7 @@
    */
   .ryv-select2 {
     @apply ryv-relative ryv-w-full ryv-mb-4;
+    max-width: var(--ryv-select-max-width, none);
   }
   .ryv-select2-input {
     @apply ryv-w-full;
@@ -343,7 +347,7 @@
     border-radius: var(--ryv-select-border-radius, var(--ryv-radius, 0));
     padding: var(--ryv-select-padding, 1rem);
     padding-right: 2.75rem;
-    font-size: var(--ryv-select-font-size, 1.125rem);
+    font-size: var(--ryv-select-font-size, var(--ryv-font-size, 1.125rem));
   }
   /*
    * A plain <select> gets its arrow for free from the browser - this is a
@@ -380,7 +384,7 @@
     @apply ryv-cursor-pointer;
     color: var(--ryv-select-text-color, var(--ryv-text-color, #1f2937));
     padding: var(--ryv-select-padding, 1rem);
-    font-size: var(--ryv-select-font-size, 1.125rem);
+    font-size: var(--ryv-select-font-size, var(--ryv-font-size, 1.125rem));
   }
   .ryv-select2-option:hover,
   .ryv-select2-option.is-highlighted {
@@ -421,7 +425,7 @@
     border-width: var(--ryv-text-restrict-height-border-width, 1px);
     border-color: var(--ryv-text-restrict-height-border-color, #afb0b1);
     color: var(--ryv-text-restrict-height-color, var(--ryv-primary-color, #002a41));
-    font-size: var(--ryv-text-restrict-height-font-size, 1.125rem);
+    font-size: var(--ryv-text-restrict-height-font-size, var(--ryv-font-size, 1.125rem));
   }
 
   /*
@@ -439,7 +443,7 @@
     border-radius: var(--ryv-path-end-border-radius, var(--ryv-radius, 0));
     background-color: var(--ryv-path-end-bg, #cadae3);
     color: var(--ryv-path-end-color, var(--ryv-primary-color, #002a41));
-    font-size: var(--ryv-path-end-font-size, 1.125rem);
+    font-size: var(--ryv-path-end-font-size, var(--ryv-font-size, 1.125rem));
   }
 
   .ryv-error-box {

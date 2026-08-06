@@ -40,7 +40,7 @@ class RYV_Settings_Page {
 	const OPTION_GROUP = 'ryv_global_styles_group';
 
 	/**
-	 * Option name - one array, not five separate autoloaded options.
+	 * Option name - one array, not two dozen separate autoloaded options.
 	 */
 	const OPTION_NAME = 'ryv_global_styles';
 
@@ -53,29 +53,259 @@ class RYV_Settings_Page {
 	private $hook_suffix = '';
 
 	/**
-	 * Field defaults.
+	 * One declarative description of every field, grouped into Settings API
+	 * sections - register_settings()/render_field()/sanitize()/build_css()
+	 * below all iterate this single structure instead of hand-listing each
+	 * field key in four separate places (the shape this page had at 5
+	 * fields; it stopped scaling once per-component color/spacing overrides
+	 * were added, taking this to ~24). A method rather than a class `const`
+	 * specifically because 'label' needs a real `__()` call for
+	 * translatability (Loco Translate/WPML both work off of real gettext
+	 * calls picked up from source - see ryv-eligibility-tool.php's
+	 * load_plugin_textdomain() docblock) - a `const` initializer can't
+	 * contain a function call at all.
 	 *
-	 * primary_color/text_color match the hardcoded fallbacks already baked
-	 * into assets/src/input.css (`var(--ryv-primary-color, #002a41)` etc. -
-	 * the navy/flat-button palette matches campaignlegal.org/restoreyourvote,
-	 * the real production site this form targets), so saving this page
-	 * unmodified changes nothing visually. bg_color/border_radius/font_family
-	 * default to '' (omitted entirely from the generated CSS - see
-	 * build_css()) rather than to a value, since those three are genuinely
-	 * new overrides with no prior equivalent; defaulting them to a concrete
-	 * value would repaint every existing site's forms the moment this
-	 * feature ships, before any admin opted in.
+	 * Per-field shape:
+	 *   'type'    'color' | 'px' | 'font' - which render_field()/sanitize()
+	 *             branch handles it.
+	 *   'label'   Settings API field label.
+	 *   'css_var' The exact CSS custom property this field writes -
+	 *             deliberately the SAME name the corresponding per-instance
+	 *             Elementor widget control already writes to (see
+	 *             widgets/class-ryv-widget.php's register_*_style_controls()
+	 *             methods, none of which carry a hardcoded 'default' for any
+	 *             field also listed here - see register_color_controls()'s
+	 *             docblock for why that matters) - so a value here only
+	 *             ever adds a lower-specificity, `:root, .ryv-app-wrapper`-
+	 *             scoped fallback layer underneath Elementor, never a
+	 *             competing declaration.
+	 *   'default' Stored/emitted default. '' means "omit the CSS
+	 *             declaration entirely unless an admin sets a value" (see
+	 *             build_css()) - used for every field that's a genuinely
+	 *             new override with no prior equivalent, so shipping this
+	 *             feature (or adding a field to it later) never repaints an
+	 *             existing site's forms before an admin opts in. A concrete
+	 *             default (primary_color, text_color) is only for fields
+	 *             that already had a hardcoded fallback baked into
+	 *             assets/src/input.css before Global Styles existed at all.
+	 *   'max'     'px' fields only - sanitize() clamps to [0, max].
+	 *   'placeholder' 'px'/'font' fields only - input placeholder text
+	 *             ('font''s is also its help text, same as before this
+	 *             page had more than one field per type).
+	 *
+	 * @return array<string,array{label:string,fields:array<string,array>}>
+	 */
+	private static function field_groups(): array {
+		return array(
+			'colors'         => array(
+				'label'  => __( 'Colors & Typography', 'ryv-eligibility-tool' ),
+				'fields' => array(
+					'primary_color' => array(
+						'type'    => 'color',
+						'label'   => __( 'Primary Color', 'ryv-eligibility-tool' ),
+						'css_var' => '--ryv-primary-color',
+						'default' => '#002a41',
+					),
+					'text_color'    => array(
+						'type'    => 'color',
+						'label'   => __( 'Text Color', 'ryv-eligibility-tool' ),
+						'css_var' => '--ryv-text-color',
+						'default' => '#1f2937',
+					),
+					'bg_color'      => array(
+						'type'    => 'color',
+						'label'   => __( 'Background Color', 'ryv-eligibility-tool' ),
+						'css_var' => '--ryv-bg-color',
+						'default' => '',
+					),
+					'border_radius' => array(
+						'type'        => 'px',
+						'label'       => __( 'Border Radius', 'ryv-eligibility-tool' ),
+						'css_var'     => '--ryv-radius',
+						'default'     => '',
+						'max'         => 100,
+						'placeholder' => '8',
+					),
+					'font_family'   => array(
+						'type'        => 'font',
+						'label'       => __( 'Font Family', 'ryv-eligibility-tool' ),
+						'css_var'     => '--ryv-font',
+						'default'     => '',
+						'placeholder' => __( 'e.g. "Inter", sans-serif - leave blank to inherit the theme\'s font', 'ryv-eligibility-tool' ),
+					),
+					'font_size'     => array(
+						'type'        => 'px',
+						'label'       => __( 'Base Font Size', 'ryv-eligibility-tool' ),
+						'css_var'     => '--ryv-font-size',
+						'default'     => '',
+						'max'         => 60,
+						'placeholder' => '18',
+					),
+				),
+			),
+			'wrapper'        => array(
+				'label'  => __( 'Wrapper', 'ryv-eligibility-tool' ),
+				'fields' => array(
+					'wrapper_max_width'    => array(
+						'type'        => 'px',
+						'label'       => __( 'Max Width', 'ryv-eligibility-tool' ),
+						'css_var'     => '--ryv-wrapper-max-width',
+						'default'     => '',
+						'max'         => 2000,
+						'placeholder' => '576',
+					),
+					'wrapper_padding'      => array(
+						'type'    => 'px',
+						'label'   => __( 'Padding', 'ryv-eligibility-tool' ),
+						'css_var' => '--ryv-wrapper-padding',
+						'default' => '',
+						'max'     => 200,
+					),
+					'wrapper_border_width' => array(
+						'type'    => 'px',
+						'label'   => __( 'Border Width', 'ryv-eligibility-tool' ),
+						'css_var' => '--ryv-wrapper-border-width',
+						'default' => '',
+						'max'     => 20,
+					),
+					'wrapper_border_color' => array(
+						'type'    => 'color',
+						'label'   => __( 'Border Color', 'ryv-eligibility-tool' ),
+						'css_var' => '--ryv-wrapper-border-color',
+						'default' => '',
+					),
+				),
+			),
+			'buttons'        => array(
+				'label'  => __( 'Choice Buttons', 'ryv-eligibility-tool' ),
+				'fields' => array(
+					'button_text_color'   => array(
+						'type'    => 'color',
+						'label'   => __( 'Text Color', 'ryv-eligibility-tool' ),
+						'css_var' => '--ryv-btn-text-color',
+						'default' => '',
+					),
+					'button_bg_color'     => array(
+						'type'    => 'color',
+						'label'   => __( 'Background Color', 'ryv-eligibility-tool' ),
+						'css_var' => '--ryv-btn-bg',
+						'default' => '',
+					),
+					'button_border_color' => array(
+						'type'    => 'color',
+						'label'   => __( 'Border Color', 'ryv-eligibility-tool' ),
+						'css_var' => '--ryv-btn-border-color',
+						'default' => '',
+					),
+					'button_padding'      => array(
+						'type'    => 'px',
+						'label'   => __( 'Padding', 'ryv-eligibility-tool' ),
+						'css_var' => '--ryv-btn-padding',
+						'default' => '',
+						'max'     => 60,
+					),
+				),
+			),
+			'dropdown_input' => array(
+				'label'  => __( 'Dropdown & Input', 'ryv-eligibility-tool' ),
+				'fields' => array(
+					'dropdown_text_color'   => array(
+						'type'    => 'color',
+						'label'   => __( 'Dropdown Text Color', 'ryv-eligibility-tool' ),
+						'css_var' => '--ryv-select-text-color',
+						'default' => '',
+					),
+					'dropdown_bg_color'     => array(
+						'type'    => 'color',
+						'label'   => __( 'Dropdown Background Color', 'ryv-eligibility-tool' ),
+						'css_var' => '--ryv-select-bg',
+						'default' => '',
+					),
+					'dropdown_border_color' => array(
+						'type'    => 'color',
+						'label'   => __( 'Dropdown Border Color', 'ryv-eligibility-tool' ),
+						'css_var' => '--ryv-select-border-color',
+						'default' => '',
+					),
+					'input_text_color'      => array(
+						'type'    => 'color',
+						'label'   => __( 'Text Input Text Color', 'ryv-eligibility-tool' ),
+						'css_var' => '--ryv-input-text-color',
+						'default' => '',
+					),
+					'input_bg_color'        => array(
+						'type'    => 'color',
+						'label'   => __( 'Text Input Background Color', 'ryv-eligibility-tool' ),
+						'css_var' => '--ryv-input-bg',
+						'default' => '',
+					),
+					'input_border_color'    => array(
+						'type'    => 'color',
+						'label'   => __( 'Text Input Border Color', 'ryv-eligibility-tool' ),
+						'css_var' => '--ryv-input-border-color',
+						'default' => '',
+					),
+				),
+			),
+			'radio_help'     => array(
+				'label'  => __( 'Radio & Help Tooltip', 'ryv-eligibility-tool' ),
+				'fields' => array(
+					'radio_text_color'        => array(
+						'type'    => 'color',
+						'label'   => __( 'Radio Text Color', 'ryv-eligibility-tool' ),
+						'css_var' => '--ryv-radio-text-color',
+						'default' => '',
+					),
+					'radio_accent_color'      => array(
+						'type'    => 'color',
+						'label'   => __( 'Radio Color', 'ryv-eligibility-tool' ),
+						'css_var' => '--ryv-radio-accent-color',
+						'default' => '',
+					),
+					'help_icon_color'         => array(
+						'type'    => 'color',
+						'label'   => __( 'Help Icon Color', 'ryv-eligibility-tool' ),
+						'css_var' => '--ryv-help-icon-color',
+						'default' => '',
+					),
+					'help_icon_bg_color'      => array(
+						'type'    => 'color',
+						'label'   => __( 'Help Icon Background Color', 'ryv-eligibility-tool' ),
+						'css_var' => '--ryv-help-icon-bg',
+						'default' => '',
+					),
+					'help_tooltip_text_color' => array(
+						'type'    => 'color',
+						'label'   => __( 'Help Tooltip Text Color', 'ryv-eligibility-tool' ),
+						'css_var' => '--ryv-help-tooltip-text-color',
+						'default' => '',
+					),
+					'help_tooltip_bg_color'   => array(
+						'type'    => 'color',
+						'label'   => __( 'Help Tooltip Background Color', 'ryv-eligibility-tool' ),
+						'css_var' => '--ryv-help-tooltip-bg',
+						'default' => '',
+					),
+				),
+			),
+		);
+	}
+
+	/**
+	 * Field defaults, flattened from field_groups().
 	 *
 	 * @return array<string,string>
 	 */
 	public static function defaults(): array {
-		return array(
-			'primary_color' => '#002a41',
-			'text_color'    => '#1f2937',
-			'bg_color'      => '',
-			'border_radius' => '',
-			'font_family'   => '',
-		);
+		$out = array();
+
+		foreach ( self::field_groups() as $group ) {
+			foreach ( $group['fields'] as $key => $field ) {
+				$out[ $key ] = $field['default'];
+			}
+		}
+
+		return $out;
 	}
 
 	/**
@@ -145,7 +375,10 @@ class RYV_Settings_Page {
 	}
 
 	/**
-	 * Register the option + Settings API section/fields.
+	 * Register the option + one Settings API section per field_groups()
+	 * entry (mirroring the Elementor widget's own Style-tab section
+	 * grouping, for the same reason - 24 fields under one blank heading
+	 * isn't browsable).
 	 */
 	public function register_settings() {
 		register_setting(
@@ -158,65 +391,65 @@ class RYV_Settings_Page {
 			)
 		);
 
-		add_settings_section( 'ryv_global_styles_main', '', '__return_false', self::PAGE_SLUG );
+		foreach ( self::field_groups() as $group_id => $group ) {
+			$section_id = 'ryv_global_styles_' . $group_id;
 
-		$fields = array(
-			'primary_color' => __( 'Primary Color', 'ryv-eligibility-tool' ),
-			'text_color'    => __( 'Text Color', 'ryv-eligibility-tool' ),
-			'bg_color'      => __( 'Background Color', 'ryv-eligibility-tool' ),
-			'border_radius' => __( 'Border Radius', 'ryv-eligibility-tool' ),
-			'font_family'   => __( 'Font Family', 'ryv-eligibility-tool' ),
-		);
+			add_settings_section( $section_id, $group['label'], '__return_false', self::PAGE_SLUG );
 
-		foreach ( $fields as $key => $label ) {
-			add_settings_field(
-				$key,
-				$label,
-				array( $this, 'render_field' ),
-				self::PAGE_SLUG,
-				'ryv_global_styles_main',
-				array( 'key' => $key )
-			);
+			foreach ( $group['fields'] as $key => $field ) {
+				add_settings_field(
+					$key,
+					$field['label'],
+					array( $this, 'render_field' ),
+					self::PAGE_SLUG,
+					$section_id,
+					array(
+						'key'   => $key,
+						'field' => $field,
+					)
+				);
+			}
 		}
 	}
 
 	/**
-	 * Settings API field callback - one <input>, type/attributes depend on
-	 * which field this is.
+	 * Settings API field callback - one <input>, shape depends on the
+	 * field's declared 'type' (see field_groups()'s docblock).
 	 *
-	 * @param array $args { 'key' => string }.
+	 * @param array $args { 'key' => string, 'field' => array }.
 	 */
 	public function render_field( array $args ) {
-		$key    = $args['key'];
-		$value  = self::get_values()[ $key ];
-		$name   = self::OPTION_NAME . '[' . $key . ']';
+		$key   = $args['key'];
+		$field = $args['field'];
+		$value = self::get_values()[ $key ];
+		$name  = self::OPTION_NAME . '[' . $key . ']';
 
-		switch ( $key ) {
-			case 'primary_color':
-			case 'text_color':
-			case 'bg_color':
+		switch ( $field['type'] ) {
+			case 'color':
 				printf(
 					'<input type="text" class="ryv-color-field" name="%1$s" value="%2$s" data-default-color="%3$s" />',
 					esc_attr( $name ),
 					esc_attr( $value ),
-					esc_attr( self::defaults()[ $key ] )
+					esc_attr( $field['default'] )
 				);
 				break;
 
-			case 'border_radius':
+			case 'px':
 				printf(
-					'<input type="number" min="0" max="100" step="1" class="small-text" name="%1$s" value="%2$s" placeholder="8" /> px',
+					'<input type="number" min="0" max="%4$d" step="1" class="small-text" name="%1$s" value="%2$s" placeholder="%3$s" /> px',
 					esc_attr( $name ),
-					esc_attr( $value )
+					esc_attr( $value ),
+					esc_attr( $field['placeholder'] ?? '' ),
+					(int) ( $field['max'] ?? 9999 )
 				);
 				break;
 
-			case 'font_family':
+			case 'font':
 				printf(
 					'<input type="text" class="regular-text" name="%1$s" value="%2$s" placeholder="%3$s" />',
 					esc_attr( $name ),
 					esc_attr( $value ),
-					esc_attr__( 'e.g. "Inter", sans-serif - leave blank to inherit the theme\'s font', 'ryv-eligibility-tool' )
+					esc_attr( $field['placeholder'] ?? '' )
 				);
 				break;
 		}
@@ -234,24 +467,40 @@ class RYV_Settings_Page {
 	}
 
 	/**
-	 * Settings API sanitize callback for the whole `ryv_global_styles` array.
+	 * Settings API sanitize callback for the whole `ryv_global_styles`
+	 * array - iterates field_groups(), dispatching on each field's 'type'.
 	 *
 	 * @param mixed $input Raw $_POST value for this option.
 	 * @return array<string,string>
 	 */
 	public function sanitize( $input ): array {
-		$input    = is_array( $input ) ? $input : array();
-		$defaults = self::defaults();
+		$input = is_array( $input ) ? $input : array();
+		$out   = array();
 
-		$border_radius = isset( $input['border_radius'] ) ? trim( (string) $input['border_radius'] ) : '';
+		foreach ( self::field_groups() as $group ) {
+			foreach ( $group['fields'] as $key => $field ) {
+				$raw = $input[ $key ] ?? '';
 
-		return array(
-			'primary_color' => $this->sanitize_color( $input['primary_color'] ?? '', $defaults['primary_color'] ),
-			'text_color'    => $this->sanitize_color( $input['text_color'] ?? '', $defaults['text_color'] ),
-			'bg_color'      => $this->sanitize_color( $input['bg_color'] ?? '', '' ),
-			'border_radius' => ( '' === $border_radius ) ? '' : (string) max( 0, min( 100, absint( $border_radius ) ) ),
-			'font_family'   => $this->sanitize_font_family( $input['font_family'] ?? '' ),
-		);
+				switch ( $field['type'] ) {
+					case 'color':
+						$out[ $key ] = $this->sanitize_color( $raw, $field['default'] );
+						break;
+
+					case 'px':
+						$out[ $key ] = $this->sanitize_px( $raw, (int) ( $field['max'] ?? 9999 ) );
+						break;
+
+					case 'font':
+						$out[ $key ] = $this->sanitize_font_family( $raw );
+						break;
+
+					default:
+						$out[ $key ] = '';
+				}
+			}
+		}
+
+		return $out;
 	}
 
 	/**
@@ -273,6 +522,26 @@ class RYV_Settings_Page {
 		$hex = sanitize_hex_color( $value );
 
 		return $hex ? $hex : $fallback;
+	}
+
+	/**
+	 * A blank value stays blank (see field_groups()'s docblock on
+	 * 'default' === '' - omitted from build_css() entirely, not written as
+	 * "0px"). Anything else is clamped to a non-negative integer no larger
+	 * than $max.
+	 *
+	 * @param mixed $value Raw submitted value.
+	 * @param int   $max   Upper bound for this field.
+	 * @return string
+	 */
+	private function sanitize_px( $value, int $max ): string {
+		$trimmed = is_string( $value ) ? trim( $value ) : '';
+
+		if ( '' === $trimmed ) {
+			return '';
+		}
+
+		return (string) max( 0, min( $max, absint( $trimmed ) ) );
 	}
 
 	/**
@@ -315,10 +584,13 @@ class RYV_Settings_Page {
 
 	/**
 	 * Build the `:root, .ryv-app-wrapper { --ryv-...: ...; }` block from the
-	 * saved values - a blank value is omitted entirely (not written as an
-	 * empty declaration), so it falls through to whatever
-	 * assets/src/input.css's own `var(--x, <default>)` fallback (or an
-	 * Elementor per-instance override) would otherwise resolve to.
+	 * saved values, iterating field_groups() - a blank value is omitted
+	 * entirely (not written as an empty declaration), so it falls through
+	 * to whatever assets/src/input.css's own `var(--x, <default>)` fallback
+	 * (or an Elementor per-instance override, which always wins by
+	 * specificity when set - see field_groups()'s own docblock) would
+	 * otherwise resolve to. 'px' fields get a literal `px` suffix; every
+	 * other type is written as-is (a color hex, or a sanitized font stack).
 	 *
 	 * @return string CSS, or '' if every value is blank.
 	 */
@@ -326,24 +598,17 @@ class RYV_Settings_Page {
 		$values       = self::get_values();
 		$declarations = array();
 
-		if ( '' !== $values['primary_color'] ) {
-			$declarations[] = '--ryv-primary-color: ' . $values['primary_color'] . ';';
-		}
+		foreach ( self::field_groups() as $group ) {
+			foreach ( $group['fields'] as $key => $field ) {
+				$value = $values[ $key ];
 
-		if ( '' !== $values['text_color'] ) {
-			$declarations[] = '--ryv-text-color: ' . $values['text_color'] . ';';
-		}
+				if ( '' === $value ) {
+					continue;
+				}
 
-		if ( '' !== $values['bg_color'] ) {
-			$declarations[] = '--ryv-bg-color: ' . $values['bg_color'] . ';';
-		}
-
-		if ( '' !== $values['border_radius'] ) {
-			$declarations[] = '--ryv-radius: ' . absint( $values['border_radius'] ) . 'px;';
-		}
-
-		if ( '' !== $values['font_family'] ) {
-			$declarations[] = '--ryv-font: ' . $values['font_family'] . ';';
+				$unit           = ( 'px' === $field['type'] ) ? 'px' : '';
+				$declarations[] = $field['css_var'] . ': ' . $value . $unit . ';';
+			}
 		}
 
 		if ( empty( $declarations ) ) {

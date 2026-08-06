@@ -230,23 +230,31 @@ class RYV_Widget extends \Elementor\Widget_Base {
 
 	/**
 	 * The `.ryv-app-wrapper` element itself - max-width, padding, border,
-	 * shadow, and a per-instance background override - as opposed to every
-	 * OTHER style section here, which targets something rendered INSIDE it
-	 * (buttons, dropdown, tooltip, ...). Same CSS-custom-property technique
-	 * as the rest of this file (see register_button_style_controls()'s
-	 * docblock): every control here writes onto `.ryv-app-wrapper` itself,
-	 * consumed by assets/src/input.css's own `.ryv-app-wrapper` rule.
+	 * shadow, a per-instance background override, and the vertical gap
+	 * between question cards (`.ryv-list`, which has no other Style-tab
+	 * section of its own since gap is its only meaningful visual knob) - as
+	 * opposed to every OTHER style section here, which targets something
+	 * rendered INSIDE it (buttons, dropdown, tooltip, ...). Same
+	 * CSS-custom-property technique as the rest of this file (see
+	 * register_button_style_controls()'s docblock): every control here
+	 * writes onto `.ryv-app-wrapper` itself, consumed by
+	 * assets/src/input.css's own `.ryv-app-wrapper` rule.
 	 *
-	 * `wrapper_bg_color` deliberately reuses `--ryv-bg-color` (not a new
-	 * variable) - the exact same variable RYV_Settings_Page's Global Styles
-	 * page writes at `:root, .ryv-app-wrapper` scope - so leaving it blank
-	 * falls through to Global Styles (or transparent) instead of a
-	 * hardcoded value, same reasoning as primary_color/text_color in
-	 * register_color_controls(). Every other control here has no
-	 * Global-Styles equivalent to fall through to, so each gets its own
-	 * fallback baked into input.css instead (matching the widget's current,
-	 * unstyled-wrapper look - no default value here, so an untouched
-	 * instance stays visually identical to before this section existed).
+	 * `wrapper_max_width`/`wrapper_padding`/`wrapper_border_width`/
+	 * `wrapper_bg_color`/`wrapper_border_color` all deliberately have no
+	 * `'default'` and reuse the exact variable names RYV_Settings_Page's
+	 * Global Styles page also writes at `:root, .ryv-app-wrapper` scope -
+	 * so leaving any of them blank falls through to Global Styles instead
+	 * of a hardcoded value, same reasoning as primary_color/text_color in
+	 * register_color_controls(). `wrapper_border_radius` isn't its own
+	 * field at all - input.css chains it through the existing global
+	 * Border Radius field (`--ryv-radius`) the same way every other
+	 * border-radius property in this file already does. Only the
+	 * question-gap control has no Global Styles equivalent (no sensible
+	 * single "site-wide" value for it), so it keeps its own fallback baked
+	 * into input.css directly (matching the widget's original look - no
+	 * default value here either, so an untouched instance stays visually
+	 * identical to before this section existed).
 	 */
 	private function register_wrapper_style_controls() {
 		$this->start_controls_section(
@@ -296,6 +304,25 @@ class RYV_Widget extends \Elementor\Widget_Base {
 			)
 		);
 
+		$this->add_responsive_control(
+			'wrapper_list_gap',
+			array(
+				'label'      => __( 'Gap Between Questions', 'ryv-eligibility-tool' ),
+				'type'       => \Elementor\Controls_Manager::SLIDER,
+				'size_units' => array( 'px' ),
+				'range'      => array(
+					'px' => array(
+						'min' => 0,
+						'max' => 80,
+					),
+				),
+				'description' => __( 'Vertical spacing between question cards (`.ryv-list`). Leave blank for the default (1.5rem, ~24px).', 'ryv-eligibility-tool' ),
+				'selectors'   => array(
+					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-list-gap: {{SIZE}}{{UNIT}};',
+				),
+			)
+		);
+
 		$this->add_control(
 			'wrapper_bg_color',
 			array(
@@ -338,10 +365,13 @@ class RYV_Widget extends \Elementor\Widget_Base {
 		$this->add_control(
 			'wrapper_border_color',
 			array(
-				'label'     => __( 'Border Color', 'ryv-eligibility-tool' ),
-				'type'      => \Elementor\Controls_Manager::COLOR,
-				'default'   => '#e5e7eb',
-				'selectors' => array(
+				'label'       => __( 'Border Color', 'ryv-eligibility-tool' ),
+				'type'        => \Elementor\Controls_Manager::COLOR,
+				// No 'default' - see register_color_controls()'s docblock:
+				// falls through to RYV_Settings_Page's Global Styles, or
+				// input.css's own #e5e7eb fallback if that's unset too.
+				'description' => __( 'Leave blank to use the site-wide default set under RYV Forms → Global Styles.', 'ryv-eligibility-tool' ),
+				'selectors'   => array(
 					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-wrapper-border-color: {{VALUE}};',
 				),
 			)
@@ -765,10 +795,13 @@ class RYV_Widget extends \Elementor\Widget_Base {
 		$this->add_control(
 			'button_border_color',
 			array(
-				'label'     => __( 'Border Color', 'ryv-eligibility-tool' ),
-				'type'      => \Elementor\Controls_Manager::COLOR,
-				'default'   => '#d1d5db',
-				'selectors' => array(
+				'label'       => __( 'Border Color', 'ryv-eligibility-tool' ),
+				'type'        => \Elementor\Controls_Manager::COLOR,
+				// No 'default' - see register_color_controls()'s docblock:
+				// falls through to RYV_Settings_Page's Global Styles, or
+				// input.css's own #ececec fallback if that's unset too.
+				'description' => __( 'Leave blank to use the site-wide default set under RYV Forms → Global Styles.', 'ryv-eligibility-tool' ),
+				'selectors'   => array(
 					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-btn-border-color: {{VALUE}};',
 				),
 			)
@@ -999,6 +1032,33 @@ class RYV_Widget extends \Elementor\Widget_Base {
 		);
 
 		$this->add_responsive_control(
+			'dropdown_max_width',
+			array(
+				'label'       => __( 'Max Width', 'ryv-eligibility-tool' ),
+				'type'        => \Elementor\Controls_Manager::SLIDER,
+				'size_units'  => array( 'px', '%', 'rem' ),
+				'range'       => array(
+					'px'  => array(
+						'min' => 50,
+						'max' => 1400,
+					),
+					'%'   => array(
+						'min' => 10,
+						'max' => 100,
+					),
+					'rem' => array(
+						'min' => 5,
+						'max' => 90,
+					),
+				),
+				'description' => __( 'Applies to both the plain dropdown and the searchable (Select2) variant - they share the same underlying styling. Leave blank for full width (100%).', 'ryv-eligibility-tool' ),
+				'selectors'   => array(
+					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-select-max-width: {{SIZE}}{{UNIT}};',
+				),
+			)
+		);
+
+		$this->add_responsive_control(
 			'dropdown_padding',
 			array(
 				'label'      => __( 'Padding', 'ryv-eligibility-tool' ),
@@ -1075,9 +1135,15 @@ class RYV_Widget extends \Elementor\Widget_Base {
 		$this->add_control(
 			'dropdown_border_color',
 			array(
-				'label'     => __( 'Border Color', 'ryv-eligibility-tool' ),
-				'type'      => \Elementor\Controls_Manager::COLOR,
-				'default'   => '#d1d5db',
+				'label'       => __( 'Border Color', 'ryv-eligibility-tool' ),
+				'type'        => \Elementor\Controls_Manager::COLOR,
+				// No 'default' - see register_color_controls()'s docblock.
+				// This one's old hardcoded '#d1d5db' never actually matched
+				// input.css's own fallback (#afb0b1, campaignlegal.org's
+				// real dropdown border) anyway - removing it also fixes
+				// that mismatch for every untouched instance, not just
+				// unlocking Global Styles.
+				'description' => __( 'Leave blank to use the site-wide default set under RYV Forms → Global Styles.', 'ryv-eligibility-tool' ),
 				'selectors' => array(
 					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-select-border-color: {{VALUE}};',
 				),
@@ -1139,6 +1205,33 @@ class RYV_Widget extends \Elementor\Widget_Base {
 				'name'     => 'input_typography',
 				'label'    => __( 'Typography', 'ryv-eligibility-tool' ),
 				'selector' => '{{WRAPPER}} .ryv-input',
+			)
+		);
+
+		$this->add_responsive_control(
+			'input_max_width',
+			array(
+				'label'       => __( 'Max Width', 'ryv-eligibility-tool' ),
+				'type'        => \Elementor\Controls_Manager::SLIDER,
+				'size_units'  => array( 'px', '%', 'rem' ),
+				'range'       => array(
+					'px'  => array(
+						'min' => 50,
+						'max' => 1400,
+					),
+					'%'   => array(
+						'min' => 10,
+						'max' => 100,
+					),
+					'rem' => array(
+						'min' => 5,
+						'max' => 90,
+					),
+				),
+				'description' => __( 'Leave blank for full width (100%).', 'ryv-eligibility-tool' ),
+				'selectors'   => array(
+					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-input-max-width: {{SIZE}}{{UNIT}};',
+				),
 			)
 		);
 
@@ -1219,10 +1312,11 @@ class RYV_Widget extends \Elementor\Widget_Base {
 		$this->add_control(
 			'input_border_color',
 			array(
-				'label'     => __( 'Border Color', 'ryv-eligibility-tool' ),
-				'type'      => \Elementor\Controls_Manager::COLOR,
-				'default'   => '#d1d5db',
-				'selectors' => array(
+				'label'       => __( 'Border Color', 'ryv-eligibility-tool' ),
+				'type'        => \Elementor\Controls_Manager::COLOR,
+				// No 'default' - see register_color_controls()'s docblock.
+				'description' => __( 'Leave blank to use the site-wide default set under RYV Forms → Global Styles.', 'ryv-eligibility-tool' ),
+				'selectors'   => array(
 					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-input-border-color: {{VALUE}};',
 				),
 			)
@@ -1354,10 +1448,11 @@ class RYV_Widget extends \Elementor\Widget_Base {
 		$this->add_control(
 			'help_icon_color',
 			array(
-				'label'     => __( 'Icon Color', 'ryv-eligibility-tool' ),
-				'type'      => \Elementor\Controls_Manager::COLOR,
-				'default'   => '#ffffff',
-				'selectors' => array(
+				'label'       => __( 'Icon Color', 'ryv-eligibility-tool' ),
+				'type'        => \Elementor\Controls_Manager::COLOR,
+				// No 'default' - see register_color_controls()'s docblock.
+				'description' => __( 'Leave blank to use the site-wide default set under RYV Forms → Global Styles.', 'ryv-eligibility-tool' ),
+				'selectors'   => array(
 					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-help-icon-color: {{VALUE}};',
 				),
 			)
