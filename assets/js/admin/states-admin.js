@@ -442,14 +442,19 @@
 			var $caret    = $('<span class="ryv-sa-row-caret" aria-hidden="true"></span>');
 
 			$summary.append($idPill, $typeBadge, $title, $caret);
-			// Wrapped in a <td> rather than prepended straight into the <tr>:
-			// a bare non-td child sits outside the table's own column-width
-			// negotiation, so its shrink-to-fit width was computed from the
-			// title's full, unwrapped text - blowing out the row (and page)
-			// width for any long node title instead of eliding it.
-			var $summaryCell = $('<td class="ryv-sa-row-summary-cell"></td>');
-			$summaryCell.append($summary);
-			$row.prepend($summaryCell);
+			// Prepended inside the existing .acf-fields <td>, not as a new
+			// sibling <td>/bare <tr> child: either of those makes the
+			// summary bar its own table column, which (a) sits outside the
+			// table's column-width negotiation entirely when it's a bare
+			// non-td child - shrink-to-fit against the title's full,
+			// unwrapped text and blowing out the row/page width instead of
+			// eliding it - and (b) even wrapped in a proper <td>, still
+			// forces every row to share a column whose width is driven by
+			// the (always-visible) summary content, squeezing the
+			// (only-visible-when-expanded) real fields column down to a
+			// sliver. Living inside .acf-fields keeps the summary bar and
+			// the fields it toggles in the one column, sized normally.
+			$row.children('.acf-fields').first().prepend($summary);
 
 			var refreshSummary = function () {
 				var id    = $row.find('[data-name="node_id"] input').first().val() || '(new node)';
