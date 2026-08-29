@@ -1,8 +1,8 @@
 // See the matching comment in ../decision-engine.js - these query strings
 // are the only thing cache-busting these nested imports; bump them with
 // every RYV_VERSION change.
-import { fetchForm, logSubmission, submitLead } from './api-client.js?ver=0.8.7';
-import * as renderer from './renderer.js?ver=0.8.7';
+import { fetchForm, logSubmission, submitLead } from './api-client.js?ver=0.8.15';
+import * as renderer from './renderer.js?ver=0.8.15';
 
 const LOADING_CARD_ID = '__loading__';
 const ERROR_CARD_ID = '__error__';
@@ -27,6 +27,16 @@ export class RYVDecisionEngine {
     // placements already behaved.
     this.showStartOver = root.dataset.showStartOver !== '0';
     this.labels = { ...renderer.DEFAULT_LABELS, ...this.parseLabelsAttribute(root) };
+    // Set by the Elementor widget's "Auto-Detect State From Page" mode
+    // (class-ryv-widget.php's get_state_entry_override()) when this
+    // placement is on a `ryv_states` page linked to a form: overrides where
+    // rendering starts (and where restart() goes back to) so the visitor
+    // lands straight on that state's first question instead of the full
+    // multi-state picker. Empty/absent for every other placement.
+    this.entryNodeOverride = root.dataset.entryNode || null;
+    this.showSteps = root.dataset.showSteps === '1';
+    this.totalSteps = parseInt(root.dataset.totalSteps, 10) || 0;
+    this.stepEl = null;
     // One id per attempt at the questionnaire - restart() rolls a new one so
     // an abandoned-then-restarted trail stays on record as its own row
     // (see RYV_Submission_Log) instead of being overwritten in place.
@@ -81,6 +91,10 @@ export class RYVDecisionEngine {
 
   mount() {
     this.root.classList.add('ryv-app-wrapper');
+    if (this.showSteps) {
+      this.stepEl = renderer.renderStepIndicator(this.labels);
+      this.root.appendChild(this.stepEl);
+    }
     this.list = renderer.createList();
     this.root.appendChild(this.list);
     this.loadForm();
@@ -91,7 +105,13 @@ export class RYVDecisionEngine {
     try {
       const data = await fetchForm(this.formId);
       this.nodes = data.nodes || {};
-      this.entryNode = data.entry_node;
+      // Only use the override if it actually resolves in this form's own
+      // graph - a stale override (e.g. the state page's linked form was
+      // repointed after this widget instance was configured) should fall
+      // back to the form's normal entry_node rather than render nothing.
+      this.entryNode = (this.entryNodeOverride && this.nodes[this.entryNodeOverride])
+        ? this.entryNodeOverride
+        : data.entry_node;
       this.truncateFrom(0);
       this.renderFrom(this.entryNode, true);
     } catch (err) {
@@ -108,6 +128,23 @@ export class RYVDecisionEngine {
     this.sessionId = this.generateSessionId();
     this.truncateFrom(0);
     this.renderFrom(this.entryNode, true);
+  }
+
+  /**
+   * "Current step" has no fixed meaning in a branching DAG (see CLAUDE.md -
+   * different answers reach different numbers of questions), so this counts
+   * however many real, on-screen question cards exist right now - i.e. how
+   * far into *this* visitor's own path they've gotten. Excludes the
+   * loading/error sentinel cards and any `node.hidden` node (never given a
+   * card at all - see renderFrom()), same as what's actually visible.
+   */
+  updateStepIndicator() {
+    if (!this.stepEl) return;
+    let count = 0;
+    this.cardElements.forEach((el, id) => {
+      if (this.nodes[id]) count += 1;
+    });
+    renderer.updateStepIndicator(this.stepEl, count, this.totalSteps, this.labels);
   }
 
   /**
@@ -270,9 +307,13 @@ export class RYVDecisionEngine {
     // renderedOrder (truncateFrom()/indexOf() need it to find its place in
     // the sequence when an earlier answer changes) but never inserted into
     // cardElements/the DOM, since there's nothing to remove later either.
-    if (!element) return;
+    if (!element) {
+      this.updateStepIndicator();
+      return;
+    }
     this.cardElements.set(id, element);
     renderer.appendCard(this.list, element, animate);
+    this.updateStepIndicator();
   }
 
   indexOf(id) {
@@ -288,6 +329,7 @@ export class RYVDecisionEngine {
       if (element && element.parentNode) element.parentNode.removeChild(element);
       this.cardElements.delete(id);
     });
+    this.updateStepIndicator();
   }
 }
 

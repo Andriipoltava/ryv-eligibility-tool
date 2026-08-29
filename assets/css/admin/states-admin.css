@@ -1,0 +1,169 @@
+/**
+ * Restyles the `ryv_states` "Form Nodes" ACF repeater to match the form
+ * builder's own list look (admin/src/style.css) - same class names
+ * (.ryv-builder-node-type[--type]/.ryv-builder-node-title) reused
+ * deliberately, not just visually similar, so the two screens read as one
+ * tool. Progressive enhancement only: states-admin.js adds a
+ * `.ryv-sa-row-summary` header to each top-level node row and toggles
+ * `.ryv-sa-collapsed` on click - this file never restructures ACF's own
+ * markup, it only restyles it.
+ */
+
+.ryv-sa-intro {
+	color: #50575e;
+	max-width: 640px;
+}
+
+.ryv-sa-toolbar {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	margin: 10px 0 14px;
+}
+
+.ryv-sa-filter {
+	flex: 0 1 320px;
+	min-width: 200px;
+}
+
+.ryv-sa-status {
+	font-size: 12px;
+	color: #646970;
+	font-style: italic;
+}
+
+.ryv-sa-status-error {
+	color: #b32d2e;
+	font-style: normal;
+	font-weight: 600;
+}
+
+/* --- collapsed row summary -------------------------------------------- */
+
+.acf-field-ryv-form-nodes > .acf-input > .acf-repeater > .acf-row-fc-wrap,
+.acf-field-ryv-form-nodes .acf-row.ryv-sa-row {
+	position: relative;
+	border: 1px solid #ccd0d4;
+	border-left: 3px solid transparent;
+	border-radius: 4px;
+	background: #fff;
+	margin-bottom: 6px;
+	transition: background-color 0.1s ease-in-out, border-color 0.1s ease-in-out;
+}
+
+.acf-field-ryv-form-nodes .acf-row.ryv-sa-row:hover {
+	border-left-color: #8c8f94;
+}
+
+.acf-field-ryv-form-nodes .acf-row.ryv-sa-row:not(.ryv-sa-collapsed) {
+	border-left-color: #2271b1;
+	background: #f6f9fc;
+}
+
+.ryv-sa-row-summary-cell {
+	padding: 0 !important;
+	max-width: 0;
+}
+
+.ryv-sa-row-summary {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	width: 100%;
+	padding: 8px 40px 8px 10px;
+	margin: 0;
+	background: none;
+	border: none;
+	border-bottom: 1px solid #e2e4e7;
+	cursor: pointer;
+	text-align: left;
+	font: inherit;
+	box-sizing: border-box;
+}
+
+.ryv-sa-row.ryv-sa-collapsed .ryv-sa-row-summary {
+	border-bottom: none;
+}
+
+.ryv-sa-row-id {
+	flex: 0 0 auto;
+	font-size: 11px;
+	color: #3c434a;
+	background: #f0f0f1;
+	border-radius: 3px;
+	padding: 2px 6px;
+	max-width: 260px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.ryv-sa-row-summary .ryv-builder-node-title {
+	flex: 1;
+	min-width: 0;
+	max-width: none;
+}
+
+.ryv-sa-row-caret {
+	flex: 0 0 auto;
+	color: #646970;
+	transition: transform 0.1s ease-in-out;
+}
+
+.ryv-sa-row-caret::before {
+	content: '\25BE';
+}
+
+.ryv-sa-row.ryv-sa-collapsed .ryv-sa-row-caret {
+	transform: rotate(-90deg);
+}
+
+.ryv-sa-row.ryv-sa-collapsed > .acf-fields {
+	display: none;
+}
+
+/* One accent color per node type - same palette as admin/src/style.css's
+   NodeList badges, so a node reads the same way in both screens. */
+.ryv-builder-node-type {
+	display: inline-block;
+	flex: 0 0 auto;
+	font-size: 10px;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.02em;
+	color: #50575e;
+	background: #f0f0f1;
+	border-radius: 10px;
+	padding: 1px 8px;
+}
+.ryv-builder-node-type--radio,
+.ryv-builder-node-type--checkbox {
+	color: #0a4b78;
+	background: #e5f1fa;
+}
+.ryv-builder-node-type--text,
+.ryv-builder-node-type--textarea {
+	color: #0a6b5e;
+	background: #e3f5f1;
+}
+.ryv-builder-node-type--markup {
+	color: #4a4d52;
+	background: #eef0f2;
+}
+.ryv-builder-node-type--lead_capture {
+	color: #6a3a9e;
+	background: #f1e8fb;
+}
+.ryv-builder-node-type--unsupported {
+	color: #8a5300;
+	background: #fcf0e0;
+}
+
+.ryv-builder-node-title {
+	font-size: 12px;
+	color: #1d2327;
+	max-width: 320px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}

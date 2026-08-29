@@ -75,6 +75,27 @@ final class RYV_Plugin {
 	private $help_page = null;
 
 	/**
+	 * States CPT controller instance.
+	 *
+	 * @var RYV_States_CPT|null
+	 */
+	private $states_cpt = null;
+
+	/**
+	 * Events CPT controller instance.
+	 *
+	 * @var RYV_Events_CPT|null
+	 */
+	private $events_cpt = null;
+
+	/**
+	 * Resources CPT controller instance.
+	 *
+	 * @var RYV_Resources_CPT|null
+	 */
+	private $resources_cpt = null;
+
+	/**
 	 * Get (or create) the singleton instance.
 	 *
 	 * @return RYV_Plugin
@@ -134,6 +155,15 @@ final class RYV_Plugin {
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-assets.php';
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-elementor.php';
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-shortcode.php';
+		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-states-cpt.php';
+		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-events-cpt.php';
+		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-resources-cpt.php';
+
+		// ACF + sync only when ACF is available.
+		if ( class_exists( 'ACF' ) ) {
+			require_once RYV_PLUGIN_DIR . 'includes/class-ryv-states-acf.php';
+			require_once RYV_PLUGIN_DIR . 'includes/class-ryv-states-sync.php';
+		}
 
 		// Not is_admin()-gated like the other admin/*-page.php controllers
 		// below - RYV_Settings_Page also feeds the frontend CSS variable
@@ -161,13 +191,21 @@ final class RYV_Plugin {
 		// which is the only other place install() would otherwise run.
 		RYV_DB::maybe_upgrade();
 
-		$this->cpt = new RYV_CPT();
+		$this->cpt           = new RYV_CPT();
+		$this->states_cpt    = new RYV_States_CPT();
+		$this->events_cpt    = new RYV_Events_CPT();
+		$this->resources_cpt = new RYV_Resources_CPT();
 		new RYV_API();
 		new RYV_Admin_API();
 		new RYV_Assets();
 		new RYV_Elementor();
 		new RYV_Shortcode();
 		new RYV_Settings_Page();
+
+		if ( class_exists( 'ACF' ) ) {
+			new RYV_States_ACF();
+			new RYV_States_Sync();
+		}
 
 		if ( is_admin() ) {
 			$this->import_page      = new RYV_Import_Page();
@@ -202,6 +240,18 @@ final class RYV_Plugin {
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-cpt.php';
 		$cpt = new RYV_CPT();
 		$cpt->register_post_type();
+
+		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-states-cpt.php';
+		$states_cpt = new RYV_States_CPT();
+		$states_cpt->register_post_type();
+
+		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-events-cpt.php';
+		$events_cpt = new RYV_Events_CPT();
+		$events_cpt->register_post_type();
+
+		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-resources-cpt.php';
+		$resources_cpt = new RYV_Resources_CPT();
+		$resources_cpt->register_post_type();
 
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-db.php';
 		RYV_DB::install();

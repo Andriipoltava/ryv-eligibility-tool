@@ -30,6 +30,12 @@ export const DEFAULT_LABELS = {
   continue: 'Continue',
   leadSubmitted: 'Thank you! Your submission has been received.',
   leadError: 'Something went wrong submitting your information. Please try again.',
+  // {current}/{total} placeholders - see renderer.js's updateStepIndicator().
+  // stepWithTotal only applies once the widget's "Total Steps" setting is
+  // filled in (class-ryv-widget.php's total_steps control); otherwise step
+  // (no total) is used for every render.
+  step: 'Step {current}',
+  stepWithTotal: 'Step {current} of {total}',
 };
 
 function el(tag, opts = {}, children = []) {
@@ -187,6 +193,40 @@ export function appendCard(container, card, animate = true) {
     container.appendChild(card);
   }
   return card;
+}
+
+/**
+ * The optional "Step N" (or "Step N of Total") indicator above the question
+ * list (see class-ryv-widget.php's `show_steps`/`total_steps` controls, and
+ * engine.js's updateStepIndicator() for what "N" actually counts - there's
+ * no fixed step count in a branching DAG, so this is the visitor's own
+ * current position, not a total the graph could compute itself).
+ *
+ * @param {object} labels
+ * @returns {HTMLElement}
+ */
+export function renderStepIndicator(labels = DEFAULT_LABELS) {
+  return el('div', { className: 'ryv-step-indicator', attrs: { role: 'status' } });
+}
+
+/**
+ * @param {HTMLElement} stepEl From renderStepIndicator().
+ * @param {number} current Count of real (non-sentinel, non-hidden) cards currently on screen.
+ * @param {number} total The widget's "Total Steps" setting - 0/unset means no total is shown.
+ * @param {object} labels
+ */
+export function updateStepIndicator(stepEl, current, total, labels = DEFAULT_LABELS) {
+  if (!stepEl) return;
+
+  // Nothing real has rendered yet (still loading, or the graph's first node
+  // is itself hidden) - leave the indicator empty rather than showing "Step 0".
+  if (current < 1) {
+    stepEl.textContent = '';
+    return;
+  }
+
+  const template = total > 0 ? labels.stepWithTotal : labels.step;
+  stepEl.textContent = template.replace('{current}', current).replace('{total}', total);
 }
 
 export function renderLoadingCard(labels = DEFAULT_LABELS) {

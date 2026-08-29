@@ -88,6 +88,22 @@ class RYV_Widget extends \Elementor\Widget_Base {
 		);
 
 		$this->add_control(
+			'auto_state_entry',
+			array(
+				'label'        => __( 'Auto-Detect State From Page', 'ryv-eligibility-tool' ),
+				'type'         => \Elementor\Controls_Manager::SWITCHER,
+				'label_on'     => __( 'On', 'ryv-eligibility-tool' ),
+				'label_off'    => __( 'Off', 'ryv-eligibility-tool' ),
+				'return_value' => 'yes',
+				'default'      => '',
+				'description'  => __(
+					'When this widget is placed on a State page (RYV States post type) that has a linked Eligibility Form and State selected, skip the state picker entirely and jump straight to that state\'s first question - "Start Over" restarts from there too, not from the full picker. Falls back to the Eligibility Form selected below on any other page, or if the current State page has no form linked yet.',
+					'ryv-eligibility-tool'
+				),
+			)
+		);
+
+		$this->add_control(
 			'show_start_over',
 			array(
 				'label'        => __( 'Show "Start Over" Button', 'ryv-eligibility-tool' ),
@@ -131,6 +147,7 @@ class RYV_Widget extends \Elementor\Widget_Base {
 
 		$this->end_controls_section();
 
+		$this->register_step_indicator_controls();
 		$this->register_label_controls();
 		$this->register_wrapper_style_controls();
 		$this->register_color_controls();
@@ -142,6 +159,54 @@ class RYV_Widget extends \Elementor\Widget_Base {
 		$this->register_input_style_controls();
 		$this->register_radio_style_controls();
 		$this->register_help_tooltip_style_controls();
+		$this->register_step_indicator_style_controls();
+	}
+
+	/**
+	 * Content-tab controls for the optional "Step N" progress indicator
+	 * shown above the question list. There's no fixed step count in a
+	 * branching DAG (see CLAUDE.md - different answers reach different
+	 * numbers of questions), so "current step" here means "how many
+	 * question cards are on screen right now," and Total Steps is a
+	 * manually-authored estimate for the "of N" portion rather than
+	 * anything computed from the graph - left blank, only "Step N" shows.
+	 */
+	private function register_step_indicator_controls() {
+		$this->start_controls_section(
+			'steps_section',
+			array(
+				'label' => __( 'Progress Steps', 'ryv-eligibility-tool' ),
+				'tab'   => \Elementor\Controls_Manager::TAB_CONTENT,
+			)
+		);
+
+		$this->add_control(
+			'show_steps',
+			array(
+				'label'        => __( 'Show Step Indicator', 'ryv-eligibility-tool' ),
+				'type'         => \Elementor\Controls_Manager::SWITCHER,
+				'label_on'     => __( 'Show', 'ryv-eligibility-tool' ),
+				'label_off'    => __( 'Hide', 'ryv-eligibility-tool' ),
+				'return_value' => 'yes',
+				'default'      => '',
+				'description'  => __( 'Shows "Step N" (or "Step N of Total" if set below) above the questions, updating as the visitor answers.', 'ryv-eligibility-tool' ),
+			)
+		);
+
+		$this->add_control(
+			'total_steps',
+			array(
+				'label'       => __( 'Total Steps (optional)', 'ryv-eligibility-tool' ),
+				'type'        => \Elementor\Controls_Manager::NUMBER,
+				'min'         => 1,
+				'condition'   => array(
+					'show_steps' => 'yes',
+				),
+				'description' => __( 'An estimated total for this form/state (e.g. "8"), shown as "Step 3 of 8". This is authored by hand, not computed - a branching questionnaire has no single fixed length. Leave blank to just show "Step 3".', 'ryv-eligibility-tool' ),
+			)
+		);
+
+		$this->end_controls_section();
 	}
 
 	/**
@@ -1555,12 +1620,82 @@ class RYV_Widget extends \Elementor\Widget_Base {
 	}
 
 	/**
+	 * Style controls for the "Show Step Indicator" element (.ryv-step-indicator,
+	 * see register_step_indicator_controls() on the Content tab for why "step"
+	 * is a running count, not a fixed wizard position).
+	 */
+	private function register_step_indicator_style_controls() {
+		$this->start_controls_section(
+			'step_indicator_style_section',
+			array(
+				'label'     => __( 'Step Indicator', 'ryv-eligibility-tool' ),
+				'tab'       => \Elementor\Controls_Manager::TAB_STYLE,
+				'condition' => array(
+					'show_steps' => 'yes',
+				),
+			)
+		);
+
+		$this->add_group_control(
+			\Elementor\Group_Control_Typography::get_type(),
+			array(
+				'name'     => 'step_indicator_typography',
+				'selector' => '{{WRAPPER}} .ryv-step-indicator',
+			)
+		);
+
+		$this->add_control(
+			'step_indicator_color',
+			array(
+				'label'     => __( 'Text Color', 'ryv-eligibility-tool' ),
+				'type'      => \Elementor\Controls_Manager::COLOR,
+				'selectors' => array(
+					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-step-color: {{VALUE}};',
+				),
+			)
+		);
+
+		$this->add_control(
+			'step_indicator_margin_bottom',
+			array(
+				'label'      => __( 'Bottom Spacing', 'ryv-eligibility-tool' ),
+				'type'       => \Elementor\Controls_Manager::SLIDER,
+				'size_units' => array( 'px' ),
+				'range'      => array(
+					'px' => array(
+						'min' => 0,
+						'max' => 60,
+					),
+				),
+				'selectors'  => array(
+					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-step-margin-bottom: {{SIZE}}{{UNIT}};',
+				),
+			)
+		);
+
+		$this->end_controls_section();
+	}
+
+	/**
 	 * Output the mount point. The decision engine (assets/js/decision-engine.js)
 	 * finds this by `.ryv-app-wrapper[data-form-id]` and takes over from here -
 	 * no markup for the questionnaire itself is rendered server-side.
 	 */
 	protected function render() {
-		$form_id = $this->get_settings_for_display( 'form_id' );
+		$form_id    = $this->get_settings_for_display( 'form_id' );
+		$entry_node = null;
+
+		if ( 'yes' === $this->get_settings_for_display( 'auto_state_entry' ) ) {
+			$override = $this->get_state_entry_override();
+			if ( $override ) {
+				// The state page's own linked form always wins over a
+				// manually-picked one below it - the whole point of this
+				// mode is "show *this page's* state, regardless of what the
+				// widget was originally configured with."
+				$form_id    = $override['form_id'];
+				$entry_node = $override['entry_node'];
+			}
+		}
 
 		if ( empty( $form_id ) ) {
 			if ( \Elementor\Plugin::$instance->editor->is_edit_mode() ) {
@@ -1573,14 +1708,64 @@ class RYV_Widget extends \Elementor\Widget_Base {
 		}
 
 		$show_start_over = 'yes' === $this->get_settings_for_display( 'show_start_over' );
+		$show_steps      = 'yes' === $this->get_settings_for_display( 'show_steps' );
+		$total_steps     = absint( $this->get_settings_for_display( 'total_steps' ) );
 
 		$this->render_header( absint( $form_id ) );
 
 		printf(
-			'<div class="ryv-app-wrapper" data-form-id="%d" data-show-start-over="%d" data-labels="%s"></div>',
+			'<div class="ryv-app-wrapper" data-form-id="%d" data-show-start-over="%d" data-labels="%s" data-entry-node="%s" data-show-steps="%d" data-total-steps="%d"></div>',
 			absint( $form_id ),
 			$show_start_over ? 1 : 0,
-			esc_attr( wp_json_encode( $this->get_label_overrides() ) )
+			esc_attr( wp_json_encode( $this->get_label_overrides() ) ),
+			esc_attr( (string) $entry_node ),
+			$show_steps ? 1 : 0,
+			$total_steps
+		);
+	}
+
+	/**
+	 * "Auto-Detect State From Page" resolution: when the current page is a
+	 * `ryv_states` post with both a linked form and a state selected, look
+	 * up that state's own first question (the same node RYV_States_Sync's
+	 * node-repeater sync uses as its walk's starting point) and hand it back
+	 * as a decision-engine entry-node override, together with the form to
+	 * fetch it from.
+	 *
+	 * Requires ACF (the `ryv_states` fields, and RYV_States_Sync::find_start_node()
+	 * which RYV_Plugin only loads when ACF is active) - silently returns
+	 * null without it, same as this whole feature simply not applying,
+	 * rather than a fatal error.
+	 *
+	 * @return array{form_id:int,entry_node:string}|null
+	 */
+	private function get_state_entry_override(): ?array {
+		if ( ! class_exists( 'RYV_States_Sync' ) || ! function_exists( 'get_field' ) ) {
+			return null;
+		}
+
+		$post_id = get_the_ID();
+		if ( ! $post_id || get_post_type( $post_id ) !== RYV_States_CPT::POST_TYPE ) {
+			return null;
+		}
+
+		$form_id    = (int) get_field( 'ryv_form_connection', $post_id );
+		$state_slug = (string) get_field( 'ryv_state_slug', $post_id );
+
+		if ( ! $form_id || ! $state_slug ) {
+			return null;
+		}
+
+		$schema     = RYV_CPT::get_schema( $form_id );
+		$entry_node = RYV_States_Sync::find_start_node( $schema['nodes'] ?? array(), $schema['entry_node'] ?? null, $state_slug );
+
+		if ( ! $entry_node ) {
+			return null;
+		}
+
+		return array(
+			'form_id'    => $form_id,
+			'entry_node' => $entry_node,
 		);
 	}
 

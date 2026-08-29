@@ -1,0 +1,170 @@
+uuid: 4f8a92b1-12a8-4c31-987d-88bc112999aa
+langcode: en
+status: open
+dependencies: {  }
+weight: 0
+open: null
+close: null
+uid: 1
+template: false
+archive: false
+id: community_grant_eligibility
+title: 'Community Relief & Grant Eligibility Assessment'
+description: 'An interactive decision-tree questionnaire for local assistance programs.'
+categories: {  }
+elements: |-
+  select_program:
+    '#type': select
+    '#title': 'Which assistance program are you interested in?'
+    '#options':
+      small_business: 'Small Business Grant'
+      housing_relief: 'Housing & Rent Relief'
+      emergency_fund: 'Individual Emergency Assistance'
+    '#empty_option': 'Select a program...'
+
+  # --- SECTION 1: SMALL BUSINESS GRANT ---
+  program_small_business:
+    '#type': container
+    '#states':
+      visible:
+        ':input[name="select_program"]':
+          value: small_business
+    sb_registered_in_state:
+      '#type': webform_buttons
+      '#title': 'Is your business legally registered and operating within the state?'
+      '#options':
+        'Yes': 'Yes'
+        'No': 'No'
+      '#states':
+        visible:
+          ':input[name="select_program"]':
+            value: small_business
+    sb_not_registered_result:
+      '#type': processed_text
+      '#states':
+        visible:
+          ':input[name="sb_registered_in_state"]':
+            value: 'No'
+      '#text': |
+        <p><strong>Not Eligible:</strong> Only businesses registered and physically operating within the state qualify for this municipal grant.</p>
+      '#format': basic_html
+    sb_employee_count:
+      '#type': webform_buttons
+      '#title': 'How many full-time employees does your company employ?'
+      '#options':
+        micro: '1 - 10 employees'
+        small: '11 - 50 employees'
+        large: 'More than 50 employees'
+      '#states':
+        visible:
+          ':input[name="sb_registered_in_state"]':
+            value: 'Yes'
+    sb_large_result:
+      '#type': processed_text
+      '#states':
+        visible:
+          ':input[name="sb_employee_count"]':
+            value: large
+      '#text': |
+        <p><strong>Not Eligible:</strong> This specific grant is restricted to micro and small businesses with 50 or fewer employees.</p>
+      '#format': basic_html
+    sb_eligible_result:
+      '#type': processed_text
+      '#states':
+        visible:
+          - ':input[name="sb_employee_count"]':
+              value: micro
+          - or
+          - ':input[name="sb_employee_count"]':
+              value: small
+      '#text': |
+        <p><strong>You are eligible to apply!</strong></p>
+        <p>Please prepare your tax identification and payroll documents. You can <a href="https://example.org/apply-grant">start your application here</a>.</p>
+      '#format': basic_html
+
+  # --- SECTION 2: HOUSING & RENT RELIEF ---
+  program_housing:
+    '#type': container
+    '#states':
+      visible:
+        ':input[name="select_program"]':
+          value: housing_relief
+    housing_status:
+      '#type': webform_buttons
+      '#title': 'What is your current living/housing arrangement?'
+      '#options':
+        renter: 'Renting an Apartment/House'
+        homeowner: 'Homeowner with Mortgage'
+        unhoused: 'Temporary Shelter'
+      '#states':
+        visible:
+          ':input[name="select_program"]':
+            value: housing_relief
+    housing_income_check:
+      '#type': webform_buttons
+      '#title': 'Is your total household income below 80% of the Area Median Income (AMI)?'
+      '#options':
+        'Yes': 'Yes'
+        'No': 'No'
+        Maybe: 'Not Sure'
+      '#states':
+        visible:
+          ':input[name="housing_status"]':
+            value: renter
+    housing_eligible_result:
+      '#type': processed_text
+      '#states':
+        visible:
+          ':input[name="housing_income_check"]':
+            value: 'Yes'
+      '#text': |
+        <p><strong>You qualify for Emergency Rent Assistance!</strong></p>
+        <p>You may receive up to 3 months of rental assistance. Please <a href="https://example.org/housing-portal">upload your lease agreement here</a>.</p>
+      '#format': basic_html
+    housing_income_help:
+      '#type': processed_text
+      '#states':
+        visible:
+          ':input[name="housing_income_check"]':
+            value: Maybe
+      '#text': |
+        <p>If you are unsure of your AMI percentage, please contact our support hotline at 1-800-555-0199 or check the income limit table on our portal.</p>
+      '#format': basic_html
+
+  # --- SECTION 3: INDIVIDUAL EMERGENCY ASSISTANCE ---
+  program_emergency:
+    '#type': container
+    '#states':
+      visible:
+        ':input[name="select_program"]':
+          value: emergency_fund
+    emergency_type:
+      '#type': select
+      '#title': 'Select the nature of your emergency:'
+      '#options':
+        medical: 'Unexpected Medical Crisis'
+        job_loss: 'Sudden Employment Loss'
+        disaster: 'Property Disaster / Fire'
+      '#empty_option': 'Choose type...'
+      '#states':
+        visible:
+          ':input[name="select_program"]':
+            value: emergency_fund
+    emergency_result_medical:
+      '#type': processed_text
+      '#states':
+        visible:
+          ':input[name="emergency_type"]':
+            value: medical
+      '#text': |
+        <p><strong>Emergency Medical Stipend Available:</strong> You can apply for a one-time grant to cover out-of-pocket medical costs incurred within the last 90 days.</p>
+      '#format': basic_html
+
+actions:
+  '#type': webform_actions
+  '#title': 'Submit button(s)'
+  '#submit_hide': true
+css: ''
+javascript: ''
+settings:
+  ajax: false

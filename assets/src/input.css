@@ -40,6 +40,24 @@
     gap: var(--ryv-list-gap, 1.5rem);
   }
 
+  /*
+   * The Elementor widget's "Show Step Indicator" content control (see
+   * class-ryv-widget.php's register_step_indicator_controls()) - engine.js
+   * only creates this element at all when that switch is on, and leaves it
+   * empty until the first real card renders (see renderer.js's
+   * updateStepIndicator()), so an untouched/hidden instance never reserves
+   * space for it.
+   */
+  .ryv-step-indicator {
+    @apply ryv-text-sm ryv-font-semibold ryv-uppercase;
+    letter-spacing: 0.03em;
+    color: var(--ryv-step-color, var(--ryv-secondary-color, #64748b));
+    margin-bottom: var(--ryv-step-margin-bottom, 0.75rem);
+  }
+  .ryv-step-indicator:empty {
+    margin-bottom: 0;
+  }
+
   .ryv-card {
     @apply ryv-transition-all ryv-duration-200 ryv-ease-out ryv-opacity-100 ryv-translate-y-0;
   }
@@ -139,7 +157,7 @@
   }
 
   .ryv-options-list ~ .ryv-content {
-    margin-top: 1.5rem;;
+    margin-top: var(--ryv-list-gap, 1.5rem);
   }
   .ryv-content a {
     @apply ryv-underline ryv-text-ryv-primary;
