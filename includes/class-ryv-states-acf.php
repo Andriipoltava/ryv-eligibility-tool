@@ -616,14 +616,35 @@ class RYV_States_ACF {
 							'label'         => 'Display Style',
 							'name'          => 'node_display_style',
 							'type'          => 'select',
+							// Values must match what renderQuestionCard()/
+							// renderSingleChoiceOptions() in renderer.js actually
+							// switch on ('buttons' | 'radio' | 'dropdown') - and
+							// the admin builder SPA's own DISPLAY_STYLE_OPTIONS
+							// (NodeEditor.js) - not an independent label set.
+							// A stored value that doesn't match one of these
+							// falls through to the 'buttons' default silently.
 							'choices'       => array(
 								''        => '(Default)',
 								'buttons' => 'Buttons',
+								'radio'   => 'Radio buttons',
 								'dropdown' => 'Dropdown',
-								'list'    => 'List',
 							),
 							'allow_null'    => 1,
 							'wrapper'       => array( 'width' => '25' ),
+							'instructions'  => 'Only applies to Radio nodes - Checkbox questions always render as buttons regardless of this setting.',
+							// Matches the admin builder SPA: display_style only
+							// ever applies to single-choice (radio) questions,
+							// never checkbox - see renderQuestionCard() in
+							// renderer.js.
+							'conditional_logic' => array(
+								array(
+									array(
+										'field'    => 'field_ryv_node_type',
+										'operator' => '==',
+										'value'    => 'radio',
+									),
+								),
+							),
 						),
 						array(
 							'key'           => 'field_ryv_node_hidden',
@@ -633,6 +654,25 @@ class RYV_States_ACF {
 							'ui'            => 1,
 							'wrapper'       => array( 'width' => '25' ),
 							'instructions'  => 'Hidden nodes are skipped during rendering but remain in the graph.',
+							// Hiding a choice/text/lead_capture node would strand a
+							// visitor with no way to ever answer it - only markup
+							// and unsupported nodes support being hidden.
+							'conditional_logic' => array(
+								array(
+									array(
+										'field'    => 'field_ryv_node_type',
+										'operator' => '==',
+										'value'    => 'markup',
+									),
+								),
+								array(
+									array(
+										'field'    => 'field_ryv_node_type',
+										'operator' => '==',
+										'value'    => 'unsupported',
+									),
+								),
+							),
 						),
 						array(
 							'key'     => 'field_ryv_node_next_node',
@@ -640,6 +680,22 @@ class RYV_States_ACF {
 							'name'    => 'node_next_node',
 							'type'    => 'text',
 							'instructions' => 'Node ID to advance to (for non-choice nodes).',
+							// Choice nodes route via their own options' next_node,
+							// not this one.
+							'conditional_logic' => array(
+								array(
+									array(
+										'field'    => 'field_ryv_node_type',
+										'operator' => '!=',
+										'value'    => 'radio',
+									),
+									array(
+										'field'    => 'field_ryv_node_type',
+										'operator' => '!=',
+										'value'    => 'checkbox',
+									),
+								),
+							),
 						),
 						array(
 							'key'     => 'field_ryv_node_reference_nodes',
@@ -647,6 +703,24 @@ class RYV_States_ACF {
 							'name'    => 'node_reference_nodes',
 							'type'    => 'text',
 							'instructions' => 'Comma-separated list of node IDs whose content is shown alongside this node.',
+							// Only choice nodes can carry reference content
+							// (see RYV_Eligibility_Tool CLAUDE.md's reference_node_ids).
+							'conditional_logic' => array(
+								array(
+									array(
+										'field'    => 'field_ryv_node_type',
+										'operator' => '==',
+										'value'    => 'radio',
+									),
+								),
+								array(
+									array(
+										'field'    => 'field_ryv_node_type',
+										'operator' => '==',
+										'value'    => 'checkbox',
+									),
+								),
+							),
 						),
 						// --- Options sub-repeater (for radio/checkbox nodes) ---
 						array(
@@ -658,6 +732,22 @@ class RYV_States_ACF {
 							'button_label' => 'Add Option',
 							'min'          => 0,
 							'instructions' => 'Only applicable for radio/checkbox node types.',
+							'conditional_logic' => array(
+								array(
+									array(
+										'field'    => 'field_ryv_node_type',
+										'operator' => '==',
+										'value'    => 'radio',
+									),
+								),
+								array(
+									array(
+										'field'    => 'field_ryv_node_type',
+										'operator' => '==',
+										'value'    => 'checkbox',
+									),
+								),
+							),
 							'sub_fields'   => array(
 								array(
 									'key'     => 'field_ryv_option_label',

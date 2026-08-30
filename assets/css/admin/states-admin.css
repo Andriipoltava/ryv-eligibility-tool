@@ -40,6 +40,25 @@
 
 /* --- collapsed row summary -------------------------------------------- */
 
+/* ACF's repeater table uses table-layout: auto with no width constraint,
+   so its columns size to their own preferred (max-content) width and the
+   table itself can render wider than its container instead of shrinking
+   to fit - harmless for the original plain-text fields, but the row
+   summary bar (long node titles) and the wysiwyg "Content / HTML" field
+   both want to fill the available width, which pushes that preferred
+   width past the viewport. Pin the table to a fixed layout at 100% so
+   column widths come from the drag-handle columns' own size instead,
+   with everything else going to .acf-fields - stable regardless of any
+   single row's content. */
+.acf-field-ryv-form-nodes .acf-table {
+	table-layout: fixed;
+	width: 100%;
+}
+
+.acf-field-ryv-form-nodes .acf-table > tbody > tr > .acf-row-handle {
+	width: 34px;
+}
+
 .acf-field-ryv-form-nodes > .acf-input > .acf-repeater > .acf-row-fc-wrap,
 .acf-field-ryv-form-nodes .acf-row.ryv-sa-row {
 	position: relative;
@@ -58,11 +77,6 @@
 .acf-field-ryv-form-nodes .acf-row.ryv-sa-row:not(.ryv-sa-collapsed) {
 	border-left-color: #2271b1;
 	background: #f6f9fc;
-}
-
-.ryv-sa-row-summary-cell {
-	padding: 0 !important;
-	max-width: 0;
 }
 
 .ryv-sa-row-summary {
@@ -118,7 +132,11 @@
 	transform: rotate(-90deg);
 }
 
-.ryv-sa-row.ryv-sa-collapsed > .acf-fields {
+/* The summary bar now lives inside .acf-fields (so it shares the fields'
+   own table column instead of forcing a separate one - see
+   states-admin.js) - collapse hides every actual field wrapper beneath it,
+   not .acf-fields itself, so the summary bar stays visible either way. */
+.ryv-sa-row.ryv-sa-collapsed > .acf-fields > .acf-field {
 	display: none;
 }
 
