@@ -79,7 +79,7 @@ class RYV_Schema_Diff {
 	private static function diff_node( array $old_node, array $new_node ): array {
 		$changed = array();
 
-		foreach ( array( 'type', 'title', 'content', 'next_node', 'display_style' ) as $field ) {
+		foreach ( array( 'type', 'title', 'step_name', 'content', 'next_node', 'display_style' ) as $field ) {
 			$old_val = $old_node[ $field ] ?? null;
 			$new_val = $new_node[ $field ] ?? null;
 			if ( $old_val !== $new_val ) {

@@ -1,8 +1,8 @@
 // See the matching comment in ../decision-engine.js - these query strings
 // are the only thing cache-busting these nested imports; bump them with
 // every RYV_VERSION change.
-import { fetchForm, logSubmission, submitLead } from './api-client.js?ver=0.8.15';
-import * as renderer from './renderer.js?ver=0.8.15';
+import { fetchForm, logSubmission, submitLead } from './api-client.js?ver=0.8.21';
+import * as renderer from './renderer.js?ver=0.8.21';
 
 const LOADING_CARD_ID = '__loading__';
 const ERROR_CARD_ID = '__error__';
@@ -34,9 +34,19 @@ export class RYVDecisionEngine {
     // lands straight on that state's first question instead of the full
     // multi-state picker. Empty/absent for every other placement.
     this.entryNodeOverride = root.dataset.entryNode || null;
-    this.showSteps = root.dataset.showSteps === '1';
+    // 'none' (default) | 'counter' (legacy "Step N (of Total)" text) |
+    // 'sidebar' (named checklist, see updateStepSidebar()). data-step-mode
+    // replaces the old boolean data-show-steps attribute; class-ryv-widget.php
+    // still only ever prints one of these three values.
+    this.stepMode = root.dataset.stepMode || 'none';
     this.totalSteps = parseInt(root.dataset.totalSteps, 10) || 0;
     this.stepEl = null;
+    this.stepSidebarEl = null;
+    // One-question-at-a-time layout (widget's "Layout" control): every
+    // rendered card stays in cardElements/renderedOrder exactly as in
+    // stacked mode (the DAG-walking logic never changes) - only their
+    // visibility is toggled, in appendCard()/truncateFrom() below.
+    this.wizardMode = root.dataset.questionLayout === 'wizard';
     // One id per attempt at the questionnaire - restart() rolls a new one so
     // an abandoned-then-restarted trail stays on record as its own row
     // (see RYV_Submission_Log) instead of being overwritten in place.
@@ -91,9 +101,22 @@ export class RYVDecisionEngine {
 
   mount() {
     this.root.classList.add('ryv-app-wrapper');
-    if (this.showSteps) {
+    if (this.stepMode === 'counter') {
       this.stepEl = renderer.renderStepIndicator(this.labels);
       this.root.appendChild(this.stepEl);
+    } else if (this.stepMode === 'sidebar') {
+      // class-ryv-widget.php's render() nests this .ryv-app-wrapper and an
+      // empty `.ryv-step-sidebar-slot` (alongside the header title/
+      // description) as siblings inside one shared `.ryv-layout--sidebar`
+      // container per widget instance - .closest() scopes the lookup to
+      // *this* instance's own slot, so two widgets on the same page (even
+      // for the same form) never cross-wire.
+      const layout = this.root.closest('.ryv-layout--sidebar');
+      const slot = layout ? layout.querySelector('.ryv-step-sidebar-slot') : null;
+      if (slot) {
+        this.stepSidebarEl = renderer.renderStepSidebar();
+        slot.appendChild(this.stepSidebarEl);
+      }
     }
     this.list = renderer.createList();
     this.root.appendChild(this.list);
@@ -145,6 +168,87 @@ export class RYVDecisionEngine {
       if (this.nodes[id]) count += 1;
     });
     renderer.updateStepIndicator(this.stepEl, count, this.totalSteps, this.labels);
+  }
+
+  /**
+   * Builds the sidebar's step list from the visitor's own path so far:
+   * walks `renderedOrder`, collecting each real on-screen node's
+   * `step_name` - a node with no name (or the same name as the entry just
+   * added) doesn't start a new entry, it stays folded into the running one
+   * (see NodeEditor.js's Step Name help text). The last real node's step is
+   * "active" (not yet marked done); everything before it is done.
+   */
+  updateStepSidebar() {
+    if (!this.stepSidebarEl) return;
+
+    const steps = [];
+    let activeIndex = -1;
+
+    this.renderedOrder.forEach((id) => {
+      const node = this.nodes[id];
+      if (!node || !this.cardElements.has(id)) return; // sentinel, or node.hidden (no card)
+      const last = steps[steps.length - 1];
+      if (node.step_name && (!last || last.name !== node.step_name)) {
+        steps.push({ name: node.step_name, firstNodeId: id });
+      }
+      if (steps.length) activeIndex = steps.length - 1;
+    });
+
+    renderer.updateStepSidebar(this.stepSidebarEl, steps, activeIndex, (nodeId) => this.goToStep(nodeId));
+  }
+
+  /**
+   * Jump back to a completed step's first question, clicked from the
+   * sidebar (renderer.js's `onStepClick`). Stacked layout already shows
+   * every card at once - nothing is hidden to reveal, so this just scrolls
+   * it into view. Wizard layout truncates rendering back to that node (same
+   * `truncateFrom()` any answer change already uses) and re-appends just
+   * that one card - deliberately *not* the normal renderFrom() walk, which
+   * would immediately recompute forward through the still-cached answers
+   * and land right back where the visitor started; this leaves them on the
+   * revisited card, pre-filled with their previous answer, until they
+   * Continue again (replaying forward one Continue click at a time, same as
+   * any other wizard step).
+   */
+  goToStep(nodeId) {
+    const index = this.indexOf(nodeId);
+    if (index < 0) return;
+
+    if (!this.wizardMode) {
+      const element = this.cardElements.get(nodeId);
+      if (element) element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+
+    this.truncateFrom(index);
+    const node = this.nodes[nodeId];
+    if (!node) return;
+    this.appendCard(nodeId, node.hidden ? null : this.buildCard(nodeId, node, false), true);
+  }
+
+  /** Dispatches to whichever step display is active (or neither). */
+  updateSteps() {
+    if (this.stepMode === 'counter') this.updateStepIndicator();
+    else if (this.stepMode === 'sidebar') this.updateStepSidebar();
+  }
+
+  /**
+   * Wizard (one-question-at-a-time) layout: only the most recently
+   * appended real card stays visible - every earlier one gets
+   * `.ryv-card-hidden` (pure CSS, `display:none`). Cards stay fully
+   * mounted in `cardElements`/`renderedOrder`/the DOM, same as stacked
+   * mode - `truncateFrom()`/`indexOf()`/answer recomputation are
+   * completely unaffected, only visibility changes.
+   */
+  updateWizardVisibility() {
+    if (!this.wizardMode) return;
+    let lastRealId = null;
+    this.renderedOrder.forEach((id) => {
+      if (this.cardElements.has(id)) lastRealId = id;
+    });
+    this.cardElements.forEach((el, id) => {
+      el.classList.toggle('ryv-card-hidden', id !== lastRealId);
+    });
   }
 
   /**
@@ -228,11 +332,18 @@ export class RYVDecisionEngine {
           (values) => this.onAnswerChange(nodeId, values),
           nodeId,
           this.labels,
-          this.nodes
+          this.nodes,
+          this.wizardMode
         );
       case 'text':
       case 'textarea':
-        return renderer.renderInputCard(node, this.answers.get(nodeId) || '', (value) => this.onAnswerChange(nodeId, value));
+        return renderer.renderInputCard(
+          node,
+          this.answers.get(nodeId) || '',
+          (value) => this.onAnswerChange(nodeId, value),
+          this.labels,
+          this.wizardMode
+        );
       case 'lead_capture':
         return renderer.renderLeadCaptureCard(
           node,
@@ -308,12 +419,13 @@ export class RYVDecisionEngine {
     // the sequence when an earlier answer changes) but never inserted into
     // cardElements/the DOM, since there's nothing to remove later either.
     if (!element) {
-      this.updateStepIndicator();
+      this.updateSteps();
       return;
     }
     this.cardElements.set(id, element);
     renderer.appendCard(this.list, element, animate);
-    this.updateStepIndicator();
+    this.updateSteps();
+    this.updateWizardVisibility();
   }
 
   indexOf(id) {
@@ -329,7 +441,8 @@ export class RYVDecisionEngine {
       if (element && element.parentNode) element.parentNode.removeChild(element);
       this.cardElements.delete(id);
     });
-    this.updateStepIndicator();
+    this.updateSteps();
+    this.updateWizardVisibility();
   }
 }
 

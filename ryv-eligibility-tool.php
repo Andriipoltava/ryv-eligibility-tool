@@ -15,7 +15,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit; // No direct access.
 }
 
-define( 'RYV_VERSION', '0.8.19' );
+define( 'RYV_VERSION', '0.8.21' );
 define( 'RYV_PLUGIN_FILE', __FILE__ );
 define( 'RYV_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'RYV_PLUGIN_URL', plugin_dir_url( __FILE__ ) );

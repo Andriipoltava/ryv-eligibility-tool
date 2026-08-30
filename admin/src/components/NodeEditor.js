@@ -141,6 +141,16 @@ export default function NodeEditor({ node, nodeId, allNodeIds, allNodes, onChang
       <div className="ryv-builder-node-editor-section-title">{__('Organization', 'ryv-eligibility-tool')}</div>
 
       <TextControl
+        label={__('Step Name (shown to visitors)', 'ryv-eligibility-tool')}
+        value={node.step_name || ''}
+        onChange={(step_name) => onChange({ ...node, step_name })}
+        help={__(
+          'Optional label for the widget\'s step sidebar (when enabled). Leave blank to keep this question folded into the previous named step instead of starting a new one - unlike Group below, this is visitor-facing.',
+          'ryv-eligibility-tool'
+        )}
+      />
+
+      <TextControl
         label={__('Group', 'ryv-eligibility-tool')}
         value={node.group || ''}
         onChange={(group) => onChange({ ...node, group })}

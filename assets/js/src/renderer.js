@@ -229,6 +229,69 @@ export function updateStepIndicator(stepEl, current, total, labels = DEFAULT_LAB
   stepEl.textContent = template.replace('{current}', current).replace('{total}', total);
 }
 
+/**
+ * The alternate "step sidebar" indicator (widget's `step_mode: sidebar`
+ * control) - an admin-named checklist instead of a bare "Step N" counter.
+ * Unlike renderStepIndicator()'s fixed count, the list of entries is built
+ * and grown dynamically by engine.js's updateStepSidebar() as the visitor's
+ * own path reveals nodes carrying a `step_name` - there is no way to know
+ * the full list in advance in a branching DAG (same reasoning as Total
+ * Steps above), so an entry only appears once a node with that name has
+ * actually been rendered.
+ *
+ * @returns {HTMLElement} A `<ul>` - populated/updated via updateStepSidebar().
+ */
+export function renderStepSidebar() {
+  return el('ul', { className: 'ryv-step-list' });
+}
+
+/**
+ * @param {HTMLElement} listEl From renderStepSidebar().
+ * @param {{name: string, firstNodeId: string}[]} steps Distinct, ordered
+ *   steps reached so far - `firstNodeId` is the node that started this step,
+ *   the target for `onStepClick` (revisiting a step always lands on its
+ *   first question, not wherever inside it the visitor last was).
+ * @param {number} activeIndex Index into `steps` of the step the
+ *   currently-active (last on-screen, unanswered) card belongs to - entries
+ *   before it are marked done (checkmark) and clickable, entries at/after it
+ *   are not. -1 (nothing named reached yet) marks every entry as upcoming.
+ * @param {(nodeId: string) => void} [onStepClick] Called with a done step's
+ *   `firstNodeId` when the visitor clicks it, to jump back and revisit it.
+ *   Omitted/no-op for a sidebar that isn't interactive (e.g. no step_mode).
+ */
+export function updateStepSidebar(listEl, steps, activeIndex, onStepClick) {
+  if (!listEl) return;
+
+  listEl.textContent = '';
+  steps.forEach((step, index) => {
+    const isDone = activeIndex >= 0 && index < activeIndex;
+    const isActive = index === activeIndex;
+    const marker = el('span', {
+      className: 'ryv-step-list-marker',
+      text: isDone ? '✓' : String(index + 1),
+    });
+    const itemAttrs = isDone ? { role: 'button', tabindex: '0' } : {};
+    const item = el('li', { className: 'ryv-step-list-item', attrs: itemAttrs }, [
+      marker,
+      el('span', { text: step.name }),
+    ]);
+    if (isDone) item.classList.add('is-done');
+    if (isActive) item.classList.add('is-active');
+
+    if (isDone && onStepClick) {
+      item.addEventListener('click', () => onStepClick(step.firstNodeId));
+      item.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onStepClick(step.firstNodeId);
+        }
+      });
+    }
+
+    listEl.appendChild(item);
+  });
+}
+
 export function renderLoadingCard(labels = DEFAULT_LABELS) {
   return el('div', { className: 'ryv-loading', text: labels.loading });
 }
@@ -461,13 +524,42 @@ function renderSingleChoiceOptions(wrap, options, selectedValue, onSelect, displ
  * @param {object} [allNodes] Full `{ id: node }` graph - only needed to resolve `node.reference_node_id`
  *   (see appendReferenceContent()). Optional so callers that never merge reference content can omit it.
  */
-export function renderQuestionCard(node, selectedValues, onChange, nodeId, labels = DEFAULT_LABELS, allNodes = null) {
+/**
+ * @param {boolean} deferCommit Wizard (one-question-at-a-time) layout mode:
+ *   a click/change only updates the visible selection - `onChange` isn't
+ *   called until the visitor clicks the appended "Continue" button. Stacked
+ *   (default) layout keeps today's behavior: `onChange` fires immediately,
+ *   no Continue button is rendered at all.
+ */
+export function renderQuestionCard(node, selectedValues, onChange, nodeId, labels = DEFAULT_LABELS, allNodes = null, deferCommit = false) {
   const wrap = cardWrap(node);
   wrap.appendChild(titleEl(node.title, node.help));
   if (node.description) wrap.appendChild(descriptionEl(node.description));
 
   const isMulti = node.type === 'checkbox';
   const selected = new Set(selectedValues || []);
+
+  let continueBtn = null;
+  let pending = Array.from(selected);
+  const commit = (values) => {
+    pending = values;
+    if (!deferCommit) {
+      onChange(values);
+      return;
+    }
+    if (continueBtn) continueBtn.disabled = pending.length === 0;
+  };
+  const appendContinueButton = () => {
+    if (!deferCommit) return;
+    continueBtn = el('button', {
+      className: 'ryv-continue-btn',
+      text: labels.continue,
+      attrs: { type: 'button' },
+      on: { click: () => onChange(pending) },
+    });
+    continueBtn.disabled = pending.length === 0;
+    wrap.appendChild(continueBtn);
+  };
 
   // Checkbox nodes always render as the button list regardless of
   // display_style - the display_style setting only applies to single-choice
@@ -477,7 +569,7 @@ export function renderQuestionCard(node, selectedValues, onChange, nodeId, label
       wrap,
       node.options || [],
       selectedValues && selectedValues[0],
-      (value) => onChange(value ? [value] : []),
+      (value) => commit(value ? [value] : []),
       node.display_style,
       `ryv-node-${nodeId}`,
       labels,
@@ -485,6 +577,7 @@ export function renderQuestionCard(node, selectedValues, onChange, nodeId, label
       node.placeholder || null
     );
     appendReferenceContent(wrap, node, allNodes);
+    appendContinueButton();
     return wrap;
   }
 
@@ -515,7 +608,7 @@ export function renderQuestionCard(node, selectedValues, onChange, nodeId, label
           otherBtn.setAttribute('aria-pressed', value === option.value ? 'true' : 'false');
         });
       }
-      onChange(Array.from(selected));
+      commit(Array.from(selected));
     });
 
     list.appendChild(btn);
@@ -523,6 +616,7 @@ export function renderQuestionCard(node, selectedValues, onChange, nodeId, label
 
   wrap.appendChild(list);
   appendReferenceContent(wrap, node, allNodes);
+  appendContinueButton();
   return wrap;
 }
 
@@ -557,7 +651,13 @@ function appendReferenceContent(wrap, node, allNodes) {
   });
 }
 
-export function renderInputCard(node, previousValue, onChange) {
+/**
+ * @param {boolean} deferCommit Wizard layout mode: also renders a "Continue"
+ *   button that calls the same `commit()` as blur/Enter - harmless to leave
+ *   blur/Enter active too, since committing the same value twice is a no-op
+ *   (see `lastCommitted` below).
+ */
+export function renderInputCard(node, previousValue, onChange, labels = DEFAULT_LABELS, deferCommit = false) {
   const wrap = cardWrap(node);
   wrap.appendChild(titleEl(node.title, node.help));
   if (node.description) wrap.appendChild(descriptionEl(node.description));
@@ -592,6 +692,17 @@ export function renderInputCard(node, previousValue, onChange) {
   }
 
   wrap.appendChild(input);
+
+  if (deferCommit) {
+    const continueBtn = el('button', {
+      className: 'ryv-continue-btn',
+      text: labels.continue,
+      attrs: { type: 'button' },
+      on: { click: commit },
+    });
+    wrap.appendChild(continueBtn);
+  }
+
   return wrap;
 }
 

@@ -594,6 +594,14 @@ class RYV_States_ACF {
 							'wrapper' => array( 'width' => '50' ),
 						),
 						array(
+							'key'          => 'field_ryv_node_step_name',
+							'label'        => 'Step Name',
+							'name'         => 'node_step_name',
+							'type'         => 'text',
+							'wrapper'      => array( 'width' => '50' ),
+							'instructions' => 'Shown to visitors in the widget\'s step sidebar. Leave blank to keep this node folded into the previous named step instead of starting a new one.',
+						),
+						array(
 							'key'          => 'field_ryv_node_content',
 							'label'        => 'Content / HTML',
 							'name'         => 'node_content',

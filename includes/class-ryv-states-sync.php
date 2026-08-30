@@ -251,14 +251,43 @@ class RYV_States_Sync {
 			'node_id'              => $node_id,
 			'node_type'            => $node['type'] ?? 'markup',
 			'node_title'           => $node['title'] ?? '',
+			'node_step_name'       => $node['step_name'] ?? '',
 			'node_content'         => $node['content'] ?? '',
 			'node_help'            => $node['help'] ?? '',
-			'node_display_style'   => $node['display_style'] ?? '',
+			'node_display_style'   => self::resolve_display_style( $node ),
 			'node_hidden'          => ! empty( $node['hidden'] ) ? 1 : 0,
 			'node_next_node'       => $node['next_node'] ?? '',
 			'node_reference_nodes' => $ref_nodes,
 			'node_options'         => $options,
 		);
+	}
+
+	/**
+	 * A node's explicit `display_style` (set at import time only for a
+	 * Drupal `select`, see RYV_Yaml_Parser::build_node()) wins when present.
+	 * Older imports of `radios`/`webform_buttons` elements never got an
+	 * explicit style written - they render correctly today only because
+	 * the frontend's own missing-style fallback happens to be 'buttons' -
+	 * but that leaves this repeater's Display Style field blank instead of
+	 * showing the style the source form element actually used. Derive it
+	 * from `source_type` (the raw Drupal `#type`, always preserved) so the
+	 * States screen shows/edits the same style the form is really using,
+	 * without needing a data migration or re-import.
+	 *
+	 * @param array $node Node data from the schema.
+	 * @return string
+	 */
+	private static function resolve_display_style( array $node ): string {
+		if ( ! empty( $node['display_style'] ) ) {
+			return $node['display_style'];
+		}
+
+		$source_type_map = array(
+			'webform_buttons' => 'buttons',
+			'radios'          => 'radio',
+		);
+
+		return $source_type_map[ $node['source_type'] ?? '' ] ?? '';
 	}
 
 	/**
@@ -315,6 +344,11 @@ class RYV_States_Sync {
 			$help = $row['node_help'] ?? '';
 			if ( '' !== $help || isset( $nodes[ $node_id ]['help'] ) ) {
 				$nodes[ $node_id ]['help'] = $help;
+			}
+
+			$step_name = $row['node_step_name'] ?? '';
+			if ( '' !== $step_name || isset( $nodes[ $node_id ]['step_name'] ) ) {
+				$nodes[ $node_id ]['step_name'] = $step_name;
 			}
 
 			$display_style = $row['node_display_style'] ?? '';

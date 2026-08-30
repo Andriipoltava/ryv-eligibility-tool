@@ -160,6 +160,7 @@ class RYV_Widget extends \Elementor\Widget_Base {
 		$this->register_radio_style_controls();
 		$this->register_help_tooltip_style_controls();
 		$this->register_step_indicator_style_controls();
+		$this->register_step_sidebar_style_controls();
 	}
 
 	/**
@@ -175,21 +176,23 @@ class RYV_Widget extends \Elementor\Widget_Base {
 		$this->start_controls_section(
 			'steps_section',
 			array(
-				'label' => __( 'Progress Steps', 'ryv-eligibility-tool' ),
+				'label' => __( 'Steps & Layout', 'ryv-eligibility-tool' ),
 				'tab'   => \Elementor\Controls_Manager::TAB_CONTENT,
 			)
 		);
 
 		$this->add_control(
-			'show_steps',
+			'step_mode',
 			array(
-				'label'        => __( 'Show Step Indicator', 'ryv-eligibility-tool' ),
-				'type'         => \Elementor\Controls_Manager::SWITCHER,
-				'label_on'     => __( 'Show', 'ryv-eligibility-tool' ),
-				'label_off'    => __( 'Hide', 'ryv-eligibility-tool' ),
-				'return_value' => 'yes',
-				'default'      => '',
-				'description'  => __( 'Shows "Step N" (or "Step N of Total" if set below) above the questions, updating as the visitor answers.', 'ryv-eligibility-tool' ),
+				'label'       => __( 'Step Indicator', 'ryv-eligibility-tool' ),
+				'type'        => \Elementor\Controls_Manager::SELECT,
+				'default'     => 'none',
+				'options'     => array(
+					'none'    => __( 'None', 'ryv-eligibility-tool' ),
+					'counter' => __( '"Step N" counter', 'ryv-eligibility-tool' ),
+					'sidebar' => __( 'Named step sidebar', 'ryv-eligibility-tool' ),
+				),
+				'description' => __( '"Step N" counts however far into the questionnaire the visitor has gotten. The named sidebar instead shows a checklist built from each question\'s "Step Name" field (set in the form builder or a state\'s Nodes list) - it grows as the visitor reaches newly-named steps, since a branching questionnaire has no fixed total known in advance.', 'ryv-eligibility-tool' ),
 			)
 		);
 
@@ -200,9 +203,23 @@ class RYV_Widget extends \Elementor\Widget_Base {
 				'type'        => \Elementor\Controls_Manager::NUMBER,
 				'min'         => 1,
 				'condition'   => array(
-					'show_steps' => 'yes',
+					'step_mode' => 'counter',
 				),
 				'description' => __( 'An estimated total for this form/state (e.g. "8"), shown as "Step 3 of 8". This is authored by hand, not computed - a branching questionnaire has no single fixed length. Leave blank to just show "Step 3".', 'ryv-eligibility-tool' ),
+			)
+		);
+
+		$this->add_control(
+			'question_layout',
+			array(
+				'label'       => __( 'Question Layout', 'ryv-eligibility-tool' ),
+				'type'        => \Elementor\Controls_Manager::SELECT,
+				'default'     => 'stacked',
+				'options'     => array(
+					'stacked' => __( 'Stacked (all questions, growing list)', 'ryv-eligibility-tool' ),
+					'wizard'  => __( 'One question at a time', 'ryv-eligibility-tool' ),
+				),
+				'description' => __( 'Stacked keeps every answered question visible and advances instantly on click (today\'s behavior). "One question at a time" shows only the current question and always requires an explicit Continue click to advance, for every question type.', 'ryv-eligibility-tool' ),
 			)
 		);
 
@@ -1631,7 +1648,7 @@ class RYV_Widget extends \Elementor\Widget_Base {
 				'label'     => __( 'Step Indicator', 'ryv-eligibility-tool' ),
 				'tab'       => \Elementor\Controls_Manager::TAB_STYLE,
 				'condition' => array(
-					'show_steps' => 'yes',
+					'step_mode' => 'counter',
 				),
 			)
 		);
@@ -1677,6 +1694,66 @@ class RYV_Widget extends \Elementor\Widget_Base {
 	}
 
 	/**
+	 * Style controls for the "Named step sidebar" mode (.ryv-step-list, see
+	 * register_step_indicator_controls()'s `step_mode` control). Same
+	 * CSS-custom-property technique as the rest of this file - values here
+	 * fall through to input.css's own defaults (which already reuse
+	 * --ryv-primary-color/--ryv-secondary-color) when left blank.
+	 */
+	private function register_step_sidebar_style_controls() {
+		$this->start_controls_section(
+			'step_sidebar_style_section',
+			array(
+				'label'     => __( 'Step Sidebar', 'ryv-eligibility-tool' ),
+				'tab'       => \Elementor\Controls_Manager::TAB_STYLE,
+				'condition' => array(
+					'step_mode' => 'sidebar',
+				),
+			)
+		);
+
+		$this->add_group_control(
+			\Elementor\Group_Control_Typography::get_type(),
+			array(
+				'name'     => 'step_sidebar_typography',
+				'selector' => '{{WRAPPER}} .ryv-step-list-item',
+			)
+		);
+
+		$this->add_control(
+			'step_sidebar_active_color',
+			array(
+				'label'       => __( 'Active Step Color', 'ryv-eligibility-tool' ),
+				'type'        => \Elementor\Controls_Manager::COLOR,
+				'description' => __( 'Leave blank to use the widget\'s Primary Color.', 'ryv-eligibility-tool' ),
+				'selectors'   => array(
+					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-step-sidebar-active-color: {{VALUE}};',
+				),
+			)
+		);
+
+		$this->add_control(
+			'step_sidebar_gap',
+			array(
+				'label'      => __( 'Gap Between Steps', 'ryv-eligibility-tool' ),
+				'type'       => \Elementor\Controls_Manager::SLIDER,
+				'size_units' => array( 'px' ),
+				'range'      => array(
+					'px' => array(
+						'min' => 0,
+						'max' => 40,
+					),
+				),
+				'selectors'  => array(
+					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-step-sidebar-gap: {{SIZE}}{{UNIT}};',
+				),
+			)
+		);
+
+		$this->end_controls_section();
+	}
+
+	/**
 	 * Output the mount point. The decision engine (assets/js/decision-engine.js)
 	 * finds this by `.ryv-app-wrapper[data-form-id]` and takes over from here -
 	 * no markup for the questionnaire itself is rendered server-side.
@@ -1708,20 +1785,40 @@ class RYV_Widget extends \Elementor\Widget_Base {
 		}
 
 		$show_start_over = 'yes' === $this->get_settings_for_display( 'show_start_over' );
-		$show_steps      = 'yes' === $this->get_settings_for_display( 'show_steps' );
+		$step_mode       = $this->get_settings_for_display( 'step_mode' );
+		$step_mode       = in_array( $step_mode, array( 'counter', 'sidebar' ), true ) ? $step_mode : 'none';
 		$total_steps     = absint( $this->get_settings_for_display( 'total_steps' ) );
+		$question_layout = 'wizard' === $this->get_settings_for_display( 'question_layout' ) ? 'wizard' : 'stacked';
 
-		$this->render_header( absint( $form_id ) );
+		// The "Named step sidebar" mode needs a two-column layout (header +
+		// step checklist on the left, the questions on the right) - the
+		// header and an empty sidebar slot (populated client-side by
+		// engine.js's mount(), see updateStepSidebar()) both need to live
+		// *outside* .ryv-app-wrapper as its sibling, inside one shared
+		// `.ryv-layout--sidebar` grid container. Every other step_mode
+		// keeps today's flat markup (header printed directly, no wrapper).
+		if ( 'sidebar' === $step_mode ) {
+			echo '<div class="ryv-layout ryv-layout--sidebar"><div class="ryv-layout-sidebar">';
+			$this->render_header( absint( $form_id ) );
+			echo '<div class="ryv-step-sidebar-slot"></div></div><div class="ryv-layout-main">';
+		} else {
+			$this->render_header( absint( $form_id ) );
+		}
 
 		printf(
-			'<div class="ryv-app-wrapper" data-form-id="%d" data-show-start-over="%d" data-labels="%s" data-entry-node="%s" data-show-steps="%d" data-total-steps="%d"></div>',
+			'<div class="ryv-app-wrapper" data-form-id="%d" data-show-start-over="%d" data-labels="%s" data-entry-node="%s" data-step-mode="%s" data-total-steps="%d" data-question-layout="%s"></div>',
 			absint( $form_id ),
 			$show_start_over ? 1 : 0,
 			esc_attr( wp_json_encode( $this->get_label_overrides() ) ),
 			esc_attr( (string) $entry_node ),
-			$show_steps ? 1 : 0,
-			$total_steps
+			esc_attr( $step_mode ),
+			$total_steps,
+			esc_attr( $question_layout )
 		);
+
+		if ( 'sidebar' === $step_mode ) {
+			echo '</div></div>';
+		}
 	}
 
 	/**

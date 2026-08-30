@@ -58,6 +58,82 @@
     margin-bottom: 0;
   }
 
+  /*
+   * The Elementor widget's "Named step sidebar" step_mode (see
+   * class-ryv-widget.php's register_step_indicator_controls()) - a
+   * two-column grid holding the header title/description + step checklist
+   * on the left (.ryv-layout-sidebar) and .ryv-app-wrapper itself on the
+   * right (.ryv-layout-main). Only printed by render() when that mode is
+   * active, so every other placement's markup/layout is unaffected.
+   */
+  .ryv-layout--sidebar {
+    @apply ryv-grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+    gap: var(--ryv-layout-sidebar-gap, 3rem);
+    align-items: start;
+  }
+  @media (max-width: 782px) {
+    .ryv-layout--sidebar {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .ryv-step-list {
+    @apply ryv-flex ryv-flex-col ryv-list-none ryv-p-0 ryv-m-0;
+    gap: var(--ryv-step-sidebar-gap, 1rem);
+  }
+
+  .ryv-step-list-item {
+    @apply ryv-flex ryv-items-center ryv-text-sm;
+    gap: 0.75rem;
+    color: var(--ryv-secondary-color, #64748b);
+  }
+  .ryv-step-list-item.is-active {
+    @apply ryv-font-semibold;
+    color: var(--ryv-step-sidebar-active-color, var(--ryv-primary-color, #002a41));
+  }
+  /*
+   * A done step (renderer.js's updateStepSidebar()) is the only clickable
+   * entry - clicking it calls engine.js's goToStep() to revisit that step
+   * (wizard layout) or scroll to it (stacked layout, where it's already
+   * on screen). Active/upcoming entries have no click handler at all.
+   */
+  .ryv-step-list-item.is-done {
+    cursor: pointer;
+  }
+  .ryv-step-list-item.is-done:hover,
+  .ryv-step-list-item.is-done:focus-visible {
+    color: var(--ryv-step-sidebar-active-color, var(--ryv-primary-color, #002a41));
+    outline: none;
+  }
+
+  .ryv-step-list-marker {
+    @apply ryv-flex ryv-items-center ryv-justify-center ryv-shrink-0 ryv-rounded-full ryv-text-xs ryv-font-semibold;
+    width: 1.75rem;
+    height: 1.75rem;
+    border: 1px solid var(--ryv-secondary-color, #cbd5e1);
+    color: inherit;
+  }
+  .ryv-step-list-item.is-done .ryv-step-list-marker {
+    background-color: var(--ryv-step-sidebar-active-color, var(--ryv-primary-color, #002a41));
+    border-color: var(--ryv-step-sidebar-active-color, var(--ryv-primary-color, #002a41));
+    color: #fff;
+  }
+  .ryv-step-list-item.is-active .ryv-step-list-marker {
+    border-color: var(--ryv-step-sidebar-active-color, var(--ryv-primary-color, #002a41));
+  }
+
+  /*
+   * Wizard (one-question-at-a-time) question_layout: toggled by engine.js's
+   * updateWizardVisibility() on every real card except the most recently
+   * appended one. Cards stay fully mounted (see that method's docblock) -
+   * this is the only thing that changes, so nothing else needs to know the
+   * layout mode is active.
+   */
+  .ryv-card-hidden {
+    display: none;
+  }
+
   .ryv-card {
     @apply ryv-transition-all ryv-duration-200 ryv-ease-out ryv-opacity-100 ryv-translate-y-0;
   }
