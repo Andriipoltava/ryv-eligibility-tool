@@ -1,8 +1,8 @@
 // See the matching comment in ../decision-engine.js - these query strings
 // are the only thing cache-busting these nested imports; bump them with
 // every RYV_VERSION change.
-import { fetchForm, logSubmission, submitLead } from './api-client.js?ver=0.8.21';
-import * as renderer from './renderer.js?ver=0.8.21';
+import { fetchForm, logSubmission, submitLead } from './api-client.js?ver=0.8.31';
+import * as renderer from './renderer.js?ver=0.8.31';
 
 const LOADING_CARD_ID = '__loading__';
 const ERROR_CARD_ID = '__error__';
@@ -278,7 +278,13 @@ export class RYVDecisionEngine {
       }
 
       const next = this.computeNext(current, node);
-      const isTerminal = !next && (node.type === 'markup' || node.type === 'unsupported');
+      // Terminal-ness is about whether the *graph* dead-ends here
+      // (`node.next_node` unset), not about whether `next` itself is
+      // available yet - in wizard mode a markup node with a `next_node` set
+      // still gets `next === null` from computeNext() (deferred until its
+      // own Continue click, see below), and that must not be mistaken for
+      // "Start Over" terminal.
+      const isTerminal = !node.next_node && (node.type === 'markup' || node.type === 'unsupported');
       // `node.hidden` (see RYV_YAML_Parser's "visible_and_invisible" case)
       // still routes through normally - it's just never given a card, so a
       // hidden markup node's own next_node keeps the chain moving
@@ -296,7 +302,22 @@ export class RYVDecisionEngine {
    * or is still awaiting user input.
    */
   computeNext(nodeId, node) {
-    if (node.type === 'markup' || node.type === 'unsupported') {
+    // Wizard layout: a markup node with somewhere to go still stops here and
+    // waits for its own Continue click (onMarkupContinue()), same as every
+    // other node type in this mode - otherwise renderFrom()'s synchronous
+    // walk would build this card, wizard-hide it, and move straight to
+    // next_node's card in one pass, and the visitor would never see it
+    // painted at all. `unsupported` nodes have no Continue affordance
+    // (renderUnsupportedCard never renders one), so they still auto-advance.
+    if (node.type === 'markup') {
+      // `node.hidden` nodes never get a card at all (see renderFrom()), so
+      // there's no Continue button to click - deferring here would dead-end
+      // the visitor with no way to move on. Only defer a node that's
+      // actually going to be shown.
+      if (this.wizardMode && node.next_node && !node.hidden) return null;
+      return node.next_node || null;
+    }
+    if (node.type === 'unsupported') {
       return node.next_node || null;
     }
 
@@ -353,7 +374,14 @@ export class RYVDecisionEngine {
           this.labels
         );
       case 'markup':
-        return renderer.renderMarkupCard(node, isTerminal && this.showStartOver, () => this.restart(), this.labels);
+        return renderer.renderMarkupCard(
+          node,
+          isTerminal && this.showStartOver,
+          () => this.restart(),
+          this.labels,
+          this.wizardMode && !isTerminal,
+          () => this.onMarkupContinue(nodeId)
+        );
       default:
         return renderer.renderUnsupportedCard(node, isTerminal && this.showStartOver, () => this.restart(), this.labels);
     }
@@ -402,6 +430,21 @@ export class RYVDecisionEngine {
    * DOM node.
    */
   onLeadContinue(nodeId) {
+    const node = this.nodes[nodeId];
+    if (!node || !node.next_node) return;
+
+    this.truncateFrom(this.indexOf(nodeId) + 1);
+    this.renderFrom(node.next_node, true);
+    this.logProgress();
+  }
+
+  /**
+   * Advances past a wizard-mode markup card once its own "Continue" button
+   * is clicked - computeNext() deliberately defers markup nodes in wizard
+   * mode (see there), so this is the only path that renders forward from
+   * one in that layout. Same shape as onLeadContinue().
+   */
+  onMarkupContinue(nodeId) {
     const node = this.nodes[nodeId];
     if (!node || !node.next_node) return;
 

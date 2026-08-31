@@ -858,8 +858,20 @@ export function renderLeadCaptureCard(node, submittedValue, onSubmit, onContinue
  * outer card wrap like every other card type (see cardWrap()) - e.g.
  * `text-restrict-height` needs to scope to just the scrollable content, not
  * the title above it too.
+ *
+ * @param {boolean} deferCommit Wizard (one-question-at-a-time) layout mode:
+ *   a non-terminal markup card (one with a `next_node`) stops here and
+ *   renders its own "Continue" button instead of engine.js's renderFrom()
+ *   walking straight through it - otherwise the card would be built, hidden
+ *   by updateWizardVisibility(), and replaced by its next_node's card all
+ *   within the same synchronous pass, so the visitor would never actually
+ *   see it painted. Stacked (default) layout keeps today's behavior: no
+ *   button, the whole chain renders and stays visible at once.
+ * @param {() => void} [onContinue] Called when the Continue button is
+ *   clicked. Only used when `deferCommit` is true and the card isn't
+ *   terminal.
  */
-export function renderMarkupCard(node, isTerminal, onRestart, labels = DEFAULT_LABELS) {
+export function renderMarkupCard(node, isTerminal, onRestart, labels = DEFAULT_LABELS, deferCommit = false, onContinue = null) {
   const wrap = el('div');
   if (node.title) {
     wrap.appendChild(titleEl(node.title, node.help));
@@ -880,6 +892,15 @@ export function renderMarkupCard(node, isTerminal, onRestart, labels = DEFAULT_L
         text: labels.startOver,
         attrs: { type: 'button' },
         on: { click: onRestart },
+      })
+    );
+  } else if (deferCommit) {
+    wrap.appendChild(
+      el('button', {
+        className: 'ryv-continue-btn',
+        text: labels.continue,
+        attrs: { type: 'button' },
+        on: { click: onContinue },
       })
     );
   }
