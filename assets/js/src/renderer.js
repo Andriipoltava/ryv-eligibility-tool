@@ -38,6 +38,41 @@ export const DEFAULT_LABELS = {
   stepWithTotal: 'Step {current} of {total}',
 };
 
+/**
+ * Optional icon for the Continue/Start Over/Retry buttons (the widget's
+ * "Icon"/"Icon Position" controls on each - see class-ryv-widget.php's
+ * register_label_controls() and get_icon_overrides()). Each value is either
+ * `null` (no icon, today's plain-text button) or
+ * `{ html: string, position: 'before' | 'after' }` - `html` is
+ * server-rendered by Elementor's own `Icons_Manager::render_icon()`, the
+ * same trust boundary as `node.content`/`node.title` elsewhere in this file
+ * (admin-only, never visitor input), so it's applied via `innerHTML` here
+ * rather than re-parsed.
+ */
+export const DEFAULT_ICONS = {
+  continue: null,
+  startOver: null,
+  retry: null,
+};
+
+/**
+ * Builds a button's children: a `.ryv-btn-text` span, plus (if `icon` is
+ * set) a `.ryv-btn-icon` span holding Elementor's pre-rendered icon markup,
+ * positioned before or after the text per `icon.position`. Returned as a
+ * children array for `el('button', {...}, buttonChildren(...))` - buttons
+ * with no icon get a single plain text span, same DOM shape as before this
+ * existed.
+ */
+function buttonChildren(text, icon) {
+  const textSpan = el('span', { className: 'ryv-btn-text', text });
+  if (!icon || !icon.html) return [textSpan];
+
+  const iconSpan = el('span', { className: 'ryv-btn-icon', attrs: { 'aria-hidden': 'true' } });
+  iconSpan.innerHTML = icon.html;
+
+  return icon.position === 'before' ? [iconSpan, textSpan] : [textSpan, iconSpan];
+}
+
 function el(tag, opts = {}, children = []) {
   const node = document.createElement(tag);
   if (opts.className) node.className = opts.className;
@@ -296,17 +331,20 @@ export function renderLoadingCard(labels = DEFAULT_LABELS) {
   return el('div', { className: 'ryv-loading', text: labels.loading });
 }
 
-export function renderErrorCard(message, onRetry, labels = DEFAULT_LABELS) {
+export function renderErrorCard(message, onRetry, labels = DEFAULT_LABELS, icons = DEFAULT_ICONS) {
   const box = el('div', { className: 'ryv-error-box' });
   box.appendChild(el('p', { text: message || labels.error }));
   if (onRetry) {
     box.appendChild(
-      el('button', {
-        className: 'ryv-continue-btn ryv-mt-3',
-        text: labels.retry,
-        attrs: { type: 'button' },
-        on: { click: onRetry },
-      })
+      el(
+        'button',
+        {
+          className: 'ryv-continue-btn ryv-mt-3',
+          attrs: { type: 'button' },
+          on: { click: onRetry },
+        },
+        buttonChildren(labels.retry, icons.retry)
+      )
     );
   }
   return box;
@@ -531,7 +569,16 @@ function renderSingleChoiceOptions(wrap, options, selectedValue, onSelect, displ
  *   (default) layout keeps today's behavior: `onChange` fires immediately,
  *   no Continue button is rendered at all.
  */
-export function renderQuestionCard(node, selectedValues, onChange, nodeId, labels = DEFAULT_LABELS, allNodes = null, deferCommit = false) {
+export function renderQuestionCard(
+  node,
+  selectedValues,
+  onChange,
+  nodeId,
+  labels = DEFAULT_LABELS,
+  allNodes = null,
+  deferCommit = false,
+  icons = DEFAULT_ICONS
+) {
   const wrap = cardWrap(node);
   wrap.appendChild(titleEl(node.title, node.help));
   if (node.description) wrap.appendChild(descriptionEl(node.description));
@@ -551,12 +598,15 @@ export function renderQuestionCard(node, selectedValues, onChange, nodeId, label
   };
   const appendContinueButton = () => {
     if (!deferCommit) return;
-    continueBtn = el('button', {
-      className: 'ryv-continue-btn',
-      text: labels.continue,
-      attrs: { type: 'button' },
-      on: { click: () => onChange(pending) },
-    });
+    continueBtn = el(
+      'button',
+      {
+        className: 'ryv-continue-btn',
+        attrs: { type: 'button' },
+        on: { click: () => onChange(pending) },
+      },
+      buttonChildren(labels.continue, icons.continue)
+    );
     continueBtn.disabled = pending.length === 0;
     wrap.appendChild(continueBtn);
   };
@@ -657,7 +707,7 @@ function appendReferenceContent(wrap, node, allNodes) {
  *   blur/Enter active too, since committing the same value twice is a no-op
  *   (see `lastCommitted` below).
  */
-export function renderInputCard(node, previousValue, onChange, labels = DEFAULT_LABELS, deferCommit = false) {
+export function renderInputCard(node, previousValue, onChange, labels = DEFAULT_LABELS, deferCommit = false, icons = DEFAULT_ICONS) {
   const wrap = cardWrap(node);
   wrap.appendChild(titleEl(node.title, node.help));
   if (node.description) wrap.appendChild(descriptionEl(node.description));
@@ -694,12 +744,15 @@ export function renderInputCard(node, previousValue, onChange, labels = DEFAULT_
   wrap.appendChild(input);
 
   if (deferCommit) {
-    const continueBtn = el('button', {
-      className: 'ryv-continue-btn',
-      text: labels.continue,
-      attrs: { type: 'button' },
-      on: { click: commit },
-    });
+    const continueBtn = el(
+      'button',
+      {
+        className: 'ryv-continue-btn',
+        attrs: { type: 'button' },
+        on: { click: commit },
+      },
+      buttonChildren(labels.continue, icons.continue)
+    );
     wrap.appendChild(continueBtn);
   }
 
@@ -767,7 +820,7 @@ function buildFieldControl(field) {
  *   `node.next_node`. Never called if `node.next_node` is empty.
  * @param {object} labels
  */
-export function renderLeadCaptureCard(node, submittedValue, onSubmit, onContinue, labels = DEFAULT_LABELS) {
+export function renderLeadCaptureCard(node, submittedValue, onSubmit, onContinue, labels = DEFAULT_LABELS, icons = DEFAULT_ICONS) {
   const wrap = cardWrap(node);
   if (node.title) wrap.appendChild(titleEl(node.title, node.help));
   if (node.description) wrap.appendChild(descriptionEl(node.description));
@@ -776,11 +829,14 @@ export function renderLeadCaptureCard(node, submittedValue, onSubmit, onContinue
     wrap.appendChild(el('div', { className: 'ryv-content', text: node.success_message || labels.leadSubmitted }));
 
     if (node.next_node) {
-      const continueBtn = el('button', {
-        className: 'ryv-continue-btn',
-        text: labels.continue,
-        attrs: { type: 'button' },
-      });
+      const continueBtn = el(
+        'button',
+        {
+          className: 'ryv-continue-btn',
+          attrs: { type: 'button' },
+        },
+        buttonChildren(labels.continue, icons.continue)
+      );
       continueBtn.addEventListener('click', () => {
         continueBtn.disabled = true;
         onContinue();
@@ -871,7 +927,15 @@ export function renderLeadCaptureCard(node, submittedValue, onSubmit, onContinue
  *   clicked. Only used when `deferCommit` is true and the card isn't
  *   terminal.
  */
-export function renderMarkupCard(node, isTerminal, onRestart, labels = DEFAULT_LABELS, deferCommit = false, onContinue = null) {
+export function renderMarkupCard(
+  node,
+  isTerminal,
+  onRestart,
+  labels = DEFAULT_LABELS,
+  deferCommit = false,
+  onContinue = null,
+  icons = DEFAULT_ICONS
+) {
   const wrap = el('div');
   if (node.title) {
     wrap.appendChild(titleEl(node.title, node.help));
@@ -887,28 +951,34 @@ export function renderMarkupCard(node, isTerminal, onRestart, labels = DEFAULT_L
 
   if (isTerminal) {
     wrap.appendChild(
-      el('button', {
-        className: 'ryv-continue-btn',
-        text: labels.startOver,
-        attrs: { type: 'button' },
-        on: { click: onRestart },
-      })
+      el(
+        'button',
+        {
+          className: 'ryv-continue-btn',
+          attrs: { type: 'button' },
+          on: { click: onRestart },
+        },
+        buttonChildren(labels.startOver, icons.startOver)
+      )
     );
   } else if (deferCommit) {
     wrap.appendChild(
-      el('button', {
-        className: 'ryv-continue-btn',
-        text: labels.continue,
-        attrs: { type: 'button' },
-        on: { click: onContinue },
-      })
+      el(
+        'button',
+        {
+          className: 'ryv-continue-btn',
+          attrs: { type: 'button' },
+          on: { click: onContinue },
+        },
+        buttonChildren(labels.continue, icons.continue)
+      )
     );
   }
 
   return wrap;
 }
 
-export function renderUnsupportedCard(node, isTerminal, onRestart, labels = DEFAULT_LABELS) {
+export function renderUnsupportedCard(node, isTerminal, onRestart, labels = DEFAULT_LABELS, icons = DEFAULT_ICONS) {
   const wrap = el('div', { className: 'ryv-error-box' });
   wrap.appendChild(
     el('p', {
@@ -917,12 +987,15 @@ export function renderUnsupportedCard(node, isTerminal, onRestart, labels = DEFA
   );
   if (isTerminal) {
     wrap.appendChild(
-      el('button', {
-        className: 'ryv-continue-btn ryv-mt-3',
-        text: labels.startOver,
-        attrs: { type: 'button' },
-        on: { click: onRestart },
-      })
+      el(
+        'button',
+        {
+          className: 'ryv-continue-btn ryv-mt-3',
+          attrs: { type: 'button' },
+          on: { click: onRestart },
+        },
+        buttonChildren(labels.startOver, icons.startOver)
+      )
     );
   }
   return wrap;

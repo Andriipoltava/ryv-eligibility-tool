@@ -4,6 +4,32 @@
 
 @layer components {
   /*
+   * A note on the doubled class selectors below (`.ryv-option-btn.ryv-option-btn`):
+   *
+   * Elementor writes each kit's Site Settings typography as element-level,
+   * kit-scoped rules - `.elementor-kit-6 h2 { font-size: 36px; font-weight: 800 }`
+   * in post-6.css. That is specificity (0,1,1), which beats a plain
+   * `.ryv-question-title` (0,1,0), so the kit was silently overriding this
+   * widget's own title/button/field styling on any site that had touched Site
+   * Settings. Repeating the class lifts our rule to (0,2,0) and wins without
+   * `!important`, which would otherwise have to be repeated forever and would
+   * also break the Elementor Style-tab controls in class-ryv-widget.php.
+   *
+   * Only the classes that actually sit on an element the kit styles are doubled
+   * (h2/p/a/button/input/select/label) - `div`-based ones like
+   * .ryv-step-indicator or .ryv-select2-menu are left alone, since the kit has
+   * nothing to say about them and the extra noise would not buy anything.
+   *
+   * Ordering is handled separately, in RYV_Assets::depend_on_elementor_kit():
+   * specificity fixes the tie, the dependency fixes the "kit sheet printed
+   * last" half. Both are needed.
+   *
+   * Widget-level overrides are unaffected: Elementor emits those as
+   * `{{WRAPPER}} .ryv-x` (also (0,2,0)) in inline CSS printed after this file,
+   * so a Style-tab setting still wins the tie on source order.
+   */
+
+  /*
    * background-color/font-family here are the RYV_Settings_Page "Global
    * Styles" admin page's own two new custom properties - both default to
    * `transparent`/`inherit` (i.e. today's actual behavior) since neither
@@ -78,6 +104,19 @@
     }
   }
 
+  /*
+   * Widget's "Spacing Above Steps" control (register_step_sidebar_style_
+   * controls()) - stacks the header block (title/description) above the
+   * step checklist inside .ryv-layout-sidebar. Defaults to 0 so an
+   * untouched instance's spacing still comes entirely from the header
+   * title/description's own bottom margin, exactly as before this control
+   * existed - this gap only ever adds to that.
+   */
+  .ryv-layout-sidebar {
+    @apply ryv-flex ryv-flex-col;
+    gap: var(--ryv-layout-sidebar-inner-gap, 0);
+  }
+
   .ryv-step-list {
     @apply ryv-flex ryv-flex-col ryv-list-none ryv-p-0 ryv-m-0;
     gap: var(--ryv-step-sidebar-gap, 1rem);
@@ -109,10 +148,10 @@
 
   .ryv-step-list-marker {
     @apply ryv-flex ryv-items-center ryv-justify-center ryv-shrink-0 ryv-rounded-full ryv-text-xs ryv-font-semibold;
-    width: 1.75rem;
-    height: 1.75rem;
-    border: 1px solid var(--ryv-secondary-color, #cbd5e1);
-    color: inherit;
+    width: var(--ryv-step-sidebar-marker-size, 1.75rem);
+    height: var(--ryv-step-sidebar-marker-size, 1.75rem);
+    border: 1px solid var(--ryv-step-sidebar-marker-color, var(--ryv-secondary-color, #cbd5e1));
+    color: var(--ryv-step-sidebar-marker-color, inherit);
   }
   .ryv-step-list-item.is-done .ryv-step-list-marker {
     background-color: var(--ryv-step-sidebar-active-color, var(--ryv-primary-color, #002a41));
@@ -159,7 +198,7 @@
    * getComputedStyle on the live site) - bold and primary-colored, not the
    * lighter body-text weight/color this used before.
    */
-  .ryv-question-title {
+  .ryv-question-title.ryv-question-title {
     @apply ryv-font-bold ryv-mb-4 ryv-flex ryv-items-center ryv-gap-2;
     font-size: var(--ryv-question-title-size, var(--ryv-font-size, 1.375rem));
     color: var(--ryv-question-title-color, var(--ryv-primary-color, #002a41));
@@ -178,7 +217,7 @@
   .ryv-help {
     @apply ryv-relative ryv-inline-flex ryv-flex-shrink-0;
   }
-  .ryv-help-icon {
+  .ryv-help-icon.ryv-help-icon {
     @apply ryv-inline-flex ryv-items-center ryv-justify-center ryv-rounded-full ryv-cursor-pointer ryv-p-0 ryv-font-semibold ryv-leading-none;
     box-sizing: border-box;
     width: 0.875rem;
@@ -190,11 +229,11 @@
     border-width: 2px;
     border-color: var(--ryv-help-icon-bg, var(--ryv-secondary-color, #bbb));
   }
-  .ryv-help-icon:hover {
+  .ryv-help-icon.ryv-help-icon:hover {
     background-color: var(--ryv-help-icon-bg-hover, var(--ryv-primary-color, #002a41));
     border-color: var(--ryv-help-icon-bg-hover, var(--ryv-primary-color, #002a41));
   }
-  .ryv-help-icon:focus-visible {
+  .ryv-help-icon.ryv-help-icon:focus-visible {
     @apply ryv-outline-none ryv-ring-2 ryv-ring-ryv-primary;
   }
   .ryv-help-tooltip {
@@ -220,22 +259,22 @@
   }
 
   /* NodeEditor.js's "Description" field - optional helper text between the title and the options/input. */
-  .ryv-question-description {
+  .ryv-question-description.ryv-question-description {
     @apply ryv-text-sm ryv-mb-4 ryv-leading-relaxed;
     color: var(--ryv-secondary-color, #454545);
   }
-  .ryv-question-description a {
+  .ryv-question-description.ryv-question-description a {
     @apply ryv-underline ryv-text-ryv-primary;
   }
 
-  .ryv-content {
+  .ryv-content.ryv-content {
     @apply ryv-text-ryv-text ryv-mb-4 ryv-leading-relaxed;
   }
 
-  .ryv-options-list ~ .ryv-content {
+  .ryv-options-list ~ .ryv-content.ryv-content {
     margin-top: var(--ryv-list-gap, 1.5rem);
   }
-  .ryv-content a {
+  .ryv-content.ryv-content a {
     @apply ryv-underline ryv-text-ryv-primary;
   }
 
@@ -248,13 +287,13 @@
    * .ryv-app-wrapper's own max-width/centering so an untouched widget's
    * title/description line up with the questionnaire below them.
    */
-  .ryv-header-title {
+  .ryv-header-title.ryv-header-title {
     @apply ryv-max-w-xl ryv-mx-auto ryv-text-xl ryv-font-bold;
     color: var(--ryv-header-title-color, var(--ryv-text-color, #1f2937));
     margin-bottom: var(--ryv-header-title-margin-bottom, 1rem);
   }
 
-  .ryv-header-description {
+  .ryv-header-description.ryv-header-description {
     @apply ryv-max-w-xl ryv-mx-auto ryv-leading-relaxed;
     color: var(--ryv-header-description-color, var(--ryv-text-color, #1f2937));
     margin-bottom: var(--ryv-header-description-margin-bottom, 1.5rem);
@@ -298,7 +337,7 @@
    * widget's own Style-tab controls, same as every other var(--x, <default>)
    * here.
    */
-  .ryv-option-btn {
+  .ryv-option-btn.ryv-option-btn {
     @apply ryv-text-left ryv-font-bold ryv-transition-colors ryv-duration-150;
     width: var(--ryv-btn-width, auto);
     font-size: var(--ryv-btn-font-size, var(--ryv-font-size, 1.125rem));
@@ -310,15 +349,15 @@
     border-radius: var(--ryv-btn-border-radius, var(--ryv-radius, 0));
     padding: var(--ryv-btn-padding, 0.5rem 1.125rem);
   }
-  .ryv-option-btn:hover {
+  .ryv-option-btn.ryv-option-btn:hover {
     color: var(--ryv-btn-text-color-hover, var(--ryv-btn-text-color, var(--ryv-text-color, #1f2937)));
     background-color: var(--ryv-btn-bg-hover, var(--ryv-btn-bg, #ececec));
     border-color: var(--ryv-btn-border-color-hover, var(--ryv-primary-color, #002a41));
   }
-  .ryv-option-btn:focus-visible {
+  .ryv-option-btn.ryv-option-btn:focus-visible {
     @apply ryv-outline-none ryv-ring-2 ryv-ring-ryv-primary;
   }
-  .ryv-option-btn[aria-pressed='true'] {
+  .ryv-option-btn.ryv-option-btn[aria-pressed='true'] {
     @apply ryv-font-normal;
     background-color: var(--ryv-btn-bg-selected, #cadae3);
     border-color: var(--ryv-btn-border-color-selected, var(--ryv-primary-color, #002a41));
@@ -343,7 +382,7 @@
    * fails to build). Spelled out as raw declarations instead, so each one
    * can carry its own `!important`.
    */
-  .ryv-continue-btn {
+  .ryv-continue-btn.ryv-continue-btn {
     display: inline-flex !important;
     align-items: center !important;
     font-weight: 500 !important;
@@ -358,15 +397,38 @@
     border-radius: var(--ryv-continue-btn-border-radius, var(--ryv-radius, 0)) !important;
     padding: var(--ryv-continue-btn-padding, 0.625rem 1.25rem) !important;
   }
-  .ryv-continue-btn:hover {
+  .ryv-continue-btn.ryv-continue-btn:hover {
     background-color: var(--ryv-continue-btn-bg-hover, var(--ryv-continue-btn-bg, var(--ryv-primary-color, #002a41))) !important;
     opacity: var(--ryv-continue-btn-hover-opacity, 0.9);
   }
-  .ryv-continue-btn:disabled {
+  .ryv-continue-btn.ryv-continue-btn:disabled {
     @apply ryv-opacity-40 ryv-cursor-not-allowed;
   }
 
-  .ryv-input {
+  /*
+   * Continue/Start Over/Retry buttons' Icon control (widget's
+   * register_button_icon_controls(), see renderer.js's buttonChildren()) -
+   * a button with no icon set renders only `.ryv-btn-text`, so this gap has
+   * nothing to space out and stays a no-op for every button that hasn't
+   * opted in. `.ryv-btn-icon` covers both icon libraries Elementor's Icon
+   * control can produce: an `<i>` (Font Awesome, sized by font-size) or an
+   * inline `<svg>` upload (sized explicitly here since it has no font-size
+   * to inherit).
+   */
+  .ryv-continue-btn.ryv-continue-btn {
+    gap: 0.5em !important;
+  }
+  .ryv-btn-icon {
+    @apply ryv-inline-flex ryv-items-center ryv-shrink-0;
+    line-height: 1;
+  }
+  .ryv-btn-icon svg {
+    width: 1em;
+    height: 1em;
+    fill: currentColor;
+  }
+
+  .ryv-input.ryv-input {
     @apply ryv-w-full ryv-mb-4;
     max-width: var(--ryv-input-max-width, none);
     color: var(--ryv-input-text-color, var(--ryv-text-color, #1f2937));
@@ -377,29 +439,29 @@
     border-radius: var(--ryv-input-border-radius, var(--ryv-radius, 0));
     padding: var(--ryv-input-padding, 0.625rem 1rem);
   }
-  .ryv-input:hover {
+  .ryv-input.ryv-input:hover {
     border-color: var(--ryv-input-border-color-hover, var(--ryv-input-border-color, #d1d5db));
   }
-  .ryv-input:focus-visible {
+  .ryv-input.ryv-input:focus-visible {
     @apply ryv-outline-none ryv-ring-2 ryv-ring-ryv-primary;
   }
 
   /* display_style: 'radio' - a plain radio input + label, one per option. */
-  .ryv-radio-option {
+  .ryv-radio-option.ryv-radio-option {
     @apply ryv-flex ryv-items-center ryv-mb-2 ryv-cursor-pointer;
     color: var(--ryv-radio-text-color, var(--ryv-text-color, #1f2937));
     gap: var(--ryv-radio-gap, 0.5rem);
   }
-  .ryv-radio-input {
+  .ryv-radio-input.ryv-radio-input {
     @apply ryv-h-4 ryv-w-4;
     accent-color: var(--ryv-radio-accent-color, var(--ryv-primary-color, #002a41));
   }
-  .ryv-radio-input:focus-visible {
+  .ryv-radio-input.ryv-radio-input:focus-visible {
     @apply ryv-outline-none ryv-ring-2 ryv-ring-ryv-primary;
   }
 
   /* display_style: 'dropdown' - a single native <select>. */
-  .ryv-select {
+  .ryv-select.ryv-select {
     @apply ryv-w-full ryv-mb-4;
     max-width: var(--ryv-select-max-width, none);
     color: var(--ryv-select-text-color, var(--ryv-text-color, #1f2937));
@@ -411,10 +473,10 @@
     padding: var(--ryv-select-padding, 1rem);
     font-size: var(--ryv-select-font-size, var(--ryv-font-size, 1.125rem));
   }
-  .ryv-select:hover {
+  .ryv-select.ryv-select:hover {
     border-color: var(--ryv-select-border-color-hover, var(--ryv-select-border-color, #d1d5db));
   }
-  .ryv-select:focus-visible {
+  .ryv-select.ryv-select:focus-visible {
     @apply ryv-outline-none ryv-ring-2 ryv-ring-ryv-primary;
   }
 
@@ -432,7 +494,7 @@
     @apply ryv-relative ryv-w-full ryv-mb-4;
     max-width: var(--ryv-select-max-width, none);
   }
-  .ryv-select2-input {
+  .ryv-select2-input.ryv-select2-input {
     @apply ryv-w-full;
     color: var(--ryv-select-text-color, var(--ryv-text-color, #1f2937));
     background-color: var(--ryv-select-bg, var(--ryv-bg-color, #fff));
@@ -463,7 +525,7 @@
     transform: translateY(-70%) rotate(45deg);
     pointer-events: none;
   }
-  .ryv-select2-input:focus-visible {
+  .ryv-select2-input.ryv-select2-input:focus-visible {
     @apply ryv-outline-none ryv-ring-2 ryv-ring-ryv-primary;
   }
   .ryv-select2-menu {
@@ -549,7 +611,7 @@
   .ryv-lead-form {
     @apply ryv-flex ryv-flex-col;
   }
-  .ryv-field-label {
+  .ryv-field-label.ryv-field-label {
     @apply ryv-block ryv-mb-1;
   }
   .ryv-field-label-text {
@@ -562,5 +624,189 @@
 
   .ryv-loading {
     @apply ryv-text-ryv-secondary ryv-text-sm ryv-py-8 ryv-text-center;
+  }
+
+  /*
+   * RYV_Map_Widget (widgets/class-ryv-map-widget.php) - embeds a MapSVG map
+   * plus an optional heading/description and "Or pick from a list" state
+   * dropdown. Lives outside .ryv-app-wrapper (it's a separate Elementor
+   * widget, not part of the decision-engine mount point), so - unlike
+   * everything else in this file - it can't rely on Tailwind's
+   * `important: '.ryv-app-wrapper'` utility scoping; every rule here is
+   * plain CSS for that reason, matching the .text-restrict-height/
+   * .message--path-end pattern above.
+   */
+  .ryv-map-widget-intro {
+    margin-bottom: var(--ryv-map-intro-spacing, 1.5rem);
+  }
+  .ryv-map-widget-heading.ryv-map-widget-heading {
+    margin: 0 0 0.5rem;
+  }
+  .ryv-map-widget-description.ryv-map-widget-description {
+    margin: 0;
+  }
+  .ryv-map-widget-body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--ryv-map-body-gap, 1.5rem);
+  }
+  .ryv-map-widget--has-side .ryv-map-widget-body {
+    flex-direction: row;
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+  .ryv-map-widget-map {
+    flex: 1 1 auto;
+    min-width: 0;
+    position: relative;
+  }
+  .ryv-map-widget-placeholder {
+    padding: 1.5rem;
+    border: 1px dashed #ccc;
+    text-align: center;
+    color: #666;
+  }
+  /* Small click-popup card (assets/js/map-widget.js) - positioned near the
+   * clicked region, not covering the whole map. */
+  .ryv-map-widget-popup {
+    position: absolute;
+    z-index: 20;
+    width: 240px;
+    max-width: calc(100% - 1rem);
+    padding: 1rem;
+    background-color: #ffffff;
+    border-style: solid;
+    border-width: 1px;
+    border-color: #e5e7eb;
+    border-radius: 0.25rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    font-size: 0.875rem;
+  }
+  .ryv-map-widget-popup-close.ryv-map-widget-popup-close {
+    position: absolute;
+    top: 0.375rem;
+    right: 0.5rem;
+    border: none;
+    background: none;
+    font-size: 1.25rem;
+    line-height: 1;
+    cursor: pointer;
+    color: #6b7280;
+    padding: 0;
+  }
+  .ryv-map-widget-popup-title {
+    font-weight: 700;
+    margin-right: 1.25rem;
+    margin-bottom: 0.5rem;
+  }
+  .ryv-map-widget-popup-desc.ryv-map-widget-popup-desc {
+    margin-bottom: 0.5rem;
+    color: #374151;
+  }
+  .ryv-map-widget-popup-link.ryv-map-widget-popup-link {
+    display: inline-block;
+    font-weight: 600;
+  }
+  /* Shared right-hand column holding the legend and/or state picker when
+   * either is set to "Beside the map" - stacked vertically (legend above
+   * picker), matching campaignlegal.org/restoreyourvote's own map layout. */
+  .ryv-map-widget-side {
+    flex: 0 0 auto;
+    width: var(--ryv-map-legend-width, var(--ryv-map-picker-width, 20rem));
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+  .ryv-map-widget-legend,
+  .ryv-map-widget-picker {
+    border-style: solid;
+    border-width: 1px;
+    border-color: #e5e7eb;
+  }
+  /* When rendered "below" instead: siblings of .ryv-map-widget-body, not
+   * inside .ryv-map-widget-side, so they need their own top spacing. */
+  .ryv-map-widget > .ryv-map-widget-legend,
+  .ryv-map-widget > .ryv-map-widget-picker {
+    margin-top: var(--ryv-map-body-gap, 1.5rem);
+  }
+  .ryv-map-widget-legend-title {
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-size: 0.75rem;
+    margin-bottom: 0.75rem;
+  }
+  .ryv-map-widget-legend-toggle.ryv-map-widget-legend-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    background: none;
+    border: none;
+    padding: 0;
+    margin-bottom: 0.75rem;
+    color: inherit;
+    font: inherit;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-size: 0.75rem;
+    cursor: pointer;
+  }
+  .ryv-map-widget-legend-toggle-icon {
+    flex: 0 0 auto;
+    width: 0.5rem;
+    height: 0.5rem;
+    margin-left: 0.5rem;
+    border-right: 2px solid currentColor;
+    border-bottom: 2px solid currentColor;
+    transform: rotate(45deg);
+    transition: transform 0.15s ease;
+  }
+  .ryv-map-widget-legend-toggle[aria-expanded="false"] .ryv-map-widget-legend-toggle-icon {
+    transform: rotate(-45deg);
+  }
+  .ryv-map-widget-legend-list[hidden] {
+    display: none;
+  }
+  .ryv-map-widget-legend-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  .ryv-map-widget-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    font-size: 0.875rem;
+  }
+  .ryv-map-widget-legend-swatch {
+    display: inline-block;
+    flex: 0 0 auto;
+    width: var(--ryv-map-legend-swatch-size, 1.125rem);
+    height: var(--ryv-map-legend-swatch-size, 1.125rem);
+    border-style: solid;
+    border-width: 1px;
+    border-color: rgba(0, 0, 0, 0.15);
+  }
+  .ryv-map-widget-picker-label {
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-size: 0.75rem;
+    margin-bottom: 0.5rem;
+  }
+  .ryv-map-widget-picker-select.ryv-map-widget-picker-select {
+    width: 100%;
+    padding: 0.625rem 0.75rem;
+    border-style: solid;
+    border-width: 1px;
+    border-color: #d1d5db;
+    border-radius: 0.25rem;
+    background-color: #fff;
+    font-size: 1rem;
   }
 }

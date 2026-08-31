@@ -1,8 +1,8 @@
 // See the matching comment in ../decision-engine.js - these query strings
 // are the only thing cache-busting these nested imports; bump them with
 // every RYV_VERSION change.
-import { fetchForm, logSubmission, submitLead } from './api-client.js?ver=0.8.31';
-import * as renderer from './renderer.js?ver=0.8.31';
+import { fetchForm, logSubmission, submitLead } from './api-client.js?ver=0.8.33';
+import * as renderer from './renderer.js?ver=0.8.33';
 
 const LOADING_CARD_ID = '__loading__';
 const ERROR_CARD_ID = '__error__';
@@ -26,7 +26,13 @@ export class RYVDecisionEngine {
     // setting existed - default to showing the button, matching how those
     // placements already behaved.
     this.showStartOver = root.dataset.showStartOver !== '0';
-    this.labels = { ...renderer.DEFAULT_LABELS, ...this.parseLabelsAttribute(root) };
+    this.labels = { ...renderer.DEFAULT_LABELS, ...this.parseJSONAttribute(root, 'labels') };
+    // `data-icons` is a JSON object of { continue, startOver, retry } ->
+    // { html, position } | null, pre-rendered server-side by the widget's
+    // Icon/Icon Position controls (class-ryv-widget.php's
+    // get_icon_overrides()) - see renderer.js's DEFAULT_ICONS docblock for
+    // the trust boundary.
+    this.icons = { ...renderer.DEFAULT_ICONS, ...this.parseJSONAttribute(root, 'icons') };
     // Set by the Elementor widget's "Auto-Detect State From Page" mode
     // (class-ryv-widget.php's get_state_entry_override()) when this
     // placement is on a `ryv_states` page linked to a form: overrides where
@@ -60,14 +66,15 @@ export class RYVDecisionEngine {
   }
 
   /**
-   * `data-labels` is a JSON object of overrides for a subset of
-   * renderer.DEFAULT_LABELS (only keys with a non-empty value in the widget's
-   * "Labels" controls are included, see class-ryv-widget.php). Malformed or
-   * absent JSON falls back to no overrides rather than breaking the mount.
+   * `data-labels`/`data-icons` are each a JSON object of overrides for a
+   * subset of renderer.DEFAULT_LABELS/DEFAULT_ICONS (only keys the widget's
+   * controls actually set are included - see class-ryv-widget.php's
+   * get_label_overrides()/get_icon_overrides()). Malformed or absent JSON
+   * falls back to no overrides rather than breaking the mount.
    */
-  parseLabelsAttribute(root) {
+  parseJSONAttribute(root, name) {
     try {
-      return JSON.parse(root.dataset.labels || '{}');
+      return JSON.parse(root.dataset[name] || '{}');
     } catch (err) {
       return {};
     }
@@ -139,7 +146,7 @@ export class RYVDecisionEngine {
       this.renderFrom(this.entryNode, true);
     } catch (err) {
       this.truncateFrom(0);
-      this.appendCard(ERROR_CARD_ID, renderer.renderErrorCard(err.message, () => this.loadForm(), this.labels));
+      this.appendCard(ERROR_CARD_ID, renderer.renderErrorCard(err.message, () => this.loadForm(), this.labels, this.icons));
     }
   }
 
@@ -354,7 +361,8 @@ export class RYVDecisionEngine {
           nodeId,
           this.labels,
           this.nodes,
-          this.wizardMode
+          this.wizardMode,
+          this.icons
         );
       case 'text':
       case 'textarea':
@@ -363,7 +371,8 @@ export class RYVDecisionEngine {
           this.answers.get(nodeId) || '',
           (value) => this.onAnswerChange(nodeId, value),
           this.labels,
-          this.wizardMode
+          this.wizardMode,
+          this.icons
         );
       case 'lead_capture':
         return renderer.renderLeadCaptureCard(
@@ -371,7 +380,8 @@ export class RYVDecisionEngine {
           this.answers.get(nodeId) || null,
           (values) => this.onLeadSubmit(nodeId, values),
           () => this.onLeadContinue(nodeId),
-          this.labels
+          this.labels,
+          this.icons
         );
       case 'markup':
         return renderer.renderMarkupCard(
@@ -380,10 +390,17 @@ export class RYVDecisionEngine {
           () => this.restart(),
           this.labels,
           this.wizardMode && !isTerminal,
-          () => this.onMarkupContinue(nodeId)
+          () => this.onMarkupContinue(nodeId),
+          this.icons
         );
       default:
-        return renderer.renderUnsupportedCard(node, isTerminal && this.showStartOver, () => this.restart(), this.labels);
+        return renderer.renderUnsupportedCard(
+          node,
+          isTerminal && this.showStartOver,
+          () => this.restart(),
+          this.labels,
+          this.icons
+        );
     }
   }
 

@@ -307,7 +307,65 @@ class RYV_Widget extends \Elementor\Widget_Base {
 			)
 		);
 
+		$this->register_button_icon_controls( 'icon_continue', __( 'Continue Button', 'ryv-eligibility-tool' ), true );
+		$this->register_button_icon_controls( 'icon_start_over', __( '"Start Over" Button', 'ryv-eligibility-tool' ) );
+		$this->register_button_icon_controls( 'icon_retry', __( 'Retry Button (on error)', 'ryv-eligibility-tool' ) );
+
 		$this->end_controls_section();
+	}
+
+	/**
+	 * One Icon + Icon Position control pair, shared by the Continue/
+	 * "Start Over"/Retry buttons (register_label_controls()) - rendered
+	 * server-side into `data-icons` JSON by get_icon_overrides() and applied
+	 * client-side by renderer.js's buttonChildren(). `$icon_key` is both the
+	 * Icon control's own name and (with a `_position` suffix) its position
+	 * control's name; get_icon_overrides()'s `$map` must keep using these
+	 * same names.
+	 *
+	 * @param string $icon_key   Control name for the Icon control itself.
+	 * @param string $heading    Heading label grouping this pair, so the
+	 *                           three buttons stay visually distinct in a
+	 *                           section that otherwise only has one heading.
+	 * @param bool   $separator  Whether to draw a divider above the heading -
+	 *                           only the first of the three needs one, to
+	 *                           separate this group from the text labels above.
+	 */
+	private function register_button_icon_controls( string $icon_key, string $heading, bool $separator = false ) {
+		$this->add_control(
+			$icon_key . '_heading',
+			array(
+				'label'     => $heading,
+				'type'      => \Elementor\Controls_Manager::HEADING,
+				'separator' => $separator ? 'before' : 'default',
+			)
+		);
+
+		$this->add_control(
+			$icon_key,
+			array(
+				'label'       => __( 'Icon', 'ryv-eligibility-tool' ),
+				'type'        => \Elementor\Controls_Manager::ICONS,
+				'skin'        => 'inline',
+				'label_block' => false,
+			)
+		);
+
+		$this->add_control(
+			$icon_key . '_position',
+			array(
+				'label'     => __( 'Icon Position', 'ryv-eligibility-tool' ),
+				'type'      => \Elementor\Controls_Manager::SELECT,
+				'options'   => array(
+					'before' => __( 'Before Text', 'ryv-eligibility-tool' ),
+					'after'  => __( 'After Text', 'ryv-eligibility-tool' ),
+				),
+				'default'   => 'after',
+				'condition' => array(
+					$icon_key . '[value]!' => '',
+				),
+			)
+		);
 	}
 
 	/**
@@ -1750,6 +1808,83 @@ class RYV_Widget extends \Elementor\Widget_Base {
 			)
 		);
 
+		// Spacing between the header (title/description) and the step
+		// checklist below it - the two blocks stacked inside
+		// .ryv-layout-sidebar (see render(), and the matching input.css
+		// rule this drives). Defaults to 0/no rule emitted, so an untouched
+		// instance keeps relying on the header's own bottom margin exactly
+		// as before this control existed.
+		$this->add_control(
+			'step_sidebar_header_gap',
+			array(
+				'label'      => __( 'Spacing Above Steps', 'ryv-eligibility-tool' ),
+				'type'       => \Elementor\Controls_Manager::SLIDER,
+				'size_units' => array( 'px' ),
+				'range'      => array(
+					'px' => array(
+						'min' => 0,
+						'max' => 100,
+					),
+				),
+				'description' => __( 'Extra space between the title/description above and the step checklist below, in addition to the title/description\'s own Bottom Spacing.', 'ryv-eligibility-tool' ),
+				'selectors'  => array(
+					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-layout-sidebar-inner-gap: {{SIZE}}{{UNIT}};',
+				),
+			)
+		);
+
+		$this->add_control(
+			'step_sidebar_marker_heading',
+			array(
+				'label'     => __( 'Step Number', 'ryv-eligibility-tool' ),
+				'type'      => \Elementor\Controls_Manager::HEADING,
+				'separator' => 'before',
+			)
+		);
+
+		$this->add_control(
+			'step_sidebar_marker_size',
+			array(
+				'label'      => __( 'Size', 'ryv-eligibility-tool' ),
+				'type'       => \Elementor\Controls_Manager::SLIDER,
+				'size_units' => array( 'px' ),
+				'range'      => array(
+					'px' => array(
+						'min' => 16,
+						'max' => 48,
+					),
+				),
+				'selectors'  => array(
+					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-step-sidebar-marker-size: {{SIZE}}{{UNIT}};',
+				),
+			)
+		);
+
+		$this->add_control(
+			'step_sidebar_marker_color',
+			array(
+				'label'       => __( 'Number Color', 'ryv-eligibility-tool' ),
+				'type'        => \Elementor\Controls_Manager::COLOR,
+				'description' => __( 'The upcoming (not yet done/active) step number and its border. Leave blank to use the widget\'s Secondary Color.', 'ryv-eligibility-tool' ),
+				'selectors'   => array(
+					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-step-sidebar-marker-color: {{VALUE}};',
+				),
+			)
+		);
+
+		// Direct box-shadow, not a custom property - same exception as
+		// register_wrapper_style_controls()'s own Box Shadow control:
+		// input.css has no var()-driven box-shadow to hook into here, and a
+		// unique per-instance {{WRAPPER}} selector has no specificity fight
+		// to lose.
+		$this->add_group_control(
+			\Elementor\Group_Control_Box_Shadow::get_type(),
+			array(
+				'name'     => 'step_sidebar_marker_box_shadow',
+				'selector' => '{{WRAPPER}} .ryv-step-list-marker',
+			)
+		);
+
 		$this->end_controls_section();
 	}
 
@@ -1806,10 +1941,11 @@ class RYV_Widget extends \Elementor\Widget_Base {
 		}
 
 		printf(
-			'<div class="ryv-app-wrapper" data-form-id="%d" data-show-start-over="%d" data-labels="%s" data-entry-node="%s" data-step-mode="%s" data-total-steps="%d" data-question-layout="%s"></div>',
+			'<div class="ryv-app-wrapper" data-form-id="%d" data-show-start-over="%d" data-labels="%s" data-icons="%s" data-entry-node="%s" data-step-mode="%s" data-total-steps="%d" data-question-layout="%s"></div>',
 			absint( $form_id ),
 			$show_start_over ? 1 : 0,
 			esc_attr( wp_json_encode( $this->get_label_overrides() ) ),
+			esc_attr( wp_json_encode( $this->get_icon_overrides() ) ),
 			esc_attr( (string) $entry_node ),
 			esc_attr( $step_mode ),
 			$total_steps,
@@ -1928,6 +2064,59 @@ class RYV_Widget extends \Elementor\Widget_Base {
 			if ( '' !== trim( (string) $value ) ) {
 				$overrides[ $label_key ] = $value;
 			}
+		}
+
+		return $overrides;
+	}
+
+	/**
+	 * Icon overrides for the Continue/Start Over/Retry buttons (the
+	 * `icon_*`/`icon_*_position` controls added in register_label_controls()),
+	 * pre-rendered server-side into `{ html, position }` pairs and printed as
+	 * `data-icons` JSON on `.ryv-app-wrapper` (see render()) - engine.js
+	 * merges them over renderer.js's DEFAULT_ICONS. Rendering here rather
+	 * than shipping the raw Elementor icon value to the frontend keeps the
+	 * decision-engine module free of any Font-Awesome-vs-SVG icon-library
+	 * branching of its own; `Icons_Manager::render_icon()`'s own output is
+	 * the same trust boundary as `node.content` elsewhere in this plugin
+	 * (admin-authored via the widget's own controls, applied via innerHTML).
+	 * A key is only present when that button's Icon control is actually
+	 * set - an absent key means "no icon", not "icon exists but is empty".
+	 *
+	 * @return array<string,array{html:string,position:string}>
+	 */
+	private function get_icon_overrides(): array {
+		if ( ! class_exists( '\Elementor\Icons_Manager' ) ) {
+			return array();
+		}
+
+		$map = array(
+			'continue'  => 'icon_continue',
+			'startOver' => 'icon_start_over',
+			'retry'     => 'icon_retry',
+		);
+
+		$overrides = array();
+
+		foreach ( $map as $label_key => $setting_key ) {
+			$icon = $this->get_settings_for_display( $setting_key );
+			if ( empty( $icon['value'] ) ) {
+				continue;
+			}
+
+			ob_start();
+			\Elementor\Icons_Manager::render_icon( $icon, array( 'aria-hidden' => 'true' ) );
+			$html = trim( (string) ob_get_clean() );
+
+			if ( '' === $html ) {
+				continue;
+			}
+
+			$position               = $this->get_settings_for_display( $setting_key . '_position' );
+			$overrides[ $label_key ] = array(
+				'html'     => $html,
+				'position' => 'before' === $position ? 'before' : 'after',
+			);
 		}
 
 		return $overrides;
