@@ -258,8 +258,20 @@ class RYV_Widget extends \Elementor\Widget_Base {
 	/**
 	 * Chrome text that isn't question content (that already comes from the
 	 * schema) - "Start Over", the loading/error messages, the dropdown
-	 * placeholder. Each defaults to its current hardcoded string (see
-	 * renderer.js's DEFAULT_LABELS) so leaving these blank changes nothing.
+	 * placeholder. Each uses Elementor's own 'default' (not 'placeholder')
+	 * so it round-trips through get_settings_for_display() as real content
+	 * on every render, matching renderer.js's own DEFAULT_LABELS - this is
+	 * deliberate, not cosmetic: WPML's Elementor string translation (see
+	 * wpml-config.xml) only has something to register/translate when a
+	 * control actually *has* a value. A 'placeholder' (the previous
+	 * approach) only ever shows grayed-out hint text in the Elementor
+	 * panel - get_settings_for_display() returns '' for it, so an admin
+	 * who never touched these fields had nothing for WPML to translate at
+	 * all, and a Spanish visitor always saw the English hardcoded default
+	 * regardless of any translation work done. get_label_overrides()
+	 * already only reaches renderer.js's own hardcoded fallback via an
+	 * empty-string check, so this doesn't change that path - every one of
+	 * these is now simply never empty.
 	 */
 	private function register_label_controls() {
 		$this->start_controls_section(
@@ -273,27 +285,27 @@ class RYV_Widget extends \Elementor\Widget_Base {
 		$this->add_control(
 			'label_start_over',
 			array(
-				'label'       => __( '"Start Over" Button', 'ryv-eligibility-tool' ),
-				'type'        => \Elementor\Controls_Manager::TEXT,
-				'placeholder' => __( 'Start Over', 'ryv-eligibility-tool' ),
+				'label'   => __( '"Start Over" Button', 'ryv-eligibility-tool' ),
+				'type'    => \Elementor\Controls_Manager::TEXT,
+				'default' => __( 'Start Over', 'ryv-eligibility-tool' ),
 			)
 		);
 
 		$this->add_control(
 			'label_loading',
 			array(
-				'label'       => __( 'Loading Text', 'ryv-eligibility-tool' ),
-				'type'        => \Elementor\Controls_Manager::TEXT,
-				'placeholder' => __( 'Loading…', 'ryv-eligibility-tool' ),
+				'label'   => __( 'Loading Text', 'ryv-eligibility-tool' ),
+				'type'    => \Elementor\Controls_Manager::TEXT,
+				'default' => __( 'Loading…', 'ryv-eligibility-tool' ),
 			)
 		);
 
 		$this->add_control(
 			'label_retry',
 			array(
-				'label'       => __( 'Retry Button (on error)', 'ryv-eligibility-tool' ),
-				'type'        => \Elementor\Controls_Manager::TEXT,
-				'placeholder' => __( 'Try Again', 'ryv-eligibility-tool' ),
+				'label'   => __( 'Retry Button (on error)', 'ryv-eligibility-tool' ),
+				'type'    => \Elementor\Controls_Manager::TEXT,
+				'default' => __( 'Try Again', 'ryv-eligibility-tool' ),
 			)
 		);
 
@@ -302,7 +314,7 @@ class RYV_Widget extends \Elementor\Widget_Base {
 			array(
 				'label'       => __( 'Dropdown Placeholder', 'ryv-eligibility-tool' ),
 				'type'        => \Elementor\Controls_Manager::TEXT,
-				'placeholder' => __( '— Select —', 'ryv-eligibility-tool' ),
+				'default'     => __( '— Select —', 'ryv-eligibility-tool' ),
 				'description' => __( 'Only used when a picker or question is set to display as a dropdown.', 'ryv-eligibility-tool' ),
 			)
 		);
@@ -678,6 +690,61 @@ class RYV_Widget extends \Elementor\Widget_Base {
 			array(
 				'label' => __( 'Header', 'ryv-eligibility-tool' ),
 				'tab'   => \Elementor\Controls_Manager::TAB_STYLE,
+			)
+		);
+
+		$this->add_control(
+			'header_container_width',
+			array(
+				'label'      => __( 'Container Width', 'ryv-eligibility-tool' ),
+				'type'       => \Elementor\Controls_Manager::SLIDER,
+				'size_units' => array( 'px', '%', 'em' ),
+				'range'      => array(
+					'px' => array(
+						'min' => 100,
+						'max' => 1200,
+					),
+					'%'  => array(
+						'min' => 10,
+						'max' => 100,
+					),
+					'em' => array(
+						'min' => 5,
+						'max' => 80,
+					),
+				),
+				'selectors'  => array(
+					'{{WRAPPER}}' => '--ryv-header-width: {{SIZE}}{{UNIT}};',
+				),
+				'description' => __( 'How wide the title/description block is. Leave blank to keep the default (matches the questionnaire below it).', 'ryv-eligibility-tool' ),
+			)
+		);
+
+		$this->add_control(
+			'header_alignment',
+			array(
+				'label'     => __( 'Alignment', 'ryv-eligibility-tool' ),
+				'type'      => \Elementor\Controls_Manager::CHOOSE,
+				'options'   => array(
+					'left'   => array(
+						'title' => __( 'Left', 'ryv-eligibility-tool' ),
+						'icon'  => 'eicon-text-align-left',
+					),
+					'center' => array(
+						'title' => __( 'Center', 'ryv-eligibility-tool' ),
+						'icon'  => 'eicon-text-align-center',
+					),
+					'right'  => array(
+						'title' => __( 'Right', 'ryv-eligibility-tool' ),
+						'icon'  => 'eicon-text-align-right',
+					),
+				),
+				'default'   => 'center',
+				'toggle'    => false,
+				'selectors' => array(
+					'{{WRAPPER}}' => '--ryv-header-align: {{VALUE}};',
+				),
+				'description' => __( 'Where the header block sits when it\'s narrower than the full width (Container Width above) - matches the current look when left as Center.', 'ryv-eligibility-tool' ),
 			)
 		);
 
@@ -2033,13 +2100,31 @@ class RYV_Widget extends \Elementor\Widget_Base {
 			return;
 		}
 
-		if ( $show_title && '' !== trim( $post->post_title ) ) {
-			printf( '<h2 class="ryv-header-title">%s</h2>', esc_html( $post->post_title ) );
+		$title_html       = ( $show_title && '' !== trim( $post->post_title ) )
+			? sprintf( '<h2 class="ryv-header-title">%s</h2>', esc_html( $post->post_title ) )
+			: '';
+		$description_html = ( $show_description && '' !== trim( $post->post_excerpt ) )
+			? sprintf( '<p class="ryv-header-description">%s</p>', esc_html( $post->post_excerpt ) )
+			: '';
+
+		if ( '' === $title_html && '' === $description_html ) {
+			return;
 		}
 
-		if ( $show_description && '' !== trim( $post->post_excerpt ) ) {
-			printf( '<p class="ryv-header-description">%s</p>', esc_html( $post->post_excerpt ) );
-		}
+		// `.ryv-header-align` (full width, text-align only) wraps
+		// `.ryv-header` (display:inline-block, its own max-width) - the
+		// same trick Elementor's own boxed widgets use to get "a
+		// content-width-capped block, positioned left/center/right within
+		// its full-width parent" out of plain CSS: text-align on a block
+		// parent only repositions an inline-level child, it can't reposition
+		// itself, so the width-constrained box and the alignment context
+		// can't be the same element. See register_header_style_controls()
+		// for the controls that feed --ryv-header-width/-align.
+		printf(
+			'<div class="ryv-header-align"><div class="ryv-header">%s%s</div></div>',
+			$title_html,
+			$description_html
+		);
 	}
 
 	/**

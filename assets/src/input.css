@@ -283,18 +283,35 @@
    * class-ryv-widget.php) - rendered as .ryv-app-wrapper's preceding
    * siblings, not descendants, so their Color/Margin vars are read off
    * {{WRAPPER}} itself rather than `.ryv-app-wrapper` (see
-   * register_header_style_controls()'s docblock for why). Matches
-   * .ryv-app-wrapper's own max-width/centering so an untouched widget's
-   * title/description line up with the questionnaire below them.
+   * register_header_style_controls()'s docblock for why).
+   *
+   * `.ryv-header-align` (full width, text-align only) wraps `.ryv-header`
+   * (display:inline-block, capped by --ryv-header-width) - text-align on a
+   * block parent can only reposition an inline-level child, never itself,
+   * so the width-constrained box and its alignment context can't be the
+   * same element; this is the same technique Elementor's own boxed widgets
+   * use. 36rem/center are the pre-existing defaults (this used to be a
+   * fixed `ryv-max-w-xl ryv-mx-auto` on each of .ryv-header-title/
+   * -description individually), so an untouched widget instance still
+   * lines up with .ryv-app-wrapper's own 36rem default below it.
    */
+  .ryv-header-align {
+    text-align: var(--ryv-header-align, center);
+  }
+
+  .ryv-header {
+    @apply ryv-inline-block ryv-text-left;
+    max-width: var(--ryv-header-width, 36rem);
+  }
+
   .ryv-header-title.ryv-header-title {
-    @apply ryv-max-w-xl ryv-mx-auto ryv-text-xl ryv-font-bold;
+    @apply ryv-text-xl ryv-font-bold;
     color: var(--ryv-header-title-color, var(--ryv-text-color, #1f2937));
     margin-bottom: var(--ryv-header-title-margin-bottom, 1rem);
   }
 
   .ryv-header-description.ryv-header-description {
-    @apply ryv-max-w-xl ryv-mx-auto ryv-leading-relaxed;
+    @apply ryv-leading-relaxed;
     color: var(--ryv-header-description-color, var(--ryv-text-color, #1f2937));
     margin-bottom: var(--ryv-header-description-margin-bottom, 1.5rem);
   }
