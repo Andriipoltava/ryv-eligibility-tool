@@ -82,13 +82,6 @@ final class RYV_Plugin {
 	private $states_cpt = null;
 
 	/**
-	 * Events CPT controller instance.
-	 *
-	 * @var RYV_Events_CPT|null
-	 */
-	private $events_cpt = null;
-
-	/**
 	 * Resources CPT controller instance.
 	 *
 	 * @var RYV_Resources_CPT|null
@@ -156,7 +149,6 @@ final class RYV_Plugin {
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-elementor.php';
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-shortcode.php';
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-states-cpt.php';
-		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-events-cpt.php';
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-resources-cpt.php';
 
 		// ACF + sync only when ACF is available.
@@ -199,7 +191,6 @@ final class RYV_Plugin {
 
 		$this->cpt           = new RYV_CPT();
 		$this->states_cpt    = new RYV_States_CPT();
-		$this->events_cpt    = new RYV_Events_CPT();
 		$this->resources_cpt = new RYV_Resources_CPT();
 		new RYV_API();
 		new RYV_Admin_API();
@@ -260,10 +251,6 @@ final class RYV_Plugin {
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-states-cpt.php';
 		$states_cpt = new RYV_States_CPT();
 		$states_cpt->register_post_type();
-
-		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-events-cpt.php';
-		$events_cpt = new RYV_Events_CPT();
-		$events_cpt->register_post_type();
 
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-resources-cpt.php';
 		$resources_cpt = new RYV_Resources_CPT();

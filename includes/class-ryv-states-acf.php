@@ -507,7 +507,14 @@ class RYV_States_ACF {
 	}
 
 	/**
-	 * Events — relationship field linking to ryv_events CPT.
+	 * Events — relationship field linking to The Events Calendar's
+	 * `tribe_events` CPT. Previously pointed at this plugin's own
+	 * `ryv_events` CPT (RYV_Events_CPT, now removed) - event management
+	 * moved to The Events Calendar so this plugin doesn't duplicate a
+	 * generic events feature. `tribe_events` isn't registered at all until
+	 * that plugin is active, so this field's picker is simply empty on a
+	 * site without it - same degrade-gracefully behavior as any other ACF
+	 * relationship field pointed at an inactive post type.
 	 */
 	private function register_events_group() {
 		acf_add_local_field_group( array(
@@ -519,12 +526,12 @@ class RYV_States_ACF {
 					'label'         => 'Events',
 					'name'          => 'ryv_events',
 					'type'          => 'relationship',
-					'post_type'     => array( RYV_Events_CPT::POST_TYPE ),
+					'post_type'     => array( 'tribe_events' ),
 					'filters'       => array( 'search' ),
 					'return_format' => 'id',
 					'min'           => 0,
 					'max'           => '',
-					'instructions'  => 'Select events connected to this state. Events are managed in the separate Events post type.',
+					'instructions'  => 'Select events connected to this state. Events are managed by The Events Calendar.',
 				),
 			),
 			'location' => array(
