@@ -405,29 +405,6 @@
     @apply ryv-opacity-40 ryv-cursor-not-allowed;
   }
 
-  /*
-   * Continue/Start Over/Retry buttons' Icon control (widget's
-   * register_button_icon_controls(), see renderer.js's buttonChildren()) -
-   * a button with no icon set renders only `.ryv-btn-text`, so this gap has
-   * nothing to space out and stays a no-op for every button that hasn't
-   * opted in. `.ryv-btn-icon` covers both icon libraries Elementor's Icon
-   * control can produce: an `<i>` (Font Awesome, sized by font-size) or an
-   * inline `<svg>` upload (sized explicitly here since it has no font-size
-   * to inherit).
-   */
-  .ryv-continue-btn.ryv-continue-btn {
-    gap: 0.5em !important;
-  }
-  .ryv-btn-icon {
-    @apply ryv-inline-flex ryv-items-center ryv-shrink-0;
-    line-height: 1;
-  }
-  .ryv-btn-icon svg {
-    width: 1em;
-    height: 1em;
-    fill: currentColor;
-  }
-
   .ryv-input.ryv-input {
     @apply ryv-w-full ryv-mb-4;
     max-width: var(--ryv-input-max-width, none);

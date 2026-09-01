@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	Read by WPML on plugin activation / Settings > Multilingual Content Setup
+	scan. Declares two things:
+
+	1. `ryv_states` and `ryv_forms` as translatable post types, so a fresh
+	   install doesn't need an admin to hand-flip "Translatable" for them
+	   under WPML > Settings > Post Types Translation.
+
+	   ACF field-level translation modes (which ryv_states/ryv_forms fields
+	   get copied vs. translated per-language) are deliberately NOT set
+	   here - ACFML (Advanced Custom Fields Multilingual) exposes those as
+	   a per-field UI once the post type itself is translatable, and this
+	   site configures them there rather than baking defaults into this
+	   file that would only get in the way of that admin UI.
+
+	2. The free-text Content-tab controls on RYV's two Elementor widgets
+	   (widgets/class-ryv-widget.php, widgets/class-ryv-map-widget.php) as
+	   translatable strings, so WPML's Advanced Translation Editor picks
+	   them up per-widget-instance - these are literally-typed labels an
+	   admin fills in per placement (button/loading/placeholder text,
+	   map heading/description/legend/picker copy), not content that lives
+	   in a CPT. Every other control on these widgets is a Style-tab
+	   value, a boolean switcher, or a technical id (`map_id`,
+	   `selected_region`, `form_id`) - deliberately left out, since none of
+	   those should ever differ per language.
+-->
+<wpml-config>
+	<custom-types>
+		<custom-type translate="1">ryv_states</custom-type>
+		<custom-type translate="1">ryv_forms</custom-type>
+	</custom-types>
+	<elementor-widgets>
+		<widget name="ryv_eligibility_tool">
+			<fields>
+				<field editor_type="LINE">label_start_over</field>
+				<field editor_type="LINE">label_loading</field>
+				<field editor_type="LINE">label_retry</field>
+				<field editor_type="LINE">label_select_placeholder</field>
+			</fields>
+		</widget>
+		<widget name="ryv_state_map">
+			<fields>
+				<field editor_type="LINE">heading_text</field>
+				<field editor_type="AREA">description_text</field>
+				<field editor_type="LINE">legend_title</field>
+				<field editor_type="LINE">picker_label</field>
+				<field editor_type="LINE">picker_placeholder</field>
+			</fields>
+		</widget>
+	</elementor-widgets>
+</wpml-config>

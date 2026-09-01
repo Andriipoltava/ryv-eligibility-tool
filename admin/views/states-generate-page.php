@@ -1,0 +1,184 @@
+<?php
+/**
+ * View: Generate States admin page.
+ *
+ * Expects $result (array|null), $sync_result (array|null),
+ * $autopop_result (array|null), and $forms (WP_Post[]) from
+ * RYV_States_Generate_Page::render_page().
+ *
+ * @package RYV_Eligibility_Tool
+ */
+
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+?>
+<div class="wrap">
+	<h1><?php esc_html_e( 'Generate States', 'ryv-eligibility-tool' ); ?></h1>
+	<p><?php esc_html_e( 'Reads a form\'s state picker (its entry node) and creates one State post per option that doesn\'t already have one - matched by state slug, so states already created from this or any other form (e.g. a translated version of the same questionnaire) are never duplicated.', 'ryv-eligibility-tool' ); ?></p>
+
+	<?php if ( $result ) : ?>
+		<?php if ( ! empty( $result['success'] ) ) : ?>
+			<div class="notice notice-success is-dismissible">
+				<p>
+					<?php
+					printf(
+						/* translators: 1: created count, 2: skipped count */
+						esc_html__( 'Created %1$d state(s), skipped %2$d already-existing state(s).', 'ryv-eligibility-tool' ),
+						count( $result['created'] ),
+						count( $result['skipped'] )
+					);
+					?>
+				</p>
+			</div>
+
+			<?php if ( ! empty( $result['errors'] ) ) : ?>
+				<div class="notice notice-error" style="margin-top: 0;">
+					<p><strong><?php esc_html_e( 'Errors:', 'ryv-eligibility-tool' ); ?></strong></p>
+					<ul style="list-style: disc; margin-left: 1.5em;">
+						<?php foreach ( $result['errors'] as $error ) : ?>
+							<li><?php echo esc_html( $error ); ?></li>
+						<?php endforeach; ?>
+					</ul>
+				</div>
+			<?php endif; ?>
+
+			<?php if ( ! empty( $result['created'] ) ) : ?>
+				<h2><?php esc_html_e( 'Created', 'ryv-eligibility-tool' ); ?></h2>
+				<table class="widefat striped" style="max-width: 600px;">
+					<thead>
+						<tr>
+							<th><?php esc_html_e( 'State', 'ryv-eligibility-tool' ); ?></th>
+							<th><?php esc_html_e( 'Slug', 'ryv-eligibility-tool' ); ?></th>
+							<th><?php esc_html_e( 'Post', 'ryv-eligibility-tool' ); ?></th>
+						</tr>
+					</thead>
+					<tbody>
+						<?php foreach ( $result['created'] as $row ) : ?>
+							<tr>
+								<td><?php echo esc_html( $row['label'] ); ?></td>
+								<td><code><?php echo esc_html( $row['slug'] ); ?></code></td>
+								<td><a href="<?php echo esc_url( get_edit_post_link( $row['post_id'] ) ); ?>">#<?php echo esc_html( $row['post_id'] ); ?></a></td>
+							</tr>
+						<?php endforeach; ?>
+					</tbody>
+				</table>
+			<?php endif; ?>
+
+			<?php if ( ! empty( $result['skipped'] ) ) : ?>
+				<h2><?php esc_html_e( 'Skipped (already exist)', 'ryv-eligibility-tool' ); ?></h2>
+				<table class="widefat striped" style="max-width: 600px;">
+					<thead>
+						<tr>
+							<th><?php esc_html_e( 'State', 'ryv-eligibility-tool' ); ?></th>
+							<th><?php esc_html_e( 'Slug', 'ryv-eligibility-tool' ); ?></th>
+							<th><?php esc_html_e( 'Existing post', 'ryv-eligibility-tool' ); ?></th>
+						</tr>
+					</thead>
+					<tbody>
+						<?php foreach ( $result['skipped'] as $row ) : ?>
+							<tr>
+								<td><?php echo esc_html( $row['label'] ); ?></td>
+								<td><code><?php echo esc_html( $row['slug'] ); ?></code></td>
+								<td><a href="<?php echo esc_url( get_edit_post_link( $row['existing_post_id'] ) ); ?>">#<?php echo esc_html( $row['existing_post_id'] ); ?></a></td>
+							</tr>
+						<?php endforeach; ?>
+					</tbody>
+				</table>
+			<?php endif; ?>
+		<?php else : ?>
+			<div class="notice notice-error is-dismissible">
+				<p><?php echo esc_html( $result['message'] ); ?></p>
+			</div>
+		<?php endif; ?>
+	<?php endif; ?>
+
+	<form method="post" action="">
+		<?php wp_nonce_field( RYV_States_Generate_Page::NONCE_ACTION, 'ryv_generate_states_nonce' ); ?>
+
+		<table class="form-table" role="presentation">
+			<tr>
+				<th scope="row"><label for="ryv_generate_form_id"><?php esc_html_e( 'Form', 'ryv-eligibility-tool' ); ?></label></th>
+				<td>
+					<select name="ryv_generate_form_id" id="ryv_generate_form_id" required>
+						<option value=""><?php esc_html_e( '- Select a form -', 'ryv-eligibility-tool' ); ?></option>
+						<?php foreach ( $forms as $form ) : ?>
+							<option value="<?php echo esc_attr( $form->ID ); ?>">
+								<?php echo esc_html( $form->post_title ); ?> (#<?php echo esc_html( $form->ID ); ?>)
+							</option>
+						<?php endforeach; ?>
+					</select>
+					<p class="description"><?php esc_html_e( 'The form\'s entry node (its state picker) is read to find every state to generate.', 'ryv-eligibility-tool' ); ?></p>
+				</td>
+			</tr>
+			<tr>
+				<th scope="row"><?php esc_html_e( 'New post status', 'ryv-eligibility-tool' ); ?></th>
+				<td>
+					<label>
+						<input type="radio" name="ryv_generate_status" value="draft" checked />
+						<?php esc_html_e( 'Draft (review before publishing)', 'ryv-eligibility-tool' ); ?>
+					</label>
+					<br />
+					<label>
+						<input type="radio" name="ryv_generate_status" value="publish" />
+						<?php esc_html_e( 'Publish immediately', 'ryv-eligibility-tool' ); ?>
+					</label>
+				</td>
+			</tr>
+		</table>
+
+		<?php submit_button( __( 'Generate States', 'ryv-eligibility-tool' ), 'primary', 'ryv_generate_states_submit' ); ?>
+	</form>
+
+	<hr />
+
+	<h2><?php esc_html_e( 'Sync Category Colors to Map', 'ryv-eligibility-tool' ); ?></h2>
+	<p><?php esc_html_e( 'Pushes every published state\'s Map Category (color/tooltip/mixed-rules) into the MapSVG regions table. Needed once for any state whose category was set outside a normal wp-admin Save (e.g. a bulk import) - editing a state\'s Map Category in the States screen itself already syncs automatically on save.', 'ryv-eligibility-tool' ); ?></p>
+
+	<?php if ( $sync_result ) : ?>
+		<?php if ( ! empty( $sync_result['success'] ) ) : ?>
+			<div class="notice notice-success is-dismissible">
+				<p>
+					<?php
+					printf(
+						/* translators: %d: number of states synced */
+						esc_html__( 'Synced %d state(s) to the map.', 'ryv-eligibility-tool' ),
+						(int) $sync_result['count']
+					);
+					?>
+				</p>
+			</div>
+		<?php else : ?>
+			<div class="notice notice-error is-dismissible">
+				<p><?php echo esc_html( $sync_result['message'] ); ?></p>
+			</div>
+		<?php endif; ?>
+	<?php endif; ?>
+
+	<form method="post" action="">
+		<?php wp_nonce_field( RYV_States_Generate_Page::SYNC_NONCE_ACTION, 'ryv_sync_map_nonce' ); ?>
+		<?php submit_button( __( 'Sync Category Colors to Map', 'ryv-eligibility-tool' ), 'secondary', 'ryv_sync_map_submit' ); ?>
+	</form>
+
+	<hr />
+
+	<h2><?php esc_html_e( 'Auto-Populate Map Categories', 'ryv-eligibility-tool' ); ?></h2>
+	<p><?php esc_html_e( 'Resets the map\'s 8 categories to the CLC reference colors/labels, re-assigns every matching state\'s category from the CLC reference map (overriding any manual edit), and syncs the result to MapSVG - one click instead of a manual DB edit per state. This also runs automatically once in the background the next time any wp-admin page loads.', 'ryv-eligibility-tool' ); ?></p>
+
+	<?php if ( $autopop_result ) : ?>
+		<?php if ( ! empty( $autopop_result['success'] ) ) : ?>
+			<div class="notice notice-success is-dismissible">
+				<p><?php esc_html_e( 'Map categories and state assignments reset to the CLC reference defaults and synced to the map.', 'ryv-eligibility-tool' ); ?></p>
+			</div>
+		<?php else : ?>
+			<div class="notice notice-error is-dismissible">
+				<p><?php echo esc_html( $autopop_result['message'] ); ?></p>
+			</div>
+		<?php endif; ?>
+	<?php endif; ?>
+
+	<form method="post" action="">
+		<?php wp_nonce_field( RYV_States_Generate_Page::AUTOPOP_NONCE_ACTION, 'ryv_autopopulate_map_nonce' ); ?>
+		<?php submit_button( __( 'Auto-Populate Map Categories', 'ryv-eligibility-tool' ), 'secondary', 'ryv_autopopulate_map_submit' ); ?>
+	</form>
+</div>

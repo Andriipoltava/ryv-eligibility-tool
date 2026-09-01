@@ -24,11 +24,49 @@ if ( ! defined( 'ABSPATH' ) ) {
 class RYV_States_ACF {
 
 	/**
+	 * The 8 CLC-reference-map categories (slug/label/color/order) - the one
+	 * canonical source both the options-page field's own default_value and
+	 * maybe_seed_map_defaults()'s self-healing reconcile pull from, so the
+	 * two can never drift apart.
+	 */
+	const DEFAULT_MAP_CATEGORIES = array(
+		array( 'slug' => 'no-restrictions', 'label' => 'No Restrictions', 'color' => '#cfe7f5', 'order' => 1 ),
+		array( 'slug' => 'prison-only', 'label' => 'Prison Only', 'color' => '#87b7cd', 'order' => 2 ),
+		array( 'slug' => 'prison-parole-probation', 'label' => 'Prison, Parole, & Probation', 'color' => '#1b7a9e', 'order' => 3 ),
+		array( 'slug' => 'prison-parole-probation-lfos', 'label' => 'Prison, Parole, & Probation, & LFOs', 'color' => '#1257a5', 'order' => 4 ),
+		array( 'slug' => 'completion-plus-requirements', 'label' => 'Completion of Sentence Plus Additional Requirements', 'color' => '#0a2a43', 'order' => 5 ),
+		array( 'slug' => 'permanent-multiple-felonies', 'label' => 'Permanent Disenfranchisement for Multiple Felonies', 'color' => '#f7c0a5', 'order' => 6 ),
+		array( 'slug' => 'streamlined-executive-restoration', 'label' => 'Streamlined Executive Restoration', 'color' => '#e8431f', 'order' => 7 ),
+		array( 'slug' => 'permanent-disenfranchisement', 'label' => 'Permanent Disenfranchisement', 'color' => '#8c2a15', 'order' => 8 ),
+	);
+
+	/**
+	 * Bump whenever DEFAULT_MAP_CATEGORIES or RYV_States_Generator's CLC
+	 * state-assignment tables change, so an already-provisioned site
+	 * self-heals (wrong category color, a fixed label typo, a newly added
+	 * state left uncategorized) the next time wp-admin loads, instead of a
+	 * fresh install being the only case that ever gets seeded.
+	 *
+	 * NOTE: this alone does NOT re-categorize a state that already has a
+	 * `ryv_map_category` set - assign_default_map_categories() only fills
+	 * in states with no category yet, to avoid clobbering an admin's manual
+	 * override (see its own docblock). A correction to which category an
+	 * already-assigned state belongs in (as opposed to a category's own
+	 * color/label) needs the "Auto-Populate Map Categories" admin button
+	 * (force=true) or a one-off `assign_default_map_categories( true )`
+	 * call to actually take effect on a site that was seeded before the
+	 * correction.
+	 */
+	const MAP_DEFAULTS_VERSION = 4;
+
+	/**
 	 * Constructor.
 	 */
 	public function __construct() {
 		add_action( 'acf/init', array( $this, 'register_field_groups' ) );
+		add_action( 'acf/init', array( $this, 'register_options_pages' ) );
 		add_filter( 'acf/load_field/name=ryv_state_slug', array( $this, 'populate_state_slug_choices' ) );
+		add_filter( 'acf/load_field/name=ryv_map_category', array( $this, 'populate_map_category_choices' ) );
 	}
 
 	/**
@@ -104,12 +142,22 @@ class RYV_States_ACF {
 			'title'  => 'Map Settings',
 			'fields' => array(
 				array(
+					'key'           => 'field_ryv_map_category',
+					'label'         => 'Map Category',
+					'name'          => 'ryv_map_category',
+					'type'          => 'select',
+					'choices'       => array(), // Populated dynamically from Options page.
+					'ui'            => 1,
+					'allow_null'    => 1,
+					'instructions'  => 'Determines the fill color on the state map. Categories are managed under RYV States → Map Settings.',
+				),
+				array(
 					'key'          => 'field_ryv_map_tooltip_text',
 					'label'        => 'Map Tooltip Text',
 					'name'         => 'ryv_map_tooltip_text',
 					'type'         => 'textarea',
 					'rows'         => 4,
-					'instructions' => 'Shown on hover over the state on the map.',
+					'instructions' => 'Short 1–2 sentence summary shown on hover over the state on the map.',
 				),
 				array(
 					'key'           => 'field_ryv_map_mixed_rules',
@@ -122,7 +170,7 @@ class RYV_States_ACF {
 					),
 					'default_value' => '0',
 					'allow_null'    => 0,
-					'instructions'  => 'If yes, the state will display with a striped pattern on the map.',
+					'instructions'  => 'If yes, the state will display with a diagonal striped pattern overlay on the map.',
 				),
 			),
 			'location' => array(
@@ -796,6 +844,245 @@ class RYV_States_ACF {
 			'menu_order' => 10,
 			'style'      => 'default',
 		) );
+	}
+
+	/**
+	 * Register the "Map Settings" ACF options sub-page under the RYV States menu.
+	 *
+	 * Contains a repeater of map categories (slug, label, hex color) that
+	 * drive the legend and per-state fill color on the interactive map.
+	 */
+	public function register_options_pages() {
+		if ( ! function_exists( 'acf_add_options_sub_page' ) ) {
+			return;
+		}
+
+		acf_add_options_sub_page( array(
+			'page_title'  => __( 'Map Settings', 'ryv-eligibility-tool' ),
+			'menu_title'  => __( 'Map Settings', 'ryv-eligibility-tool' ),
+			'menu_slug'   => 'ryv-map-settings',
+			'parent_slug' => 'edit.php?post_type=' . RYV_States_CPT::POST_TYPE,
+			'capability'  => 'manage_options',
+		) );
+
+		acf_add_local_field_group( array(
+			'key'    => 'group_ryv_map_options',
+			'title'  => 'Map Categories',
+			'fields' => array(
+				array(
+					'key'          => 'field_ryv_map_id',
+					'label'        => 'MapSVG Map ID',
+					'name'         => 'ryv_mapsvg_map_id',
+					'type'         => 'number',
+					'default_value' => 1,
+					'instructions' => 'The MapSVG map ID to sync region data to. Find it in the MapSVG admin URL: map_id=X.',
+				),
+				array(
+					'key'          => 'field_ryv_map_categories',
+					'label'        => 'Categories',
+					'name'         => 'ryv_map_categories',
+					'type'         => 'repeater',
+					'layout'       => 'table',
+					'button_label' => 'Add Category',
+					'min'          => 1,
+					/*
+					 * The 8 CLC-reference-map categories, so a fresh install
+					 * (or a repeater reset back to empty) starts with the
+					 * real category set rather than one blank row. This is
+					 * an ACF *default value* - it only applies while the
+					 * option has never been explicitly saved; it is not
+					 * re-applied over an admin's own edits. See
+					 * maybe_seed_map_defaults() for the self-healing path
+					 * that also reconciles this into an already-provisioned
+					 * site's saved option value.
+					 */
+					'default_value' => self::DEFAULT_MAP_CATEGORIES,
+					'instructions' => 'Define the categories shown in the map legend. The slug is used internally; the label is shown to visitors.',
+					'sub_fields'   => array(
+						array(
+							'key'     => 'field_ryv_map_cat_slug',
+							'label'   => 'Slug',
+							'name'    => 'slug',
+							'type'    => 'text',
+							'wrapper' => array( 'width' => '25' ),
+							'instructions' => 'Unique identifier, e.g. "no-restrictions"',
+						),
+						array(
+							'key'     => 'field_ryv_map_cat_label',
+							'label'   => 'Label',
+							'name'    => 'label',
+							'type'    => 'text',
+							'wrapper' => array( 'width' => '35' ),
+							'instructions' => 'Display name in the legend',
+						),
+						array(
+							'key'           => 'field_ryv_map_cat_color',
+							'label'         => 'Color',
+							'name'          => 'color',
+							'type'          => 'color_picker',
+							'default_value' => '#cccccc',
+							'wrapper'       => array( 'width' => '20' ),
+						),
+						array(
+							'key'           => 'field_ryv_map_cat_order',
+							'label'         => 'Order',
+							'name'          => 'order',
+							'type'          => 'number',
+							'default_value' => 0,
+							'wrapper'       => array( 'width' => '20' ),
+							'instructions'  => 'Legend display order (lower = first)',
+						),
+					),
+				),
+			),
+			'location' => array(
+				array(
+					array(
+						'param'    => 'options_page',
+						'operator' => '==',
+						'value'    => 'ryv-map-settings',
+					),
+				),
+			),
+			'style' => 'default',
+		) );
+	}
+
+	/**
+	 * One-shot (per MAP_DEFAULTS_VERSION bump) reconciliation: makes sure
+	 * the map's 8 canonical categories exist with the right color/label,
+	 * every ryv_states post matching RYV_States_Generator's CLC reference
+	 * table has a category assigned, and MapSVG is synced to match - so
+	 * getting the map into its correct state is a function that runs
+	 * itself on the next wp-admin load rather than a one-off WP-CLI/DB task
+	 * someone has to remember to run.
+	 *
+	 * Hooked on `admin_init` (see RYV_Plugin::init_hooks()). Safe to run on
+	 * every request: the version-option guard makes it a single
+	 * get_option() read once caught up.
+	 *
+	 * @param bool $force Bypass the version guard and reconcile/re-sync
+	 *                     regardless - used by the manual "Auto-Populate
+	 *                     Map Categories" admin button.
+	 */
+	public static function maybe_seed_map_defaults( bool $force = false ) {
+		if ( ! $force && (int) get_option( 'ryv_map_defaults_version', 0 ) >= self::MAP_DEFAULTS_VERSION ) {
+			return;
+		}
+
+		self::reconcile_map_categories();
+
+		if ( class_exists( 'RYV_States_Generator' ) ) {
+			RYV_States_Generator::assign_default_map_categories( $force );
+		}
+
+		if ( class_exists( 'RYV_MapSVG_Sync' ) ) {
+			RYV_MapSVG_Sync::sync_all();
+		}
+
+		update_option( 'ryv_map_defaults_version', self::MAP_DEFAULTS_VERSION );
+	}
+
+	/**
+	 * Upsert DEFAULT_MAP_CATEGORIES into the options-page repeater by slug.
+	 * The 8 canonical categories always get their color/label/order
+	 * corrected - they're a fixed design system, not admin-editable content
+	 * - while any *extra* category an admin added on top (a non-canonical
+	 * slug) is left untouched.
+	 */
+	private static function reconcile_map_categories() {
+		$existing = get_field( 'ryv_map_categories', 'option' );
+		$existing = is_array( $existing ) ? $existing : array();
+
+		$by_slug = array();
+		foreach ( $existing as $row ) {
+			$slug = $row['slug'] ?? '';
+			if ( '' !== $slug ) {
+				$by_slug[ $slug ] = $row;
+			}
+		}
+
+		foreach ( self::DEFAULT_MAP_CATEGORIES as $canonical ) {
+			$by_slug[ $canonical['slug'] ] = $canonical;
+		}
+
+		update_field( 'field_ryv_map_categories', array_values( $by_slug ), 'option' );
+
+		if ( ! get_field( 'ryv_mapsvg_map_id', 'option' ) ) {
+			update_field( 'field_ryv_map_id', 1, 'option' );
+		}
+	}
+
+	/**
+	 * Retrieve all map categories from the Options page.
+	 *
+	 * @return array[] Each entry has keys: slug, label, color, order.
+	 */
+	public static function get_map_categories(): array {
+		$rows = get_field( 'ryv_map_categories', 'option' );
+
+		if ( ! is_array( $rows ) || empty( $rows ) ) {
+			return array();
+		}
+
+		// Sort by order field.
+		usort( $rows, function ( $a, $b ) {
+			return ( (int) ( $a['order'] ?? 0 ) ) - ( (int) ( $b['order'] ?? 0 ) );
+		} );
+
+		return $rows;
+	}
+
+	/**
+	 * Get the hex color for a given map category slug.
+	 *
+	 * @param string $category_slug Category slug.
+	 * @return string|null Hex color or null.
+	 */
+	public static function get_category_color( string $category_slug ): ?string {
+		foreach ( self::get_map_categories() as $cat ) {
+			if ( ( $cat['slug'] ?? '' ) === $category_slug ) {
+				return $cat['color'] ?? null;
+			}
+		}
+		return null;
+	}
+
+	/**
+	 * Get the display label for a given map category slug.
+	 *
+	 * @param string $category_slug Category slug.
+	 * @return string|null Label or null.
+	 */
+	public static function get_category_label( string $category_slug ): ?string {
+		foreach ( self::get_map_categories() as $cat ) {
+			if ( ( $cat['slug'] ?? '' ) === $category_slug ) {
+				return $cat['label'] ?? null;
+			}
+		}
+		return null;
+	}
+
+	/**
+	 * Dynamically populate the map category select with values from
+	 * the Options page repeater.
+	 *
+	 * @param array $field ACF field definition.
+	 * @return array
+	 */
+	public function populate_map_category_choices( array $field ): array {
+		$field['choices'] = array();
+
+		foreach ( self::get_map_categories() as $cat ) {
+			$slug  = $cat['slug'] ?? '';
+			$label = $cat['label'] ?? $slug;
+
+			if ( $slug ) {
+				$field['choices'][ $slug ] = $label;
+			}
+		}
+
+		return $field;
 	}
 
 	/**

@@ -163,6 +163,8 @@ final class RYV_Plugin {
 		if ( class_exists( 'ACF' ) ) {
 			require_once RYV_PLUGIN_DIR . 'includes/class-ryv-states-acf.php';
 			require_once RYV_PLUGIN_DIR . 'includes/class-ryv-states-sync.php';
+			require_once RYV_PLUGIN_DIR . 'includes/class-ryv-mapsvg-sync.php';
+			require_once RYV_PLUGIN_DIR . 'includes/class-ryv-states-generator.php';
 		}
 
 		// Not is_admin()-gated like the other admin/*-page.php controllers
@@ -179,6 +181,10 @@ final class RYV_Plugin {
 			require_once RYV_PLUGIN_DIR . 'admin/class-ryv-submissions-page.php';
 			require_once RYV_PLUGIN_DIR . 'admin/class-ryv-shortcode-hint.php';
 			require_once RYV_PLUGIN_DIR . 'admin/class-ryv-help-page.php';
+
+			if ( class_exists( 'ACF' ) ) {
+				require_once RYV_PLUGIN_DIR . 'admin/class-ryv-states-generate-page.php';
+			}
 		}
 	}
 
@@ -205,6 +211,12 @@ final class RYV_Plugin {
 		if ( class_exists( 'ACF' ) ) {
 			new RYV_States_ACF();
 			new RYV_States_Sync();
+			new RYV_MapSVG_Sync();
+
+			// Self-healing: makes sure the map's 8 canonical categories and
+			// each state's CLC-reference category are populated/correct
+			// without a manual WP-CLI/DB step - see its own docblock.
+			add_action( 'admin_init', array( 'RYV_States_ACF', 'maybe_seed_map_defaults' ) );
 		}
 
 		if ( is_admin() ) {
@@ -215,6 +227,10 @@ final class RYV_Plugin {
 			$this->submissions_page = new RYV_Submissions_Page();
 			new RYV_Shortcode_Hint();
 			$this->help_page = new RYV_Help_Page();
+
+			if ( class_exists( 'ACF' ) ) {
+				new RYV_States_Generate_Page();
+			}
 		}
 	}
 

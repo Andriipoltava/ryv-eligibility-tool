@@ -46,5 +46,8 @@ class RYV_Elementor {
 	public function register_widgets( $widgets_manager ) {
 		require_once RYV_PLUGIN_DIR . 'widgets/class-ryv-widget.php';
 		$widgets_manager->register( new RYV_Widget() );
+
+		require_once RYV_PLUGIN_DIR . 'widgets/class-ryv-map-widget.php';
+		$widgets_manager->register( new RYV_Map_Widget() );
 	}
 }
