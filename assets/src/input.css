@@ -127,22 +127,35 @@
     gap: 0.75rem;
     color: var(--ryv-secondary-color, #64748b);
   }
+  /*
+   * "Done" (completed, filled circle + checkmark) and "current" (the step
+   * the visitor is on right now - outline + text only, never filled) are
+   * deliberately distinct states with their own color + hover controls
+   * (see widgets/class-ryv-widget.php's register_step_sidebar_style_
+   * controls()) - a visitor can tell at a glance which steps are behind
+   * them vs. where they are now. Both are clickable (renderer.js's
+   * updateStepSidebar()): a done step's click revisits it, a current
+   * step's click just re-lands on the same card - harmless, and it means
+   * neither state looks inert on hover. Upcoming (neither done nor
+   * current) entries have no click handler and keep the plain --ryv-step-
+   * sidebar-marker-color outline from .ryv-step-list-marker below.
+   */
+  .ryv-step-list-item.is-done,
+  .ryv-step-list-item.is-active {
+    cursor: pointer;
+  }
   .ryv-step-list-item.is-active {
     @apply ryv-font-semibold;
-    color: var(--ryv-step-sidebar-active-color, var(--ryv-primary-color, #002a41));
-  }
-  /*
-   * A done step (renderer.js's updateStepSidebar()) is the only clickable
-   * entry - clicking it calls engine.js's goToStep() to revisit that step
-   * (wizard layout) or scroll to it (stacked layout, where it's already
-   * on screen). Active/upcoming entries have no click handler at all.
-   */
-  .ryv-step-list-item.is-done {
-    cursor: pointer;
+    color: var(--ryv-step-sidebar-current-color, var(--ryv-step-sidebar-active-color, var(--ryv-primary-color, #002a41)));
   }
   .ryv-step-list-item.is-done:hover,
   .ryv-step-list-item.is-done:focus-visible {
-    color: var(--ryv-step-sidebar-active-color, var(--ryv-primary-color, #002a41));
+    color: var(--ryv-step-sidebar-active-hover-color, var(--ryv-step-sidebar-active-color, var(--ryv-primary-color, #002a41)));
+    outline: none;
+  }
+  .ryv-step-list-item.is-active:hover,
+  .ryv-step-list-item.is-active:focus-visible {
+    color: var(--ryv-step-sidebar-current-hover-color, var(--ryv-step-sidebar-current-color, var(--ryv-step-sidebar-active-color, var(--ryv-primary-color, #002a41))));
     outline: none;
   }
 
@@ -161,10 +174,19 @@
     border-color: var(--ryv-step-sidebar-active-color, var(--ryv-primary-color, #002a41));
     color: #fff;
   }
+  .ryv-step-list-item.is-done:hover .ryv-step-list-marker,
+  .ryv-step-list-item.is-done:focus-visible .ryv-step-list-marker {
+    background-color: var(--ryv-step-sidebar-active-hover-color, var(--ryv-step-sidebar-active-color, var(--ryv-primary-color, #002a41)));
+    border-color: var(--ryv-step-sidebar-active-hover-color, var(--ryv-step-sidebar-active-color, var(--ryv-primary-color, #002a41)));
+  }
   .ryv-step-list-item.is-active .ryv-step-list-marker {
-    background-color: var(--ryv-step-sidebar-active-color, var(--ryv-primary-color, #002a41));
-    border-color: var(--ryv-step-sidebar-active-color, var(--ryv-primary-color, #002a41));
-    color: #fff;
+    border-color: var(--ryv-step-sidebar-current-color, var(--ryv-step-sidebar-active-color, var(--ryv-primary-color, #002a41)));
+    color: var(--ryv-step-sidebar-current-color, var(--ryv-step-sidebar-active-color, var(--ryv-primary-color, #002a41)));
+  }
+  .ryv-step-list-item.is-active:hover .ryv-step-list-marker,
+  .ryv-step-list-item.is-active:focus-visible .ryv-step-list-marker {
+    border-color: var(--ryv-step-sidebar-current-hover-color, var(--ryv-step-sidebar-current-color, var(--ryv-step-sidebar-active-color, var(--ryv-primary-color, #002a41))));
+    color: var(--ryv-step-sidebar-current-hover-color, var(--ryv-step-sidebar-current-color, var(--ryv-step-sidebar-active-color, var(--ryv-primary-color, #002a41))));
   }
 
   /*

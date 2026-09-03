@@ -8,7 +8,7 @@
 // (same rule as ryv-eligibility-tool.php's own version comment), or edits
 // to engine.js/renderer.js/api-client.js can silently fail to reach anyone
 // who already loaded the form once.
-import { initAll } from './src/engine.js?ver=0.8.31';
+import { initAll } from './src/engine.js?ver=0.8.37';
 
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => initAll());

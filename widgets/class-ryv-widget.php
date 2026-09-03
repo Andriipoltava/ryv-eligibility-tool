@@ -1845,14 +1845,65 @@ class RYV_Widget extends \Elementor\Widget_Base {
 			)
 		);
 
+		// Renamed from "Active Step Color" - despite the name, this control
+		// (`--ryv-step-sidebar-active-color`) has always driven the *done*
+		// (completed, filled-circle-with-checkmark) steps' color, not the
+		// one the visitor is currently on - see the four new controls
+		// below for that. The control id/CSS var are unchanged so existing
+		// saved values on live widget instances keep working; only the
+		// label changed, to stop it being mistaken for "the currently
+		// active step's color".
 		$this->add_control(
 			'step_sidebar_active_color',
 			array(
-				'label'       => __( 'Active Step Color', 'ryv-eligibility-tool' ),
+				'label'       => __( 'Done Step Color', 'ryv-eligibility-tool' ),
 				'type'        => \Elementor\Controls_Manager::COLOR,
-				'description' => __( 'Leave blank to use the widget\'s Primary Color.', 'ryv-eligibility-tool' ),
+				'description' => __( 'Completed (checkmark) steps. Leave blank to use the widget\'s Primary Color.', 'ryv-eligibility-tool' ),
 				'selectors'   => array(
-					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-step-sidebar-active-color: {{VALUE}};',
+					'{{WRAPPER}}' => '--ryv-step-sidebar-active-color: {{VALUE}};',
+				),
+			)
+		);
+
+		$this->add_control(
+			'step_sidebar_active_hover_color',
+			array(
+				'label'       => __( 'Done Step Hover Color', 'ryv-eligibility-tool' ),
+				'type'        => \Elementor\Controls_Manager::COLOR,
+				'description' => __( 'Completed steps are clickable (jump back to revisit). Leave blank to use Done Step Color.', 'ryv-eligibility-tool' ),
+				'selectors'   => array(
+					'{{WRAPPER}}' => '--ryv-step-sidebar-active-hover-color: {{VALUE}};',
+				),
+			)
+		);
+
+		// The step the visitor is currently on - a distinct, unfilled
+		// (outline + text only) state from the filled "done" steps above.
+		// Also clickable (see renderer.js's updateStepSidebar()): clicking
+		// it just re-lands on the same card, which is a harmless way to
+		// scroll it into view (stacked layout) or confirm where you are
+		// (wizard layout), so it gets the same hover affordance as a done
+		// step rather than looking inert.
+		$this->add_control(
+			'step_sidebar_current_color',
+			array(
+				'label'       => __( 'Current Step Color', 'ryv-eligibility-tool' ),
+				'type'        => \Elementor\Controls_Manager::COLOR,
+				'description' => __( 'The step the visitor is on right now. Leave blank to use Done Step Color.', 'ryv-eligibility-tool' ),
+				'selectors'   => array(
+					'{{WRAPPER}}' => '--ryv-step-sidebar-current-color: {{VALUE}};',
+				),
+			)
+		);
+
+		$this->add_control(
+			'step_sidebar_current_hover_color',
+			array(
+				'label'       => __( 'Current Step Hover Color', 'ryv-eligibility-tool' ),
+				'type'        => \Elementor\Controls_Manager::COLOR,
+				'description' => __( 'Leave blank to use Current Step Color.', 'ryv-eligibility-tool' ),
+				'selectors'   => array(
+					'{{WRAPPER}}' => '--ryv-step-sidebar-current-hover-color: {{VALUE}};',
 				),
 			)
 		);
