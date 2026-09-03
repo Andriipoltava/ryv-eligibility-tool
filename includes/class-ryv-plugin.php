@@ -75,6 +75,34 @@ final class RYV_Plugin {
 	private $help_page = null;
 
 	/**
+	 * Translations page controller instance (admin-only).
+	 *
+	 * @var RYV_Translations_Page|null
+	 */
+	private $translations_page = null;
+
+	/**
+	 * Step Names page controller instance (admin-only).
+	 *
+	 * @var RYV_Step_Names_Page|null
+	 */
+	private $step_names_page = null;
+
+	/**
+	 * Design tokens controller instance (CSS variables + font preconnects).
+	 *
+	 * @var RYV_Design_Tokens|null
+	 */
+	private $design_tokens = null;
+
+	/**
+	 * Design tokens admin page controller instance (admin-only).
+	 *
+	 * @var RYV_Design_Tokens_Page|null
+	 */
+	private $design_tokens_page = null;
+
+	/**
 	 * States CPT controller instance.
 	 *
 	 * @var RYV_States_CPT|null
@@ -150,6 +178,7 @@ final class RYV_Plugin {
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-shortcode.php';
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-states-cpt.php';
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-resources-cpt.php';
+		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-design-tokens.php';
 
 		// ACF + sync only when ACF is available.
 		if ( class_exists( 'ACF' ) ) {
@@ -173,6 +202,9 @@ final class RYV_Plugin {
 			require_once RYV_PLUGIN_DIR . 'admin/class-ryv-submissions-page.php';
 			require_once RYV_PLUGIN_DIR . 'admin/class-ryv-shortcode-hint.php';
 			require_once RYV_PLUGIN_DIR . 'admin/class-ryv-help-page.php';
+			require_once RYV_PLUGIN_DIR . 'admin/class-ryv-translations-page.php';
+			require_once RYV_PLUGIN_DIR . 'admin/class-ryv-step-names-page.php';
+			require_once RYV_PLUGIN_DIR . 'admin/class-ryv-design-tokens-page.php';
 
 			if ( class_exists( 'ACF' ) ) {
 				require_once RYV_PLUGIN_DIR . 'admin/class-ryv-states-generate-page.php';
@@ -198,6 +230,7 @@ final class RYV_Plugin {
 		new RYV_Elementor();
 		new RYV_Shortcode();
 		new RYV_Settings_Page();
+		$this->design_tokens = new RYV_Design_Tokens();
 
 		if ( class_exists( 'ACF' ) ) {
 			new RYV_States_ACF();
@@ -217,7 +250,10 @@ final class RYV_Plugin {
 			$this->logs_page        = new RYV_Logs_Page();
 			$this->submissions_page = new RYV_Submissions_Page();
 			new RYV_Shortcode_Hint();
-			$this->help_page = new RYV_Help_Page();
+			$this->help_page         = new RYV_Help_Page();
+			$this->translations_page = new RYV_Translations_Page();
+			$this->step_names_page   = new RYV_Step_Names_Page();
+			$this->design_tokens_page = new RYV_Design_Tokens_Page();
 
 			if ( class_exists( 'ACF' ) ) {
 				new RYV_States_Generate_Page();
