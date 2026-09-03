@@ -52,7 +52,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 				<?php
 				$broken_count   = count( $result['health']['broken_links'] );
 				$orphaned_count = count( $result['health']['orphaned_nodes'] );
-				$is_healthy     = 0 === $broken_count && 0 === $orphaned_count;
+				$cycle_count    = count( $result['health']['cycles'] ?? array() );
+				$is_healthy     = 0 === $broken_count && 0 === $orphaned_count && 0 === $cycle_count;
 				?>
 				<div class="notice <?php echo $is_healthy ? 'notice-success' : 'notice-warning'; ?>" style="margin-top: 0;">
 					<p>
@@ -68,10 +69,11 @@ if ( ! defined( 'ABSPATH' ) ) {
 						<?php else : ?>
 							<?php
 							printf(
-								/* translators: 1: broken link count, 2: orphaned node count */
-								esc_html__( '%1$d broken link(s), %2$d orphaned (unreachable) node(s) found - see below.', 'ryv-eligibility-tool' ),
+								/* translators: 1: broken link count, 2: orphaned node count, 3: cycle count */
+								esc_html__( '%1$d broken link(s), %2$d orphaned (unreachable) node(s), %3$d loop(s) found - see below.', 'ryv-eligibility-tool' ),
 								(int) $broken_count,
-								(int) $orphaned_count
+								(int) $orphaned_count,
+								(int) $cycle_count
 							);
 							?>
 						<?php endif; ?>
@@ -99,6 +101,15 @@ if ( ! defined( 'ABSPATH' ) ) {
 							<strong><?php esc_html_e( 'Orphaned (unreachable) nodes:', 'ryv-eligibility-tool' ); ?></strong>
 							<code><?php echo esc_html( implode( ', ', $result['health']['orphaned_nodes'] ) ); ?></code>
 						</p>
+					<?php endif; ?>
+
+					<?php if ( $cycle_count > 0 ) : ?>
+						<p><strong><?php esc_html_e( 'Loops (a node eventually routes back to itself):', 'ryv-eligibility-tool' ); ?></strong></p>
+						<ul style="list-style: disc; margin-left: 1.5em; max-height: 14em; overflow-y: auto;">
+							<?php foreach ( $result['health']['cycles'] as $cycle ) : ?>
+								<li><code><?php echo esc_html( implode( ' → ', array_merge( $cycle, array( $cycle[0] ) ) ) ); ?></code></li>
+							<?php endforeach; ?>
+						</ul>
 					<?php endif; ?>
 				</div>
 			<?php endif; ?>

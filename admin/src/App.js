@@ -36,6 +36,15 @@ export default function App() {
   const [error, setError] = useState(null);
   const [notice, setNotice] = useState(null);
   const [newTitle, setNewTitle] = useState('');
+  // Cycles found in the graph by RYV_Graph_Validator (see class-ryv-graph-
+  // validator.php's find_cycles()) - a node reachable back to itself via
+  // next_node/options[].next_node, which re-asks the same question(s)
+  // forever once a visitor reaches it. Refreshed on load and after every
+  // save so an edit that introduces one is flagged without blocking the
+  // save itself - unlike a broken link, a cycle isn't necessarily wrong
+  // (e.g. a deliberate "come back later" loop), so this is advisory only.
+  const [cycles, setCycles] = useState([]);
+  const [cyclesDismissed, setCyclesDismissed] = useState(false);
 
   useEffect(() => {
     if (!postId) return;
@@ -55,6 +64,7 @@ export default function App() {
         const requestedNodeId = new URLSearchParams(window.location.search).get('ryv_node');
         setSelectedNodeId(requestedNodeId && loadedSchema.nodes[requestedNodeId] ? requestedNodeId : null);
 
+        setCycles((data.health && data.health.cycles) || []);
         setError(null);
       })
       .catch((err) => setError(err.message))
@@ -114,10 +124,12 @@ export default function App() {
   const handleSave = () => {
     setSaving(true);
     saveForm(postId, schema)
-      .then(() => {
+      .then((data) => {
         setDirty(false);
         setNotice(__('Saved.', 'ryv-eligibility-tool'));
         window.setTimeout(() => setNotice(null), 3000);
+        setCycles((data.health && data.health.cycles) || []);
+        setCyclesDismissed(false);
       })
       .catch((err) => setError(err.message))
       .finally(() => setSaving(false));
@@ -233,6 +245,40 @@ export default function App() {
         rows={2}
         __nextHasNoMarginBottom
       />
+
+      {cycles.length > 0 && !cyclesDismissed && (
+        <Notice status="warning" onRemove={() => setCyclesDismissed(true)}>
+          <p>
+            <strong>
+              {cycles.length === 1
+                ? __('This form loops back on itself:', 'ryv-eligibility-tool')
+                : __('This form has questions that loop back on themselves:', 'ryv-eligibility-tool')}
+            </strong>
+          </p>
+          <p>
+            {__(
+              'A visitor who reaches one of these will be asked the same question(s) again, forever, instead of ever reaching a result. This is usually caused by a "Next" field pointing back at an earlier question - open each node below and check where it routes to.',
+              'ryv-eligibility-tool'
+            )}
+          </p>
+          <ul style={{ listStyle: 'disc', marginLeft: '1.5em' }}>
+            {cycles.map((cycle, i) => (
+              <li key={i}>
+                {cycle.map((nodeId, j) => (
+                  <span key={nodeId}>
+                    {j > 0 && ' → '}
+                    <a href="#" onClick={(e) => { e.preventDefault(); setSelectedNodeId(nodeId); }}>
+                      <code>{nodeId}</code>
+                    </a>
+                  </span>
+                ))}
+                {' → '}
+                <code>{cycle[0]}</code>
+              </li>
+            ))}
+          </ul>
+        </Notice>
+      )}
 
       <div className="ryv-builder-body">
         <NodeList graph={schema} selectedNodeId={selectedNodeId} onSelect={setSelectedNodeId} onChange={updateGraph} />

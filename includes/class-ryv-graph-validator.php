@@ -33,6 +33,7 @@ class RYV_Graph_Validator {
 	 * @return array{
 	 *     broken_links: array<int, array{node_id:string, context:string, option_value:string|null, target:string}>,
 	 *     orphaned_nodes: string[],
+	 *     cycles: array<int, string[]>,
 	 *     total_nodes: int,
 	 * }
 	 */
@@ -78,8 +79,96 @@ class RYV_Graph_Validator {
 		return array(
 			'broken_links'   => $broken_links,
 			'orphaned_nodes' => $orphaned,
+			'cycles'         => self::find_cycles( $nodes ),
 			'total_nodes'    => count( $nodes ),
 		);
+	}
+
+	/**
+	 * Find every cycle in the graph - a node reachable, by following
+	 * `next_node`/`options[].next_node` edges, back to itself. A cyclic
+	 * questionnaire re-asks the same question(s) forever (the frontend's
+	 * `renderFrom()` cycle guard in engine.js only stops one render pass
+	 * from spinning forever; it does nothing to stop the *visitor* clicking
+	 * "Continue" back into the same loop indefinitely), so this is worth
+	 * surfacing even though - unlike a broken link - it's not necessarily a
+	 * mistake (a "you're already registered, come back next year" loop
+	 * pointing at itself could in principle be intentional). Warn, don't
+	 * block.
+	 *
+	 * Standard three-colour (white/gray/black) DFS cycle detection: a node
+	 * is gray while it's an ancestor of the node currently being explored
+	 * (i.e. still on the call stack) and black once fully explored with no
+	 * remaining back-edges. An edge into a gray node closes a cycle - the
+	 * portion of the stack from that node to the top is the loop itself.
+	 * Broken links (target not in `$nodes`) are skipped here; those are
+	 * already reported separately by the caller.
+	 *
+	 * @param array $nodes Full node map.
+	 * @return array<int, string[]> One entry per cycle found, each an ordered list of node ids (last one links back to the first).
+	 */
+	private static function find_cycles( array $nodes ): array {
+		$cycles = array();
+		$state  = array(); // node_id => 'gray' | 'black'.
+		$stack  = array();
+
+		foreach ( array_keys( $nodes ) as $start ) {
+			if ( ! isset( $state[ $start ] ) ) {
+				self::walk_for_cycles( $start, $nodes, $state, $stack, $cycles );
+			}
+		}
+
+		return $cycles;
+	}
+
+	/**
+	 * @param string $node_id Current node.
+	 * @param array  $nodes   Full node map.
+	 * @param array  $state   node_id => 'gray'|'black' (by reference).
+	 * @param array  $stack   Current DFS path (by reference).
+	 * @param array  $cycles  Accumulator (by reference).
+	 */
+	private static function walk_for_cycles( string $node_id, array $nodes, array &$state, array &$stack, array &$cycles ): void {
+		$state[ $node_id ] = 'gray';
+		$stack[]            = $node_id;
+
+		foreach ( self::outgoing_targets( $nodes[ $node_id ] ?? array(), $nodes ) as $target ) {
+			if ( 'gray' === ( $state[ $target ] ?? null ) ) {
+				$pos        = array_search( $target, $stack, true );
+				$cycles[] = false === $pos ? array( $target ) : array_slice( $stack, $pos );
+			} elseif ( ! isset( $state[ $target ] ) ) {
+				self::walk_for_cycles( $target, $nodes, $state, $stack, $cycles );
+			}
+		}
+
+		array_pop( $stack );
+		$state[ $node_id ] = 'black';
+	}
+
+	/**
+	 * @param array $node  A single node.
+	 * @param array $nodes Full node map, to skip already-broken links (reported separately).
+	 * @return string[] Node ids this node routes to.
+	 */
+	private static function outgoing_targets( array $node, array $nodes ): array {
+		$targets = array();
+
+		if ( ! empty( $node['options'] ) && is_array( $node['options'] ) ) {
+			foreach ( $node['options'] as $option ) {
+				$target = $option['next_node'] ?? null;
+				if ( $target && isset( $nodes[ $target ] ) ) {
+					$targets[] = $target;
+				}
+			}
+			return $targets;
+		}
+
+		$target = $node['next_node'] ?? null;
+		if ( $target && isset( $nodes[ $target ] ) ) {
+			$targets[] = $target;
+		}
+
+		return $targets;
 	}
 
 	/**

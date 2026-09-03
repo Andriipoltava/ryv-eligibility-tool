@@ -88,13 +88,16 @@ class RYV_Admin_API {
 			return $this->not_found_error();
 		}
 
+		$schema = RYV_CPT::get_schema( $post_id );
+
 		return new WP_REST_Response(
 			array(
 				'post_id'     => $post_id,
 				'title'       => $post->post_title,
 				'description' => $post->post_excerpt,
 				'status'      => $post->post_status,
-				'schema'      => RYV_CPT::get_schema( $post_id ),
+				'schema'      => $schema,
+				'health'      => RYV_Graph_Validator::analyze( $schema ),
 			),
 			200
 		);
@@ -141,6 +144,7 @@ class RYV_Admin_API {
 			array(
 				'post_id' => $post_id,
 				'schema'  => $schema,
+				'health'  => RYV_Graph_Validator::analyze( $schema ),
 			),
 			200
 		);
