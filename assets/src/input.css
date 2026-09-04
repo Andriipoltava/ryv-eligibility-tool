@@ -843,6 +843,11 @@
     border-color: #d1d5db;
     border-radius: var(--ryv-map-picker-select-border-radius, 0.25rem);
     background-color: #fff;
+    /* The theme's own generic `select { background: ... url(angle-down.jpg) }`
+     * rule only gets its background-color overridden above - background-image
+     * is a separate property, so its arrow graphic was still painting
+     * underneath ours. This is the intentional custom arrow's replacement. */
+    background-image: none;
     font-size: 1rem;
     cursor: pointer;
   }
