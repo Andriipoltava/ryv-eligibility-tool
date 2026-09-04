@@ -555,7 +555,13 @@ class RYV_Map_Widget extends \Elementor\Widget_Base {
 				),
 				'description' => __( 'Only applies when the legend is set to "Beside the map".', 'ryv-eligibility-tool' ),
 				'selectors'  => array(
-					'{{WRAPPER}} .ryv-map-widget-legend' => '--ryv-map-legend-width: {{SIZE}}{{UNIT}};',
+					// input.css reads --ryv-map-legend-width on .ryv-map-widget-side
+					// (the legend/picker's shared parent, not the legend itself) -
+					// a custom property only cascades to descendants, so writing it
+					// onto .ryv-map-widget-legend (a child of .ryv-map-widget-side,
+					// not an ancestor of it) left this control silently doing
+					// nothing. Same fix as picker_width below.
+					'{{WRAPPER}} .ryv-map-widget-side' => '--ryv-map-legend-width: {{SIZE}}{{UNIT}};',
 				),
 			)
 		);
@@ -711,7 +717,11 @@ class RYV_Map_Widget extends \Elementor\Widget_Base {
 				),
 				'description' => __( 'Only applies when the picker is set to "Beside the map".', 'ryv-eligibility-tool' ),
 				'selectors'  => array(
-					'{{WRAPPER}} .ryv-map-widget-picker' => '--ryv-map-picker-width: {{SIZE}}{{UNIT}};',
+					// See legend_width's comment above - same wrong-target bug,
+					// same fix: input.css reads --ryv-map-picker-width on
+					// .ryv-map-widget-side, the picker's parent, not the picker
+					// element itself.
+					'{{WRAPPER}} .ryv-map-widget-side' => '--ryv-map-picker-width: {{SIZE}}{{UNIT}};',
 				),
 			)
 		);
@@ -839,6 +849,72 @@ class RYV_Map_Widget extends \Elementor\Widget_Base {
 				'default'   => '#ffffff',
 				'selectors' => array(
 					'{{WRAPPER}} .ryv-map-widget-picker-select' => 'background-color: {{VALUE}};',
+				),
+			)
+		);
+
+		$this->add_group_control(
+			\Elementor\Group_Control_Typography::get_type(),
+			array(
+				'name'     => 'picker_select_typography',
+				'selector' => '{{WRAPPER}} .ryv-map-widget-picker-select',
+			)
+		);
+
+		$this->add_responsive_control(
+			'picker_select_border_width',
+			array(
+				'label'      => __( 'Border Width', 'ryv-eligibility-tool' ),
+				'type'       => \Elementor\Controls_Manager::SLIDER,
+				'size_units' => array( 'px' ),
+				'range'      => array(
+					'px' => array(
+						'min' => 0,
+						'max' => 6,
+					),
+				),
+				'selectors'  => array(
+					// input.css reads this var directly on .ryv-map-widget-picker-select
+					// itself (unlike legend_width/picker_width above), so no
+					// wrong-target risk here.
+					'{{WRAPPER}} .ryv-map-widget-picker-select' => '--ryv-map-picker-select-border-width: {{SIZE}}{{UNIT}};',
+				),
+			)
+		);
+
+		$this->add_control(
+			'picker_select_border_radius',
+			array(
+				'label'      => __( 'Border Radius', 'ryv-eligibility-tool' ),
+				'type'       => \Elementor\Controls_Manager::DIMENSIONS,
+				'size_units' => array( 'px' ),
+				'selectors'  => array(
+					'{{WRAPPER}} .ryv-map-widget-picker-select' => '--ryv-map-picker-select-border-radius: {{TOP}}{{UNIT}} {{RIGHT}}{{UNIT}} {{BOTTOM}}{{UNIT}} {{LEFT}}{{UNIT}};',
+				),
+			)
+		);
+
+		$this->add_control(
+			'picker_select_arrow_color',
+			array(
+				'label'     => __( 'Arrow Color', 'ryv-eligibility-tool' ),
+				'type'      => \Elementor\Controls_Manager::COLOR,
+				'default'   => '#6b7280',
+				'selectors' => array(
+					// The wrap, not the select itself, is what the CSS's
+					// ::after arrow is actually attached to.
+					'{{WRAPPER}} .ryv-map-widget-picker-select-wrap' => '--ryv-map-picker-select-arrow-color: {{VALUE}};',
+				),
+			)
+		);
+
+		$this->add_control(
+			'picker_select_focus_color',
+			array(
+				'label'     => __( 'Focus Border Color', 'ryv-eligibility-tool' ),
+				'type'      => \Elementor\Controls_Manager::COLOR,
+				'selectors' => array(
+					'{{WRAPPER}} .ryv-map-widget-picker-select' => '--ryv-map-picker-select-focus-color: {{VALUE}};',
 				),
 			)
 		);
@@ -996,9 +1072,23 @@ class RYV_Map_Widget extends \Elementor\Widget_Base {
 
 	/**
 	 * Per-region data (title/tooltip/link) for the click popup, keyed by
-	 * MapSVG region ID (e.g. "US-TN") so assets/js/map-widget.js can look
+	 * MapSVG region ID (e.g. "TN") so assets/js/map-widget.js can look
 	 * it up directly off the clicked <path>'s own id - avoids a second
 	 * REST round trip for data the page already needs to render.
+	 *
+	 * `suppress_filters` must be forced false here: `get_posts()`'s own
+	 * default is `true` (unlike a bare `new WP_Query`), which disables the
+	 * `posts_join`/`posts_where` filters WPML uses to scope a query to the
+	 * current language - with the default, this pulls every language
+	 * edition of `ryv_states` (confirmed live: 104 published rows, exactly
+	 * 2 per state/territory, `ryv_states` being WPML-translatable per
+	 * `wpml-config.xml`). Harmless here since results are keyed by
+	 * `$svg_id` (one key per state, language-independent) so a second
+	 * language's row just overwrites the first with whichever language
+	 * happened to sort last - but non-deterministic, so still worth fixing
+	 * alongside render_picker()'s identical bug, where the effect is
+	 * visibly duplicated entries rather than a silent, order-dependent
+	 * overwrite.
 	 *
 	 * @return array<string,array{title:string,description:string,link:string}>
 	 */
@@ -1009,9 +1099,10 @@ class RYV_Map_Widget extends \Elementor\Widget_Base {
 
 		$states = get_posts(
 			array(
-				'post_type'      => RYV_States_CPT::POST_TYPE,
-				'post_status'    => 'publish',
-				'posts_per_page' => -1,
+				'post_type'        => RYV_States_CPT::POST_TYPE,
+				'post_status'      => 'publish',
+				'posts_per_page'   => -1,
+				'suppress_filters' => false,
 			)
 		);
 
@@ -1102,13 +1193,18 @@ class RYV_Map_Widget extends \Elementor\Widget_Base {
 	 * @param array $settings Widget settings.
 	 */
 	private function render_picker( array $settings ) {
+		// suppress_filters must be forced false - see build_states_data()'s
+		// docblock. Without it, every state appears twice here (once per
+		// WPML language edition, e.g. "Alabama" / "Alabama" - confirmed
+		// live: 104 published ryv_states rows, exactly 2 per state).
 		$states = get_posts(
 			array(
-				'post_type'      => RYV_States_CPT::POST_TYPE,
-				'post_status'    => 'publish',
-				'posts_per_page' => -1,
-				'orderby'        => 'title',
-				'order'          => 'ASC',
+				'post_type'        => RYV_States_CPT::POST_TYPE,
+				'post_status'      => 'publish',
+				'posts_per_page'   => -1,
+				'orderby'          => 'title',
+				'order'            => 'ASC',
+				'suppress_filters' => false,
 			)
 		);
 
@@ -1125,6 +1221,11 @@ class RYV_Map_Widget extends \Elementor\Widget_Base {
 			printf( '<div class="ryv-map-widget-picker-label">%s</div>', esc_html( $label ) );
 		}
 
+		// Wrapping element for the custom arrow (::after, see input.css) -
+		// a native <select>'s own arrow can't be recolored directly, so it's
+		// hidden (appearance: none) and this wrapper positions a replacement,
+		// same pattern as the main questionnaire's .ryv-select2 dropdown.
+		echo '<div class="ryv-map-widget-picker-select-wrap">';
 		echo '<select class="ryv-map-widget-picker-select" onchange="if(this.value){window.location.href=this.value;}">';
 		printf( '<option value="">%s</option>', esc_html( $placeholder ) );
 
@@ -1137,7 +1238,8 @@ class RYV_Map_Widget extends \Elementor\Widget_Base {
 		}
 
 		echo '</select>';
-		echo '</div>';
+		echo '</div>'; // .ryv-map-widget-picker-select-wrap
+		echo '</div>'; // .ryv-map-widget-picker
 	}
 
 	/**

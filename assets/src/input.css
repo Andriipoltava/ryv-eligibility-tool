@@ -127,35 +127,22 @@
     gap: 0.75rem;
     color: var(--ryv-secondary-color, #64748b);
   }
-  /*
-   * "Done" (completed, filled circle + checkmark) and "current" (the step
-   * the visitor is on right now - outline + text only, never filled) are
-   * deliberately distinct states with their own color + hover controls
-   * (see widgets/class-ryv-widget.php's register_step_sidebar_style_
-   * controls()) - a visitor can tell at a glance which steps are behind
-   * them vs. where they are now. Both are clickable (renderer.js's
-   * updateStepSidebar()): a done step's click revisits it, a current
-   * step's click just re-lands on the same card - harmless, and it means
-   * neither state looks inert on hover. Upcoming (neither done nor
-   * current) entries have no click handler and keep the plain --ryv-step-
-   * sidebar-marker-color outline from .ryv-step-list-marker below.
-   */
-  .ryv-step-list-item.is-done,
-  .ryv-step-list-item.is-active {
-    cursor: pointer;
-  }
   .ryv-step-list-item.is-active {
     @apply ryv-font-semibold;
-    color: var(--ryv-step-sidebar-current-color, var(--ryv-step-sidebar-active-color, var(--ryv-primary-color, #002a41)));
+    color: var(--ryv-step-sidebar-active-color, var(--ryv-primary-color, #002a41));
+  }
+  /*
+   * A done step (renderer.js's updateStepSidebar()) is the only clickable
+   * entry - clicking it calls engine.js's goToStep() to revisit that step
+   * (wizard layout) or scroll to it (stacked layout, where it's already
+   * on screen). Active/upcoming entries have no click handler at all.
+   */
+  .ryv-step-list-item.is-done {
+    cursor: pointer;
   }
   .ryv-step-list-item.is-done:hover,
   .ryv-step-list-item.is-done:focus-visible {
-    color: var(--ryv-step-sidebar-active-hover-color, var(--ryv-step-sidebar-active-color, var(--ryv-primary-color, #002a41)));
-    outline: none;
-  }
-  .ryv-step-list-item.is-active:hover,
-  .ryv-step-list-item.is-active:focus-visible {
-    color: var(--ryv-step-sidebar-current-hover-color, var(--ryv-step-sidebar-current-color, var(--ryv-step-sidebar-active-color, var(--ryv-primary-color, #002a41))));
+    color: var(--ryv-step-sidebar-active-color, var(--ryv-primary-color, #002a41));
     outline: none;
   }
 
@@ -174,19 +161,10 @@
     border-color: var(--ryv-step-sidebar-active-color, var(--ryv-primary-color, #002a41));
     color: #fff;
   }
-  .ryv-step-list-item.is-done:hover .ryv-step-list-marker,
-  .ryv-step-list-item.is-done:focus-visible .ryv-step-list-marker {
-    background-color: var(--ryv-step-sidebar-active-hover-color, var(--ryv-step-sidebar-active-color, var(--ryv-primary-color, #002a41)));
-    border-color: var(--ryv-step-sidebar-active-hover-color, var(--ryv-step-sidebar-active-color, var(--ryv-primary-color, #002a41)));
-  }
   .ryv-step-list-item.is-active .ryv-step-list-marker {
-    border-color: var(--ryv-step-sidebar-current-color, var(--ryv-step-sidebar-active-color, var(--ryv-primary-color, #002a41)));
-    color: var(--ryv-step-sidebar-current-color, var(--ryv-step-sidebar-active-color, var(--ryv-primary-color, #002a41)));
-  }
-  .ryv-step-list-item.is-active:hover .ryv-step-list-marker,
-  .ryv-step-list-item.is-active:focus-visible .ryv-step-list-marker {
-    border-color: var(--ryv-step-sidebar-current-hover-color, var(--ryv-step-sidebar-current-color, var(--ryv-step-sidebar-active-color, var(--ryv-primary-color, #002a41))));
-    color: var(--ryv-step-sidebar-current-hover-color, var(--ryv-step-sidebar-current-color, var(--ryv-step-sidebar-active-color, var(--ryv-primary-color, #002a41))));
+    background-color: var(--ryv-step-sidebar-active-color, var(--ryv-primary-color, #002a41));
+    border-color: var(--ryv-step-sidebar-active-color, var(--ryv-primary-color, #002a41));
+    color: #fff;
   }
 
   /*
@@ -827,14 +805,50 @@
     font-size: 0.75rem;
     margin-bottom: 0.5rem;
   }
+  /* Wraps the <select> so a custom arrow (::after below) can be positioned
+   * over it - the select's own native arrow is hidden via appearance: none,
+   * since a native arrow can't be recolored directly. Same pattern as the
+   * main questionnaire's .ryv-select2 dropdown. */
+  .ryv-map-widget-picker-select-wrap {
+    /* display: flex (not just position: relative) matters here: a <select>
+     * is inline-block by default, and a block wrapper containing only an
+     * inline-block child gets stretched a few px taller than the child
+     * itself (the classic baseline/line-height "phantom gap") - that threw
+     * off the ::after arrow's `top: 50%` below, which is relative to the
+     * wrap's own (inflated) height, not the select's. flex makes the wrap
+     * hug the select exactly. */
+    position: relative;
+    display: flex;
+  }
+  .ryv-map-widget-picker-select-wrap:after {
+    content: "";
+    position: absolute;
+    right: 1rem;
+    top: 50%;
+    width: 0.5rem;
+    height: 0.5rem;
+    border-right: 2px solid var(--ryv-map-picker-select-arrow-color, #6b7280);
+    border-bottom: 2px solid var(--ryv-map-picker-select-arrow-color, #6b7280);
+    transform: translateY(-70%) rotate(45deg);
+    pointer-events: none;
+  }
   .ryv-map-widget-picker-select.ryv-map-widget-picker-select {
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
     width: 100%;
-    padding: 0.625rem 0.75rem;
+    padding: 0.625rem 2.5rem 0.625rem 0.75rem;
     border-style: solid;
-    border-width: 1px;
+    border-width: var(--ryv-map-picker-select-border-width, 1px);
     border-color: #d1d5db;
-    border-radius: 0.25rem;
+    border-radius: var(--ryv-map-picker-select-border-radius, 0.25rem);
     background-color: #fff;
     font-size: 1rem;
+    cursor: pointer;
+  }
+  .ryv-map-widget-picker-select.ryv-map-widget-picker-select:focus-visible {
+    outline: 2px solid transparent;
+    outline-offset: 2px;
+    border-color: var(--ryv-map-picker-select-focus-color, var(--ryv-map-picker-select-arrow-color, #6b7280));
   }
 }

@@ -135,17 +135,26 @@ class RYV_US_States {
 	);
 
 	/**
-	 * Territory codes that MapSVG's own `usa-territories-with-boxes.svg`
-	 * keeps as bare 2-letter ids, unlike the 50 states + DC (which it
-	 * prefixes "US-", ISO-3166-2:US style) - confirmed against the actual
-	 * `wp_mapsvg6_regions_1` region ids on this site, not guessed.
-	 */
-	const BARE_SVG_ID_CODES = array( 'PR', 'AS', 'GU', 'MP', 'VI' );
-
-	/**
 	 * Get SVG region ID for a state slug, in the exact form MapSVG's own
-	 * region table uses ("US-TN" for the 50 states + DC, bare "PR" etc.
-	 * for territories).
+	 * region table uses.
+	 *
+	 * The map's SVG source (`maps.options.source`, on this site
+	 * `.../maps/not-calibrated/usa/usa.svg`) keeps every region - all 50
+	 * states + DC, no "US-" prefix - as a bare 2-letter code; a prior
+	 * version of this method prepended "US-" to everything except a
+	 * hardcoded territory list, which its own docblock claimed was
+	 * "confirmed against the actual wp_mapsvg6_regions_1 region ids" but
+	 * wasn't: querying that table directly shows 51 rows, all bare 2-letter
+	 * ids ("AL", "AK", ... "DC"), zero with a "US-" prefix. Because
+	 * `sync_to_mapsvg()` only ever UPDATEs an existing region row (never
+	 * INSERTs), the wrong prefix made its `WHERE id = 'US-AL'` match
+	 * nothing for every one of the 50 states + DC - the map's category
+	 * colors silently never reached it, no matter how many times a state
+	 * was saved or "Sync Category Colors to Map" was clicked, since the
+	 * write itself was a no-op the entire time. Confirmed live: every row
+	 * in `wp_mapsvg6_regions_1` still carried MapSVG's own default
+	 * `status = 1` / `status_text = "Enabled"`, never one of this plugin's
+	 * `status` values (see `RYV_MapSVG_Sync::STATUS_VALUE_BASE`).
 	 *
 	 * `ryv_state_slug` isn't consistently a hyphenated full-name slug
 	 * ("new-hampshire") across every state: the original Drupal webform's
@@ -170,11 +179,7 @@ class RYV_US_States {
 			}
 		}
 
-		if ( ! $code ) {
-			return null;
-		}
-
-		return in_array( $code, self::BARE_SVG_ID_CODES, true ) ? $code : 'US-' . $code;
+		return $code ?: null;
 	}
 
 	/**

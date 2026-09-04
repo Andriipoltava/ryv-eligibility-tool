@@ -160,7 +160,7 @@ class RYV_MapSVG_Sync {
 		 * Fires after a state's map data has been synced to MapSVG.
 		 *
 		 * @param int    $post_id  The ryv_states post ID.
-		 * @param string $svg_id   The MapSVG region ID (e.g. "US-TN").
+		 * @param string $svg_id   The MapSVG region ID (e.g. "TN").
 		 * @param string $category The map category slug.
 		 * @param bool   $is_mixed Whether the state has mixed rules (stripes) -
 		 *                         not yet reflected visually on the map, see
