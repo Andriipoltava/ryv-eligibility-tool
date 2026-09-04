@@ -637,6 +637,28 @@ class RYV_Map_Widget extends \Elementor\Widget_Base {
 			)
 		);
 
+		$this->add_responsive_control(
+			'legend_title_spacing',
+			array(
+				'label'      => __( 'Spacing Below', 'ryv-eligibility-tool' ),
+				'type'       => \Elementor\Controls_Manager::SLIDER,
+				'size_units' => array( 'px' ),
+				'range'      => array(
+					'px' => array(
+						'min' => 0,
+						'max' => 40,
+					),
+				),
+				'selectors'  => array(
+					// Read by both .ryv-map-widget-legend-title (plain title)
+					// and .ryv-map-widget-legend-toggle (collapsible title
+					// button) - only one of the two ever renders, but both
+					// need to move together if this is changed.
+					'{{WRAPPER}} .ryv-map-widget-legend' => '--ryv-map-legend-title-spacing: {{SIZE}}{{UNIT}};',
+				),
+			)
+		);
+
 		$this->add_control(
 			'legend_items_heading',
 			array(
@@ -662,6 +684,42 @@ class RYV_Map_Widget extends \Elementor\Widget_Base {
 			array(
 				'name'     => 'legend_item_typography',
 				'selector' => '{{WRAPPER}} .ryv-map-widget-legend-item',
+			)
+		);
+
+		$this->add_responsive_control(
+			'legend_item_gap',
+			array(
+				'label'      => __( 'Spacing Between Items', 'ryv-eligibility-tool' ),
+				'type'       => \Elementor\Controls_Manager::SLIDER,
+				'size_units' => array( 'px' ),
+				'range'      => array(
+					'px' => array(
+						'min' => 0,
+						'max' => 30,
+					),
+				),
+				'selectors'  => array(
+					'{{WRAPPER}} .ryv-map-widget-legend' => '--ryv-map-legend-item-gap: {{SIZE}}{{UNIT}};',
+				),
+			)
+		);
+
+		$this->add_responsive_control(
+			'legend_swatch_gap',
+			array(
+				'label'      => __( 'Spacing Between Swatch & Label', 'ryv-eligibility-tool' ),
+				'type'       => \Elementor\Controls_Manager::SLIDER,
+				'size_units' => array( 'px' ),
+				'range'      => array(
+					'px' => array(
+						'min' => 0,
+						'max' => 30,
+					),
+				),
+				'selectors'  => array(
+					'{{WRAPPER}} .ryv-map-widget-legend' => '--ryv-map-legend-swatch-gap: {{SIZE}}{{UNIT}};',
+				),
 			)
 		);
 

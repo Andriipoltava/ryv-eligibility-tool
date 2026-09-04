@@ -740,7 +740,7 @@
     text-transform: uppercase;
     letter-spacing: 0.05em;
     font-size: 0.75rem;
-    margin-bottom: 0.75rem;
+    margin-bottom: var(--ryv-map-legend-title-spacing, 0.75rem);
   }
   .ryv-map-widget-legend-toggle.ryv-map-widget-legend-toggle {
     display: flex;
@@ -750,7 +750,7 @@
     background: none;
     border: none;
     padding: 0;
-    margin-bottom: 0.75rem;
+    margin-bottom: var(--ryv-map-legend-title-spacing, 0.75rem);
     color: inherit;
     font: inherit;
     font-weight: 600;
@@ -781,12 +781,12 @@
     padding: 0;
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
+    gap: var(--ryv-map-legend-item-gap, 0.5rem);
   }
   .ryv-map-widget-legend-item {
     display: flex;
     align-items: center;
-    gap: 0.625rem;
+    gap: var(--ryv-map-legend-swatch-gap, 0.625rem);
     font-size: 0.875rem;
   }
   .ryv-map-widget-legend-swatch {
