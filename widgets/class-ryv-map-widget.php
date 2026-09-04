@@ -74,6 +74,7 @@ class RYV_Map_Widget extends \Elementor\Widget_Base {
 		$this->register_map_style_controls();
 		$this->register_legend_style_controls();
 		$this->register_picker_style_controls();
+		$this->register_popup_style_controls();
 	}
 
 	/**
@@ -974,6 +975,256 @@ class RYV_Map_Widget extends \Elementor\Widget_Base {
 				'selectors' => array(
 					'{{WRAPPER}} .ryv-map-widget-picker-select' => '--ryv-map-picker-select-focus-color: {{VALUE}};',
 				),
+			)
+		);
+
+		$this->end_controls_section();
+	}
+
+	/**
+	 * Style: the click popup (assets/js/map-widget.js's wireClickPopup())
+	 * shown when a region on the map is clicked - title/description/
+	 * "Learn more" link, close button, and the card itself. Not present in
+	 * the server-rendered HTML at all (MapSVG's shortcode output is a bare
+	 * host div; the popup is created and appended entirely client-side once
+	 * the map loads), so unlike every other style section here there's
+	 * nothing to see in the Elementor editor's own preview without
+	 * actually clicking a region there - the controls still apply, they
+	 * just can't be visually previewed live the way the others can.
+	 */
+	private function register_popup_style_controls() {
+		$this->start_controls_section(
+			'popup_style_section',
+			array(
+				'label' => __( 'Click Popup', 'ryv-eligibility-tool' ),
+				'tab'   => \Elementor\Controls_Manager::TAB_STYLE,
+			)
+		);
+
+		$this->add_responsive_control(
+			'popup_width',
+			array(
+				'label'      => __( 'Width', 'ryv-eligibility-tool' ),
+				'type'       => \Elementor\Controls_Manager::SLIDER,
+				'size_units' => array( 'px' ),
+				'range'      => array(
+					'px' => array(
+						'min' => 160,
+						'max' => 480,
+					),
+				),
+				'selectors'  => array(
+					'{{WRAPPER}} .ryv-map-widget-popup' => '--ryv-map-popup-width: {{SIZE}}{{UNIT}};',
+				),
+			)
+		);
+
+		$this->add_control(
+			'popup_bg_color',
+			array(
+				'label'     => __( 'Background Color', 'ryv-eligibility-tool' ),
+				'type'      => \Elementor\Controls_Manager::COLOR,
+				'default'   => '#ffffff',
+				'selectors' => array(
+					'{{WRAPPER}} .ryv-map-widget-popup' => 'background-color: {{VALUE}};',
+				),
+			)
+		);
+
+		$this->add_control(
+			'popup_border_color',
+			array(
+				'label'     => __( 'Border Color', 'ryv-eligibility-tool' ),
+				'type'      => \Elementor\Controls_Manager::COLOR,
+				'default'   => '#e5e7eb',
+				'selectors' => array(
+					'{{WRAPPER}} .ryv-map-widget-popup' => 'border-color: {{VALUE}};',
+				),
+			)
+		);
+
+		$this->add_responsive_control(
+			'popup_border_width',
+			array(
+				'label'      => __( 'Border Width', 'ryv-eligibility-tool' ),
+				'type'       => \Elementor\Controls_Manager::SLIDER,
+				'size_units' => array( 'px' ),
+				'range'      => array(
+					'px' => array(
+						'min' => 0,
+						'max' => 6,
+					),
+				),
+				'selectors'  => array(
+					'{{WRAPPER}} .ryv-map-widget-popup' => '--ryv-map-popup-border-width: {{SIZE}}{{UNIT}};',
+				),
+			)
+		);
+
+		$this->add_control(
+			'popup_border_radius',
+			array(
+				'label'      => __( 'Border Radius', 'ryv-eligibility-tool' ),
+				'type'       => \Elementor\Controls_Manager::DIMENSIONS,
+				'size_units' => array( 'px' ),
+				'selectors'  => array(
+					'{{WRAPPER}} .ryv-map-widget-popup' => '--ryv-map-popup-border-radius: {{TOP}}{{UNIT}} {{RIGHT}}{{UNIT}} {{BOTTOM}}{{UNIT}} {{LEFT}}{{UNIT}};',
+				),
+			)
+		);
+
+		$this->add_control(
+			'popup_padding',
+			array(
+				'label'      => __( 'Padding', 'ryv-eligibility-tool' ),
+				'type'       => \Elementor\Controls_Manager::DIMENSIONS,
+				'size_units' => array( 'px', 'em' ),
+				'default'    => array(
+					'top'    => '16',
+					'right'  => '16',
+					'bottom' => '16',
+					'left'   => '16',
+					'unit'   => 'px',
+				),
+				'selectors'  => array(
+					'{{WRAPPER}} .ryv-map-widget-popup' => 'padding: {{TOP}}{{UNIT}} {{RIGHT}}{{UNIT}} {{BOTTOM}}{{UNIT}} {{LEFT}}{{UNIT}};',
+				),
+			)
+		);
+
+		$this->add_group_control(
+			\Elementor\Group_Control_Box_Shadow::get_type(),
+			array(
+				'name'     => 'popup_box_shadow',
+				'selector' => '{{WRAPPER}} .ryv-map-widget-popup',
+			)
+		);
+
+		$this->add_control(
+			'popup_title_heading',
+			array(
+				'label'     => __( 'Title', 'ryv-eligibility-tool' ),
+				'type'      => \Elementor\Controls_Manager::HEADING,
+				'separator' => 'before',
+			)
+		);
+
+		$this->add_control(
+			'popup_title_color',
+			array(
+				'label'     => __( 'Title Color', 'ryv-eligibility-tool' ),
+				'type'      => \Elementor\Controls_Manager::COLOR,
+				'selectors' => array(
+					'{{WRAPPER}} .ryv-map-widget-popup-title' => 'color: {{VALUE}};',
+				),
+			)
+		);
+
+		$this->add_group_control(
+			\Elementor\Group_Control_Typography::get_type(),
+			array(
+				'name'     => 'popup_title_typography',
+				'selector' => '{{WRAPPER}} .ryv-map-widget-popup-title',
+			)
+		);
+
+		$this->add_control(
+			'popup_description_heading',
+			array(
+				'label'     => __( 'Description', 'ryv-eligibility-tool' ),
+				'type'      => \Elementor\Controls_Manager::HEADING,
+				'separator' => 'before',
+			)
+		);
+
+		$this->add_control(
+			'popup_description_color',
+			array(
+				'label'     => __( 'Description Color', 'ryv-eligibility-tool' ),
+				'type'      => \Elementor\Controls_Manager::COLOR,
+				'default'   => '#374151',
+				'selectors' => array(
+					'{{WRAPPER}} .ryv-map-widget-popup-desc' => 'color: {{VALUE}};',
+				),
+			)
+		);
+
+		$this->add_group_control(
+			\Elementor\Group_Control_Typography::get_type(),
+			array(
+				'name'     => 'popup_description_typography',
+				'selector' => '{{WRAPPER}} .ryv-map-widget-popup-desc',
+			)
+		);
+
+		$this->add_control(
+			'popup_close_heading',
+			array(
+				'label'     => __( 'Close Button', 'ryv-eligibility-tool' ),
+				'type'      => \Elementor\Controls_Manager::HEADING,
+				'separator' => 'before',
+			)
+		);
+
+		$this->add_control(
+			'popup_close_color',
+			array(
+				'label'     => __( 'Color', 'ryv-eligibility-tool' ),
+				'type'      => \Elementor\Controls_Manager::COLOR,
+				'default'   => '#6b7280',
+				'selectors' => array(
+					'{{WRAPPER}} .ryv-map-widget-popup-close' => 'color: {{VALUE}};',
+				),
+			)
+		);
+
+		$this->add_control(
+			'popup_close_hover_color',
+			array(
+				'label'     => __( 'Hover Color', 'ryv-eligibility-tool' ),
+				'type'      => \Elementor\Controls_Manager::COLOR,
+				'selectors' => array(
+					'{{WRAPPER}} .ryv-map-widget-popup-close:hover' => 'color: {{VALUE}};',
+				),
+			)
+		);
+
+		$this->add_control(
+			'popup_link_heading',
+			array(
+				'label'     => __( 'Learn More Link', 'ryv-eligibility-tool' ),
+				'type'      => \Elementor\Controls_Manager::HEADING,
+				'separator' => 'before',
+			)
+		);
+
+		$this->add_control(
+			'popup_link_color',
+			array(
+				'label'     => __( 'Color', 'ryv-eligibility-tool' ),
+				'type'      => \Elementor\Controls_Manager::COLOR,
+				'selectors' => array(
+					'{{WRAPPER}} .ryv-map-widget-popup-link' => 'color: {{VALUE}};',
+				),
+			)
+		);
+
+		$this->add_control(
+			'popup_link_hover_color',
+			array(
+				'label'     => __( 'Hover Color', 'ryv-eligibility-tool' ),
+				'type'      => \Elementor\Controls_Manager::COLOR,
+				'selectors' => array(
+					'{{WRAPPER}} .ryv-map-widget-popup-link:hover' => 'color: {{VALUE}};',
+				),
+			)
+		);
+
+		$this->add_group_control(
+			\Elementor\Group_Control_Typography::get_type(),
+			array(
+				'name'     => 'popup_link_typography',
+				'selector' => '{{WRAPPER}} .ryv-map-widget-popup-link',
 			)
 		);
 
