@@ -154,6 +154,14 @@
 
 		function closePopup() {
 			popup.hidden = true;
+			// openPopup() below sets an inline `display: block` (to force
+			// a layout so offsetWidth is measurable before `hidden` is
+			// cleared) - an inline style always beats the UA stylesheet's
+			// `[hidden] { display: none }`, so leaving it in place after
+			// closing meant `hidden = true` alone no longer actually hid
+			// the popup once it had been opened once. Clearing it here
+			// lets `[hidden]` take effect again.
+			popup.style.display = '';
 		}
 
 		function openPopup( regionId, clientX, clientY ) {
