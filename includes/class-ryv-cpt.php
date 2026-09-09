@@ -41,6 +41,69 @@ class RYV_CPT {
 		add_filter( 'manage_edit-' . self::POST_TYPE . '_columns', array( $this, 'add_shortcode_column' ) );
 		add_action( 'manage_' . self::POST_TYPE . '_posts_custom_column', array( $this, 'render_shortcode_column' ), 10, 2 );
 		add_action( 'admin_footer', array( $this, 'print_list_table_copy_script' ) );
+
+		add_action( 'save_post_' . self::POST_TYPE, array( __CLASS__, 'assign_default_language_if_missing' ) );
+	}
+
+	/**
+	 * Backstop for a `ryv_forms` post that WPML never assigned a language
+	 * to - the builder creates new forms via core's `POST /wp/v2/ryv_forms`
+	 * endpoint (see CLAUDE.md's "Admin builder SPA" section) rather than
+	 * the classic post-new.php screen, and that path doesn't reliably run
+	 * WPML's own default-language assignment for every WPML/site
+	 * configuration. A post left without a language row is invisible to
+	 * WPML's own admin list-table language filtering (an `INNER JOIN` to
+	 * `wp_icl_translations`), which is what caused a freshly-created,
+	 * published form to vanish from "All"/"Mine" on the `ryv_forms` list
+	 * table - the post existed, WPML's filtered query just excluded it.
+	 *
+	 * Hooked on every `save_post_ryv_forms` (not just creation), same as
+	 * `RYV_DB::maybe_upgrade()`'s "runs on every request, cheap no-op once
+	 * current" pattern: `wpml_element_trid` is checked first, so an
+	 * already-assigned post costs one filter call and returns immediately.
+	 *
+	 * Also callable directly (`RYV_CPT::assign_default_language_if_missing( $id )`)
+	 * to backfill an existing post - `RYV_Translations_Page`'s "Assign
+	 * Default Language" bulk action reuses this same method against every
+	 * `ryv_forms` post rather than duplicating the assignment logic.
+	 *
+	 * @param int $post_id Post ID.
+	 * @return bool True if a language was just assigned, false if the post
+	 *              already had one (or WPML/its default-language filter
+	 *              isn't available).
+	 */
+	public static function assign_default_language_if_missing( int $post_id ): bool {
+		if ( wp_is_post_autosave( $post_id ) || wp_is_post_revision( $post_id ) ) {
+			return false;
+		}
+
+		if ( ! has_filter( 'wpml_element_trid' ) || ! has_filter( 'wpml_default_language' ) || ! has_action( 'wpml_set_element_language_details' ) ) {
+			return false;
+		}
+
+		$element_type = 'post_' . self::POST_TYPE;
+
+		if ( apply_filters( 'wpml_element_trid', false, $post_id, $element_type ) ) {
+			return false;
+		}
+
+		$default_language = apply_filters( 'wpml_default_language', null );
+
+		if ( ! $default_language ) {
+			return false;
+		}
+
+		do_action(
+			'wpml_set_element_language_details',
+			array(
+				'element_id'    => $post_id,
+				'element_type'  => $element_type,
+				'trid'          => false,
+				'language_code' => $default_language,
+			)
+		);
+
+		return true;
 	}
 
 	/**

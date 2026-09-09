@@ -288,15 +288,11 @@ export function renderStepSidebar() {
  *   first question, not wherever inside it the visitor last was).
  * @param {number} activeIndex Index into `steps` of the step the
  *   currently-active (last on-screen, unanswered) card belongs to - entries
- *   before it are marked done (checkmark), entries at it are marked current
- *   (plain number, unfilled). Both are clickable; entries after it are not.
- *   -1 (nothing named reached yet) marks every entry as upcoming.
- * @param {(nodeId: string) => void} [onStepClick] Called with a done or
- *   current step's `firstNodeId` when the visitor clicks it, to jump back
- *   and revisit it (a current step's own `firstNodeId` just re-lands on the
- *   same card - harmless, and keeps it from looking inert on hover next to
- *   a done step). Omitted/no-op for a sidebar that isn't interactive (e.g.
- *   no step_mode).
+ *   before it are marked done (checkmark) and clickable, entries at/after it
+ *   are not. -1 (nothing named reached yet) marks every entry as upcoming.
+ * @param {(nodeId: string) => void} [onStepClick] Called with a done step's
+ *   `firstNodeId` when the visitor clicks it, to jump back and revisit it.
+ *   Omitted/no-op for a sidebar that isn't interactive (e.g. no step_mode).
  */
 export function updateStepSidebar(listEl, steps, activeIndex, onStepClick) {
   if (!listEl) return;
@@ -305,12 +301,11 @@ export function updateStepSidebar(listEl, steps, activeIndex, onStepClick) {
   steps.forEach((step, index) => {
     const isDone = activeIndex >= 0 && index < activeIndex;
     const isActive = index === activeIndex;
-    const isClickable = isDone || isActive;
     const marker = el('span', {
       className: 'ryv-step-list-marker',
       text: isDone ? '✓' : String(index + 1),
     });
-    const itemAttrs = isClickable ? { role: 'button', tabindex: '0' } : {};
+    const itemAttrs = isDone ? { role: 'button', tabindex: '0' } : {};
     const item = el('li', { className: 'ryv-step-list-item', attrs: itemAttrs }, [
       marker,
       el('span', { text: step.name }),
@@ -318,7 +313,7 @@ export function updateStepSidebar(listEl, steps, activeIndex, onStepClick) {
     if (isDone) item.classList.add('is-done');
     if (isActive) item.classList.add('is-active');
 
-    if (isClickable && onStepClick) {
+    if (isDone && onStepClick) {
       item.addEventListener('click', () => onStepClick(step.firstNodeId));
       item.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' || e.key === ' ') {
@@ -344,7 +339,7 @@ export function renderErrorCard(message, onRetry, labels = DEFAULT_LABELS, icons
       el(
         'button',
         {
-          className: 'ryv-continue-btn ryv-mt-3',
+          className: 'ryv-continue-btn',
           attrs: { type: 'button' },
           on: { click: onRetry },
         },
@@ -995,7 +990,7 @@ export function renderUnsupportedCard(node, isTerminal, onRestart, labels = DEFA
       el(
         'button',
         {
-          className: 'ryv-continue-btn ryv-mt-3',
+          className: 'ryv-continue-btn',
           attrs: { type: 'button' },
           on: { click: onRestart },
         },

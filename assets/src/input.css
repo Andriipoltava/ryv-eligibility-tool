@@ -154,6 +154,11 @@
     border-style: solid;
     border-width: var(--ryv-step-sidebar-marker-border-width, 1px);
     border-color: var(--ryv-step-sidebar-marker-color, var(--ryv-secondary-color, #cbd5e1));
+    /* Fill/background of an upcoming (not yet done/active) step number -
+     * transparent by default (only its border/number color were
+     * customizable before). is-done/is-active below always override this
+     * with the Active Step Color, same as before. */
+    background-color: var(--ryv-step-sidebar-marker-bg-color, transparent);
     color: var(--ryv-step-sidebar-marker-color, inherit);
   }
   .ryv-step-list-item.is-done .ryv-step-list-marker {
@@ -645,11 +650,27 @@
   .ryv-map-widget-intro {
     margin-bottom: var(--ryv-map-intro-spacing, 1.5rem);
   }
+  .ryv-map-widget-eyebrow.ryv-map-widget-eyebrow {
+    margin: 0 0 0.5rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 0.75rem;
+  }
   .ryv-map-widget-heading.ryv-map-widget-heading {
     margin: 0 0 0.5rem;
   }
   .ryv-map-widget-description.ryv-map-widget-description {
     margin: 0;
+  }
+  /* Optional divider line below the description - see the Heading section's
+   * "Show Divider" content control. */
+  .ryv-map-widget-divider {
+    margin: 1.5rem 0 0;
+    border: none;
+    border-top-style: solid;
+    border-top-width: var(--ryv-map-divider-width, 1px);
+    border-top-color: var(--ryv-map-divider-color, #e5e7eb);
   }
   .ryv-map-widget-body {
     display: flex;
@@ -805,18 +826,13 @@
     font-size: 0.75rem;
     margin-bottom: 0.5rem;
   }
-  /* Wraps the <select> so a custom arrow (::after below) can be positioned
-   * over it - the select's own native arrow is hidden via appearance: none,
-   * since a native arrow can't be recolored directly. Same pattern as the
-   * main questionnaire's .ryv-select2 dropdown. */
+  /* Wraps the search input so a custom arrow (::after below) and the
+   * dropdown menu can be positioned over/under it. A select2-style
+   * searchable combobox (assets/js/map-widget.js's wireStatePicker()),
+   * the same vanilla-JS pattern as the main questionnaire's
+   * renderSearchableSelect()/.ryv-select2 - not a native <select>, so
+   * typing filters the state list instead of only scanning it visually. */
   .ryv-map-widget-picker-select-wrap {
-    /* display: flex (not just position: relative) matters here: a <select>
-     * is inline-block by default, and a block wrapper containing only an
-     * inline-block child gets stretched a few px taller than the child
-     * itself (the classic baseline/line-height "phantom gap") - that threw
-     * off the ::after arrow's `top: 50%` below, which is relative to the
-     * wrap's own (inflated) height, not the select's. flex makes the wrap
-     * hug the select exactly. */
     position: relative;
     display: flex;
   }
@@ -833,27 +849,51 @@
     pointer-events: none;
   }
   .ryv-map-widget-picker-select.ryv-map-widget-picker-select {
-    appearance: none;
-    -webkit-appearance: none;
-    -moz-appearance: none;
     width: 100%;
-    padding: 0.625rem 2.5rem 0.625rem 0.75rem;
+    padding: var(--ryv-map-picker-select-padding, 0.625rem 2.5rem 0.625rem 0.75rem);
     border-style: solid;
     border-width: var(--ryv-map-picker-select-border-width, 1px);
     border-color: #d1d5db;
     border-radius: var(--ryv-map-picker-select-border-radius, 0.25rem);
     background-color: #fff;
-    /* The theme's own generic `select { background: ... url(angle-down.jpg) }`
-     * rule only gets its background-color overridden above - background-image
-     * is a separate property, so its arrow graphic was still painting
-     * underneath ours. This is the intentional custom arrow's replacement. */
-    background-image: none;
     font-size: 1rem;
-    cursor: pointer;
+    cursor: text;
   }
   .ryv-map-widget-picker-select.ryv-map-widget-picker-select:focus-visible {
     outline: 2px solid transparent;
     outline-offset: 2px;
     border-color: var(--ryv-map-picker-select-focus-color, var(--ryv-map-picker-select-arrow-color, #6b7280));
+  }
+  .ryv-map-widget-picker-menu[hidden] {
+    display: none;
+  }
+  .ryv-map-widget-picker-menu {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 100%;
+    margin-top: 0.25rem;
+    max-height: 16rem;
+    overflow-y: auto;
+    z-index: 10;
+    background-color: #fff;
+    border-style: solid;
+    border-width: var(--ryv-map-picker-select-border-width, 1px);
+    border-color: #d1d5db;
+    border-radius: var(--ryv-map-picker-select-border-radius, 0.25rem);
+  }
+  .ryv-map-widget-picker-option {
+    cursor: pointer;
+    padding: 0.625rem 0.75rem;
+    font-size: 1rem;
+  }
+  .ryv-map-widget-picker-option:hover,
+  .ryv-map-widget-picker-option.is-highlighted {
+    background-color: #f3f4f6;
+  }
+  .ryv-map-widget-picker-empty {
+    padding: 0.625rem 0.75rem;
+    font-size: 0.875rem;
+    color: #6b7280;
   }
 }

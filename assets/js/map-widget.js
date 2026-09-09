@@ -35,6 +35,7 @@
 
 	function initWidget( widgetEl ) {
 		wireLegendToggle( widgetEl );
+		wireStatePicker( widgetEl );
 
 		var mapContainer = widgetEl.querySelector( '.ryv-map-widget-map' );
 		if ( ! mapContainer ) {
@@ -107,6 +108,129 @@
 			var expanded = toggle.getAttribute( 'aria-expanded' ) !== 'false';
 			toggle.setAttribute( 'aria-expanded', expanded ? 'false' : 'true' );
 			list.hidden = expanded;
+		} );
+	}
+
+	/**
+	 * Turns the "Or pick from a list" state dropdown into a select2-style
+	 * searchable combobox - the vanilla-JS equivalent of the main
+	 * questionnaire's renderSearchableSelect()/.ryv-select2 (assets/js/src/
+	 * renderer.js), reimplemented here rather than imported since this
+	 * script isn't an ES module and has no build step of its own. Options
+	 * come from the search input's own `data-options` attribute (see
+	 * class-ryv-map-widget.php's render_picker()), not ryvMapWidgetData -
+	 * that global is keyed by MapSVG region id for the click popup, not
+	 * ordered/labeled the way this list needs.
+	 */
+	function wireStatePicker( widgetEl ) {
+		var wrap = widgetEl.querySelector( '.ryv-map-widget-picker-select-wrap' );
+		if ( ! wrap ) {
+			return;
+		}
+		var input = wrap.querySelector( '.ryv-map-widget-picker-select' );
+		var menu = wrap.querySelector( '.ryv-map-widget-picker-menu' );
+		if ( ! input || ! menu ) {
+			return;
+		}
+
+		var options = [];
+		try {
+			options = JSON.parse( input.getAttribute( 'data-options' ) || '[]' );
+		} catch ( err ) {
+			options = [];
+		}
+
+		var visibleOptions = [];
+		var highlightedIndex = -1;
+
+		function closeMenu() {
+			menu.hidden = true;
+			input.setAttribute( 'aria-expanded', 'false' );
+			highlightedIndex = -1;
+		}
+
+		function openMenu( query ) {
+			var q = query.trim().toLowerCase();
+			visibleOptions = q ? options.filter( function ( option ) {
+				return option.label.toLowerCase().indexOf( q ) !== -1;
+			} ) : options;
+
+			menu.innerHTML = '';
+
+			if ( ! visibleOptions.length ) {
+				var empty = document.createElement( 'div' );
+				empty.className = 'ryv-map-widget-picker-empty';
+				empty.textContent = ( window.ryvMapWidgetL10n && window.ryvMapWidgetL10n.noResults ) || 'No matches found';
+				menu.appendChild( empty );
+			} else {
+				visibleOptions.forEach( function ( option, index ) {
+					var item = document.createElement( 'div' );
+					item.className = 'ryv-map-widget-picker-option' + ( index === highlightedIndex ? ' is-highlighted' : '' );
+					item.textContent = option.label;
+					item.setAttribute( 'role', 'option' );
+					// mousedown, not click, so this commits before the
+					// input's own blur handler below (which reverts an
+					// unmatched typed value) has a chance to run.
+					item.addEventListener( 'mousedown', function ( e ) {
+						e.preventDefault();
+						navigateTo( option );
+					} );
+					menu.appendChild( item );
+				} );
+			}
+
+			menu.hidden = false;
+			input.setAttribute( 'aria-expanded', 'true' );
+		}
+
+		function navigateTo( option ) {
+			closeMenu();
+			if ( option && option.value ) {
+				window.location.href = option.value;
+			}
+		}
+
+		input.addEventListener( 'focus', function () {
+			openMenu( '' );
+		} );
+		input.addEventListener( 'input', function () {
+			highlightedIndex = -1;
+			openMenu( input.value );
+		} );
+		input.addEventListener( 'keydown', function ( e ) {
+			if ( e.key === 'ArrowDown' ) {
+				e.preventDefault();
+				if ( menu.hidden ) {
+					openMenu( input.value );
+					return;
+				}
+				highlightedIndex = Math.min( highlightedIndex + 1, visibleOptions.length - 1 );
+				openMenu( input.value );
+			} else if ( e.key === 'ArrowUp' ) {
+				e.preventDefault();
+				highlightedIndex = Math.max( highlightedIndex - 1, 0 );
+				openMenu( input.value );
+			} else if ( e.key === 'Enter' ) {
+				e.preventDefault();
+				if ( ! menu.hidden && visibleOptions[ highlightedIndex ] ) {
+					navigateTo( visibleOptions[ highlightedIndex ] );
+				}
+			} else if ( e.key === 'Escape' ) {
+				closeMenu();
+				input.value = '';
+			}
+		} );
+		input.addEventListener( 'blur', function () {
+			// Deferred so a mousedown-selected option above has already
+			// navigated away by the time this would otherwise clear the
+			// typed value back out.
+			window.setTimeout( function () {
+				if ( menu.hidden ) {
+					return;
+				}
+				closeMenu();
+				input.value = '';
+			}, 100 );
 		} );
 	}
 

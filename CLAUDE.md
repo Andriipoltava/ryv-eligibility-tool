@@ -229,10 +229,11 @@ explicit confirmation checkbox before allowing that.
 
 `includes/class-ryv-api.php` exposes one read-only route -
 `GET /ryv/v1/form/{post_id}` returns the entire `{entry_node, nodes}` graph in
-one response, plus the form's `title`/`description` - and one write route,
-`POST /ryv/v1/form/{post_id}/log`, for anonymous progress logging (see below).
-There is no more per-state lazy-loading route; with a single universal DAG
-there's no natural boundary left to preserve one.
+one response, plus the form's `title`/`description` - and two write routes:
+`POST /ryv/v1/form/{post_id}/log`, for anonymous progress logging (see below),
+and `POST /ryv/v1/form/{post_id}/submit`, for `lead_capture` node submissions
+(see "Lead capture" below). There is no more per-state lazy-loading route;
+with a single universal DAG there's no natural boundary left to preserve one.
 
 Draft forms are visible only to users who can `edit_post` that form (lets
 editors preview via the widget before publishing).
@@ -259,6 +260,20 @@ at all (showing "Start Over" only when it's a true terminal, i.e. no
 `next_node`), and text/textarea commit on blur or Enter. `restart()` just
 re-walks the same graph from `entry_node` - no special "back to the picker"
 case, since the picker is just the first node.
+
+**A second layout mode now exists alongside the growing-list model above**:
+`engine.js`'s `wizardMode` (set from `root.dataset.questionLayout === 'wizard'`,
+a per-widget-instance Elementor "Question Layout" control, `stacked` [the
+model just described] vs. `wizard` - see `widgets/class-ryv-widget.php`
+around `question_layout`) shows only the single most recent card plus a named
+step sidebar, rather than every card ever reached. This is layered on top of
+the same underlying graph walk, not a separate engine: `computeNext()` still
+defers markup nodes with a `next_node` set until their own "Continue" button
+is clicked (`advanceWizardMarkup()`) instead of auto-advancing, since
+auto-advancing would otherwise skip straight past a step the visitor is
+supposed to see one-at-a-time. Don't assume `stacked` behavior (every card
+always mounted) holds when touching `renderFrom()`/`computeNext()` - check
+`this.wizardMode` first.
 
 Watch out for the blur-on-removal trap in `renderInputCard`
 (`assets/js/src/renderer.js`): committing an answer rebuilds/removes that
@@ -358,6 +373,59 @@ onto `{{WRAPPER}}` alone, since that markup renders as `.ryv-app-wrapper`'s
 `.ryv-app-wrapper` would be invisible to it (custom properties only cascade to
 descendants).
 
+**This exact mistake recurred, inverted, in `register_step_sidebar_style_controls()`**:
+`step_sidebar_active_color`/`step_sidebar_gap`/`step_sidebar_header_gap`/
+`step_sidebar_marker_size`/`step_sidebar_marker_color` all wrote their custom
+properties onto `{{WRAPPER}} .ryv-app-wrapper`, but `.ryv-step-list`/
+`.ryv-step-list-marker` (the wizard step-sidebar's own markup) render inside
+`.ryv-layout-sidebar`, a *sibling* of `.ryv-app-wrapper` under
+`.ryv-layout--sidebar` (see `render()`) - not a descendant of it either way.
+Every one of those five controls silently no-op'd as a result (confirmed live:
+"Gap Between Steps" and "Step Number Size" visibly did nothing), until fixed
+to target plain `{{WRAPPER}}` - an ancestor of both siblings, same as the
+header fix above. If a future Style control needs to reach markup outside
+`.ryv-app-wrapper`'s own subtree (anything under `.ryv-layout-sidebar`, or the
+header block), write it onto bare `{{WRAPPER}}`, never
+`{{WRAPPER}} .ryv-app-wrapper` - and verify with a live `getComputedStyle()`
+check in the browser, not just "the Elementor control saved without an error,"
+since a wrong-target custom property fails completely silently.
+
+**Spacing above the Continue button and above a question's choice buttons**
+is controllable too now (`continue_button_margin_top` in "Continue Button",
+`button_margin_top` in "Choice Buttons" - both correctly target
+`{{WRAPPER}} .ryv-app-wrapper`, since `.ryv-continue-btn`/`.ryv-options-list`
+*are* inside `.ryv-app-wrapper`, unlike the step-sidebar case above). Adding
+`continue_button_margin_top` meant unifying what was previously an
+inconsistent default: `renderer.js` hardcoded a Tailwind `ryv-mt-3` utility
+class on only two of its many `.ryv-continue-btn` render sites (the
+error-box retry button, the unsupported-node restart button) and left every
+other one (a question's own Continue, a checkbox list's deferred Continue)
+with no top margin at all. Both hardcoded instances were removed in favor of
+one CSS default (`margin-top: var(--ryv-continue-btn-margin-top, 0.75rem)`
+in `.ryv-continue-btn.ryv-continue-btn`, alongside its existing `!important`
+declarations) - every Continue button now gets the same 0.75rem by default,
+adjustable from one place, instead of an admin discovering the control only
+affects some of them.
+
+Same "Top Spacing" idea extends to the Dropdown (`dropdown_margin_top` -
+`--ryv-select-margin-top`, shared by both `.ryv-select` and the select2
+variant `.ryv-select2`, same as every other `--ryv-select-*` var) and Radio
+Buttons (`radio_margin_top` - `--ryv-radio-margin-top`) sections. Radio's is
+the trickier of the two: `renderSingleChoiceOptions()` in `renderer.js`
+appends each `.ryv-radio-option` label straight to the card with no
+enclosing group wrapper, so a plain margin-top on the class would add space
+between *every* option, not just above the first - the CSS rule targets
+`.ryv-radio-option:first-of-type` specifically to avoid that.
+
+The Step Sidebar's "Step Number" controls gained **Font Size**
+(`step_sidebar_marker_font_size` - `--ryv-step-sidebar-marker-font-size`,
+replacing a hardcoded `ryv-text-xs`) and **Border Width**
+(`step_sidebar_marker_border_width` - `--ryv-step-sidebar-marker-border-width`)
+alongside the pre-existing Size/Number Color - `.ryv-step-list-marker`'s
+`border: 1px solid ...` shorthand was split into separate
+`border-style`/`border-width`/`border-color` declarations so width could be
+driven by its own var independently of color.
+
 `includes/class-ryv-assets.php` registers (but does not enqueue) the compiled
 CSS/JS on `wp_enqueue_scripts` at **priority 5**, deliberately before
 Elementor's own dependency-enqueuing on the same hook - the widget declares
@@ -417,6 +485,211 @@ importer above) and a "Hidden" `ToggleControl` (Markup/Unsupported nodes
 only - hiding a choice/text/lead_capture node would strand a visitor with no
 way to ever answer it, so the control simply doesn't apply there).
 
+### Lead capture (`lead_capture` node type)
+
+A choice/text/markup-adjacent node type whose schema carries `form_fields`
+(admin-defined `{ label, name, type, required }[]`) and `email_settings`
+(`save_to_db`, and independently-toggleable admin-notification /
+visitor-confirmation emails with `{field_name}`/`{all_fields}` template
+placeholders). Submitted via `POST /ryv/v1/form/{post_id}/submit`
+(`RYV_API::submit_lead()`), which reads the node's own `form_fields`/
+`email_settings` out of the stored schema rather than trusting them from the
+request - only `node_id`/`form_data`/`session_id` come from the client, and
+`form_data` is sanitized key-by-key against the schema's declared fields
+(unrecognized keys silently dropped, each value sanitized per its declared
+`type` - `email`/`textarea`/plain text - before storage or template
+interpolation). Rows land in `wp_ryv_leads` (`includes/class-ryv-leads.php`,
+via `RYV_DB`) only when `email_settings.save_to_db` is on, and are surfaced,
+paginated, on **RYV Forms → Submissions** (`admin/class-ryv-submissions-page.php`
+/ `admin/views/submissions-page.php`) alongside the anonymous progress-log
+submissions.
+
+### States, Resources, and the interactive map
+
+Two more CPTs sit alongside `ryv_forms`, both registered in
+`RYV_Plugin::includes()`/`init_hooks()` unconditionally (not gated on
+`is_admin()`, since `ryv_states` posts are public-facing state pages):
+
+- **`ryv_states`** (`includes/class-ryv-states-cpt.php`) - one post per US
+  state. When ACF Pro is active, `includes/class-ryv-states-acf.php` adds two
+  field groups: state-page content (matching the public site's design), and a
+  form-node editor (form + state selector + a node repeater). The repeater is
+  **not** the source of truth - `includes/class-ryv-states-sync.php`
+  bidirectionally syncs it against the actual `_ryv_form_schema` postmeta on
+  `acf/save_post`, resolving "which nodes belong to this state" by walking the
+  graph depth-first from the state picker's option for that state (id-prefix
+  matching was rejected as unsafe - see the file's own docblock - since
+  migrated vs. YAML-imported schemas use different node-id conventions).
+  `includes/class-ryv-states-generator.php` bulk-creates one `ryv_states` post
+  per state-picker option (keyed uniquely by `sanitize_title()` of the
+  option's untranslated `value`, safe to re-run against a translated form
+  edition without duplicating) and can auto-populate each state's map
+  category from a hardcoded NCSL reference table
+  (`CLC_CATEGORY_STATES`) - run from **RYV Forms → Generate States**
+  (`admin/class-ryv-states-generate-page.php`, ACF-gated).
+- **`ryv_resources`** (`includes/class-ryv-resources-cpt.php`) - standalone
+  guides/forms/videos/toolkits; a state links to its resources via an ACF
+  relationship field rather than embedding them as repeater rows.
+- **MapSVG sync** (`includes/class-ryv-mapsvg-sync.php`, ACF-gated) pushes
+  each state's ACF category/color/tooltip/link onto the MapSVG plugin's own
+  tables on `acf/save_post`. MapSVG 6.x's region table has no per-region
+  color column at all (confirmed via `DESCRIBE`, not assumed) - a region's
+  `status` is just an index into the *map's own* `options` JSON
+  `regionStatuses` array, so writing a state's color is a two-part
+  read-modify-write: ensure the map's `regionStatuses` has an entry for that
+  category, then point the region's `status`/`status_text` at it.
+  `widgets/class-ryv-map-widget.php` is the Elementor widget embedding that
+  MapSVG map, with a fuller Style-tab surface than MapSVG's own bundled
+  widget plus a styled "Or pick from a list" state-dropdown fallback.
+
+### Non-Elementor embed: `[ryv_form]` shortcode
+
+`includes/class-ryv-shortcode.php` renders the exact same
+`.ryv-app-wrapper[data-form-id]` mount point as the Elementor widget, so a
+form can be embedded in any post/page content without Elementor - same
+draft-visibility rule as `RYV_API::get_viewable_form()`. It enqueues the same
+registered `RYV_Assets` handles the widget depends on (never its own copies),
+so a page using both the widget and the shortcode still only loads one copy
+of the CSS/JS. `admin/class-ryv-shortcode-hint.php` adds a read-only meta box
+to the post/page editor listing every published form and its shortcode, so an
+author doesn't need to already know a form's post ID.
+
+### Drupal YAML exporter (`includes/class-ryv-drupal-yaml-exporter.php`)
+
+The inverse of `RYV_YAML_Parser`: reconstructs `#states`-gated Drupal
+containers/elements from a flat RYV graph so the result both re-imports
+cleanly through the unmodified parser and passes as a plausible Drupal
+Webform config export. Explicitly a best-effort reversal scoped to forms that
+were originally YAML-imported and only lightly edited since - it depends on
+two fields the importer writes and nothing else touches, `node.group`
+(originating Drupal container) and `node.source_type` (original Drupal
+`#type`), neither guaranteed present/accurate on a node authored fresh in the
+builder. A non-choice node's outgoing edge can only be encoded by document
+position (immediately following it in the same reconstructed container) since
+Drupal has no gate mechanism for it, so `validate_positional_edges()` checks
+that positional assumption still holds for the schema being exported and
+warns (never silently drops) when it doesn't. Reachable from **RYV Forms →
+Export** (`admin/class-ryv-export-page.php`).
+
+### Graph validator (`includes/class-ryv-graph-validator.php`)
+
+A structural health check - `RYV_Graph_Validator::analyze()` takes any
+`{ entry_node, nodes }` schema and reports broken `next_node`/option links
+(naming an id absent from `nodes`) and orphaned nodes (unreachable from
+`entry_node` by any path). Independent of any one import path, so it runs the
+same way against freshly parsed YAML, a stored schema, or a builder save.
+
+### Global Styles (`admin/class-ryv-settings-page.php`)
+
+A `manage_options` Settings API page (**RYV Forms → Global Styles**, single
+`ryv_global_styles` option) providing plugin-wide default colors/typography
+for every form, layered *underneath* any Elementor Style-tab override on a
+given widget instance. Unlike every other `admin/*-page.php` controller, it's
+instantiated unconditionally rather than inside `RYV_Plugin`'s `is_admin()`
+block, because it also feeds the frontend CSS-variable cascade
+(`build_css()`/`output_style_vars()`) that the widget and `[ryv_form]`
+shortcode both render through - its `admin_menu`/`admin_init` hooks are just
+no-ops on a frontend request.
+
+### WPML translation support
+
+`wpml-config.xml` pre-registers `ryv_forms` and its `_ryv_form_schema`
+postmeta so WPML's translation editor can offer them; widget Content-tab
+labels are marked translatable by default
+(`register_string_translation()`/ICL string translation) rather than left as
+plain hardcoded control defaults.
+
+**Linking two independently-created language editions**
+(`admin/class-ryv-translations-page.php`, **RYV Forms → Translations**,
+only registered when `has_action('wpml_set_element_language_details')` etc.
+detect WPML's API) exists because the normal WPML ways of doing this don't
+reach this CPT: `RYV_Builder_Page` fully replaces the standard post edit
+screen, so WPML's classic "Languages" meta box (the usual place to point an
+existing post at another as its translation) never renders for a
+`ryv_forms` post; the list table's own "+"/pencil icon in the Languages
+column instead routes through WPML's Translation Management job queue,
+which commissions a *new* translation rather than linking two posts that
+were each already created independently (e.g. one YAML-imported per
+language edition - exactly how the English/Spanish editions of a form
+typically come to exist). This page lets an admin pick "Form A is the
+translation of Form B" from two `<select>`s and performs the link entirely
+through WPML's own public API (`wpml_element_trid`,
+`wpml_post_language_details`, `wpml_set_element_language_details`) - it
+never touches `wp_icl_translations` directly, unlike a manual SQL fix.
+
+That same page also neutralizes WPML's own translate-link icon
+(`a.js-wpml-translate-link`) on the `ryv_forms` list table
+(`disable_list_table_translate_link()`, hooked on `admin_footer-edit.php`,
+scoped to that one screen): an admin clicking it - expecting the usual
+"jump to the linked post" behavior it has for ordinary posts/pages - can
+otherwise silently queue a duplicate-in-progress Translation Management job
+instead (the exact failure mode this page exists to avoid). The fix strips
+the link's `href` (so neither click nor keyboard Enter can reach WPML's
+queue) and rewrites its click handler to land on this Translations page
+instead - a JS fix, not `pointer-events` CSS alone, since that wouldn't
+stop keyboard activation.
+
+### Step Names (`admin/class-ryv-step-names-page.php`)
+
+Bulk-assigns the wizard step-sidebar's `step_name` field (see "A second
+layout mode" above, `NodeEditor.js`'s "Step Name" field, and `engine.js`'s
+`updateStepSidebar()`) across an entire form's graph in one pass, for the
+3-step shape every RYV questionnaire actually has: "pick your state",
+"answer about your conviction" (a different node per state, but the same
+conceptual step), "see your result" (also a different node per branch) -
+rather than requiring an admin to open a form's 400+ nodes one at a time in
+the builder to set the same label repeatedly. Reachable from **RYV States
+→ Step Names** (deliberately nested under the States CPT's menu, not
+Forms', even though it reads/writes `ryv_forms` schemas - this is normally
+set up right after a state's own content is finished).
+
+Given one "anchor" form, `apply_step_names()` resets every node's
+`step_name` to empty, then sets exactly three: the entry node (step 1),
+every node the entry node's options route to - resolved past any `hidden`
+nodes in between, since a hidden node never gets a card and so can't
+usefully anchor a sidebar entry (step 2), and every true-terminal node (no
+outgoing `next_node`/`options[].next_node` at all) not already claimed by
+step 1/2 (step 3). Every other node is left with an empty `step_name` on
+purpose - `updateStepSidebar()` only starts a new sidebar entry when a
+node's `step_name` differs from the currently-active one, so leaving it
+empty just keeps the visitor folded into whichever named step they're
+already in.
+
+When WPML is active, picking one form auto-discovers every linked
+translation via `wpml_get_element_translations` (`RYV_Translations_Page` is
+the other half of that link) and renders one row of Step 1/2/3 fields per
+language, all under a single submit - each language's own graph gets the
+rule applied independently with its own typed wording (never
+machine-translated; each edition keeps its own node ids, so this is always
+re-run per-edition, not copied across languages). Since a form and its
+translation are still two separately-linked forms rather than one, an
+"Also apply to this form's linked translations" checkbox (checked by
+default, only shown when a group has more than one member) lets an admin
+restrict a submit to just the one form picked above - e.g. to re-word or
+fix a single language's step names without touching its sibling editions.
+
+### Current Assignments (map categories, `admin/class-ryv-states-generate-page.php`)
+
+Sits directly below the "Auto-Populate Map Categories" button described
+above, on the same **RYV States → Generate States** page, and exists for
+the opposite need: that button only ever *bulk-resets everything* to the
+CLC reference defaults, with no way to see the result or hand-adjust one
+state afterward without opening its own edit screen. This section instead
+lists every `ryv_states` post with a `<select>` of every live map category
+(sourced from `RYV_States_ACF::get_map_categories()` - the same options-page
+repeater the `ryv_map_category` ACF field itself reads its choices from, so
+this table can never drift from what an admin would see on a state's own
+edit screen) pre-selected to that state's current value, all under one
+"Save Category Assignments" submit
+(`RYV_States_Generate_Page::handle_move_submission()`). Only rows whose
+selection actually changed get `update_field()`'d - comparing against each
+state's current value first, rather than blindly writing every row on every
+submit - and if anything changed, `RYV_MapSVG_Sync::sync_all()` runs once
+afterward (not per-row) to push the new colors to the map, the same manual
+trigger the "Sync Category Colors to Map" button above uses, since
+`update_field()` alone doesn't fire the `acf/save_post` hook that class
+normally syncs on.
+
 ### Help admin page (`admin/class-ryv-help-page.php`)
 
 A static, read-only documentation page (`admin/views/help-page.php`) under
@@ -431,14 +704,28 @@ something dynamic it's no longer just documentation.
 
 ## Status
 
-Implemented: CPT + postmeta schema (flat DAG), YAML importer/parser, REST
-API, frontend decision engine, Elementor widget (content + style controls,
-including title/description), admin builder SPA, visitor/admin activity
-logging, Help admin page. All phases from the original plan are built, plus
-the later flat-DAG rewrite (states-keyed → single universal graph) and its
-lazy migration path for existing forms, plus a later pass reconciling the
-whole frontend's default look 1:1 against campaignlegal.org/restoreyourvote
-(colors/typography/dropdown/buttons/help-tooltip) and adding the
-`reference_node_ids`/`hidden` gate-collision handling described above.
-Verified against both real production YAML exports and live browser testing
-(Elementor editor included, not just code review).
+Implemented: CPT + postmeta schema (flat DAG), YAML importer/parser + its
+Drupal YAML exporter inverse, graph validator, REST API (form fetch,
+progress logging, lead-capture submission), frontend decision engine with
+both stacked and one-question-at-a-time wizard/step-sidebar layouts,
+Elementor widget (content + style controls, including title/description) and
+`[ryv_form]` shortcode embed, admin builder SPA, lead capture (form fields +
+email notifications + Submissions page), visitor/admin activity logging,
+`ryv_states`/`ryv_resources` CPTs with ACF field groups, bidirectional
+states⟷schema node sync, states bulk-generator, MapSVG map sync + Elementor
+map widget, Global Styles admin page, WPML translation support plus a
+Translations admin page for manually linking independently-created language
+editions, a Step Names admin page for bulk-assigning the wizard sidebar's
+3-step structure across a form (and its linked translations) in one pass,
+a Current Assignments table for viewing/hand-adjusting every state's map
+category in one place, Help admin page. All phases from the original plan are built, plus the later flat-DAG
+rewrite (states-keyed → single universal graph) and its lazy migration path
+for existing forms, a pass reconciling the whole frontend's default look 1:1
+against campaignlegal.org/restoreyourvote (colors/typography/dropdown/
+buttons/help-tooltip), the `reference_node_ids`/`hidden` gate-collision
+handling, and the later states/resources/map/lead-capture/wizard-layout
+build-out described above. The old custom `ryv_events` CPT
+(`includes/class-ryv-events-cpt.php`) has been removed, superseded by The
+Events Calendar's `tribe_events`. Verified against both real production YAML
+exports and live browser testing (Elementor editor included, not just code
+review).

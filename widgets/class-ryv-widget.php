@@ -923,6 +923,29 @@ class RYV_Widget extends \Elementor\Widget_Base {
 			)
 		);
 
+		// Defaults to 0/no rule emitted (same reasoning as
+		// step_sidebar_header_gap above) - an untouched instance keeps
+		// relying on the question title/description's own bottom margin
+		// exactly as before this control existed.
+		$this->add_control(
+			'button_margin_top',
+			array(
+				'label'       => __( 'Top Spacing', 'ryv-eligibility-tool' ),
+				'type'        => \Elementor\Controls_Manager::SLIDER,
+				'size_units'  => array( 'px' ),
+				'range'       => array(
+					'px' => array(
+						'min' => 0,
+						'max' => 60,
+					),
+				),
+				'description' => __( 'Extra space between the question title/description above and this button list, in addition to the title/description\'s own Bottom Spacing.', 'ryv-eligibility-tool' ),
+				'selectors'   => array(
+					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-btn-list-margin-top: {{SIZE}}{{UNIT}};',
+				),
+			)
+		);
+
 		$this->add_responsive_control(
 			'button_padding',
 			array(
@@ -1108,6 +1131,30 @@ class RYV_Widget extends \Elementor\Widget_Base {
 				'name'     => 'continue_button_typography',
 				'label'    => __( 'Typography', 'ryv-eligibility-tool' ),
 				'selector' => '{{WRAPPER}} .ryv-continue-btn',
+			)
+		);
+
+		// Every render path (a question's own Continue, a checkbox list's
+		// deferred Continue, error/unsupported-node retry buttons) now shares
+		// one CSS-driven default (input.css) instead of some getting a
+		// hardcoded Tailwind `mt-3` and others getting nothing - see this
+		// control's own history in CLAUDE.md for why that inconsistency
+		// mattered.
+		$this->add_control(
+			'continue_button_margin_top',
+			array(
+				'label'      => __( 'Top Spacing', 'ryv-eligibility-tool' ),
+				'type'       => \Elementor\Controls_Manager::SLIDER,
+				'size_units' => array( 'px' ),
+				'range'      => array(
+					'px' => array(
+						'min' => 0,
+						'max' => 60,
+					),
+				),
+				'selectors'  => array(
+					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-continue-btn-margin-top: {{SIZE}}{{UNIT}};',
+				),
 			)
 		);
 
@@ -1315,6 +1362,28 @@ class RYV_Widget extends \Elementor\Widget_Base {
 				),
 				'selectors'  => array(
 					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-select-border-width: {{SIZE}}{{UNIT}};',
+				),
+			)
+		);
+
+		// Defaults to 0/no rule emitted, same reasoning as button_margin_top
+		// above - shared by both the plain <select> and the searchable
+		// (select2) variant, same as every other --ryv-select-* var.
+		$this->add_control(
+			'dropdown_margin_top',
+			array(
+				'label'      => __( 'Top Spacing', 'ryv-eligibility-tool' ),
+				'type'       => \Elementor\Controls_Manager::SLIDER,
+				'size_units' => array( 'px' ),
+				'range'      => array(
+					'px' => array(
+						'min' => 0,
+						'max' => 60,
+					),
+				),
+				'description' => __( 'Extra space between the question title/description above and the dropdown below.', 'ryv-eligibility-tool' ),
+				'selectors'   => array(
+					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-select-margin-top: {{SIZE}}{{UNIT}};',
 				),
 			)
 		);
@@ -1628,6 +1697,30 @@ class RYV_Widget extends \Elementor\Widget_Base {
 			)
 		);
 
+		// Defaults to 0/no rule emitted, same reasoning as button_margin_top -
+		// each .ryv-radio-option is appended straight to the card with no
+		// enclosing group wrapper (see renderSingleChoiceOptions() in
+		// renderer.js), so this only targets the first one via :first-of-type
+		// rather than adding space between every option.
+		$this->add_control(
+			'radio_margin_top',
+			array(
+				'label'       => __( 'Top Spacing', 'ryv-eligibility-tool' ),
+				'type'        => \Elementor\Controls_Manager::SLIDER,
+				'size_units'  => array( 'px' ),
+				'range'       => array(
+					'px' => array(
+						'min' => 0,
+						'max' => 60,
+					),
+				),
+				'description' => __( 'Extra space between the question title/description above and the radio options below.', 'ryv-eligibility-tool' ),
+				'selectors'   => array(
+					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-radio-margin-top: {{SIZE}}{{UNIT}};',
+				),
+			)
+		);
+
 		$this->end_controls_section();
 	}
 
@@ -1824,6 +1917,18 @@ class RYV_Widget extends \Elementor\Widget_Base {
 	 * CSS-custom-property technique as the rest of this file - values here
 	 * fall through to input.css's own defaults (which already reuse
 	 * --ryv-primary-color/--ryv-secondary-color) when left blank.
+	 *
+	 * Every custom property below is written onto plain `{{WRAPPER}}`
+	 * (the widget's own root element), never `{{WRAPPER}} .ryv-app-wrapper`
+	 * - the exact mistake register_header_style_controls() already warns
+	 * about, but inverted: `.ryv-step-list`/`.ryv-step-list-marker` render
+	 * inside `.ryv-layout-sidebar`, a *sibling* of `.ryv-app-wrapper` under
+	 * `.ryv-layout--sidebar` (see render()), not a descendant of it. A
+	 * property set on `.ryv-app-wrapper` is invisible outside its own
+	 * subtree, so writing it there silently no-ops every control in this
+	 * method - confirmed live (Gap Between Steps/Step Number Size did
+	 * nothing) before this was corrected to target `{{WRAPPER}}` itself,
+	 * which is an ancestor of both siblings.
 	 */
 	private function register_step_sidebar_style_controls() {
 		$this->start_controls_section(
@@ -1845,65 +1950,14 @@ class RYV_Widget extends \Elementor\Widget_Base {
 			)
 		);
 
-		// Renamed from "Active Step Color" - despite the name, this control
-		// (`--ryv-step-sidebar-active-color`) has always driven the *done*
-		// (completed, filled-circle-with-checkmark) steps' color, not the
-		// one the visitor is currently on - see the four new controls
-		// below for that. The control id/CSS var are unchanged so existing
-		// saved values on live widget instances keep working; only the
-		// label changed, to stop it being mistaken for "the currently
-		// active step's color".
 		$this->add_control(
 			'step_sidebar_active_color',
 			array(
-				'label'       => __( 'Done Step Color', 'ryv-eligibility-tool' ),
+				'label'       => __( 'Active Step Color', 'ryv-eligibility-tool' ),
 				'type'        => \Elementor\Controls_Manager::COLOR,
-				'description' => __( 'Completed (checkmark) steps. Leave blank to use the widget\'s Primary Color.', 'ryv-eligibility-tool' ),
+				'description' => __( 'Leave blank to use the widget\'s Primary Color.', 'ryv-eligibility-tool' ),
 				'selectors'   => array(
 					'{{WRAPPER}}' => '--ryv-step-sidebar-active-color: {{VALUE}};',
-				),
-			)
-		);
-
-		$this->add_control(
-			'step_sidebar_active_hover_color',
-			array(
-				'label'       => __( 'Done Step Hover Color', 'ryv-eligibility-tool' ),
-				'type'        => \Elementor\Controls_Manager::COLOR,
-				'description' => __( 'Completed steps are clickable (jump back to revisit). Leave blank to use Done Step Color.', 'ryv-eligibility-tool' ),
-				'selectors'   => array(
-					'{{WRAPPER}}' => '--ryv-step-sidebar-active-hover-color: {{VALUE}};',
-				),
-			)
-		);
-
-		// The step the visitor is currently on - a distinct, unfilled
-		// (outline + text only) state from the filled "done" steps above.
-		// Also clickable (see renderer.js's updateStepSidebar()): clicking
-		// it just re-lands on the same card, which is a harmless way to
-		// scroll it into view (stacked layout) or confirm where you are
-		// (wizard layout), so it gets the same hover affordance as a done
-		// step rather than looking inert.
-		$this->add_control(
-			'step_sidebar_current_color',
-			array(
-				'label'       => __( 'Current Step Color', 'ryv-eligibility-tool' ),
-				'type'        => \Elementor\Controls_Manager::COLOR,
-				'description' => __( 'The step the visitor is on right now. Leave blank to use Done Step Color.', 'ryv-eligibility-tool' ),
-				'selectors'   => array(
-					'{{WRAPPER}}' => '--ryv-step-sidebar-current-color: {{VALUE}};',
-				),
-			)
-		);
-
-		$this->add_control(
-			'step_sidebar_current_hover_color',
-			array(
-				'label'       => __( 'Current Step Hover Color', 'ryv-eligibility-tool' ),
-				'type'        => \Elementor\Controls_Manager::COLOR,
-				'description' => __( 'Leave blank to use Current Step Color.', 'ryv-eligibility-tool' ),
-				'selectors'   => array(
-					'{{WRAPPER}}' => '--ryv-step-sidebar-current-hover-color: {{VALUE}};',
 				),
 			)
 		);
@@ -1921,7 +1975,7 @@ class RYV_Widget extends \Elementor\Widget_Base {
 					),
 				),
 				'selectors'  => array(
-					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-step-sidebar-gap: {{SIZE}}{{UNIT}};',
+					'{{WRAPPER}}' => '--ryv-step-sidebar-gap: {{SIZE}}{{UNIT}};',
 				),
 			)
 		);
@@ -1946,7 +2000,7 @@ class RYV_Widget extends \Elementor\Widget_Base {
 				),
 				'description' => __( 'Extra space between the title/description above and the step checklist below, in addition to the title/description\'s own Bottom Spacing.', 'ryv-eligibility-tool' ),
 				'selectors'  => array(
-					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-layout-sidebar-inner-gap: {{SIZE}}{{UNIT}};',
+					'{{WRAPPER}}' => '--ryv-layout-sidebar-inner-gap: {{SIZE}}{{UNIT}};',
 				),
 			)
 		);
@@ -1973,7 +2027,25 @@ class RYV_Widget extends \Elementor\Widget_Base {
 					),
 				),
 				'selectors'  => array(
-					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-step-sidebar-marker-size: {{SIZE}}{{UNIT}};',
+					'{{WRAPPER}}' => '--ryv-step-sidebar-marker-size: {{SIZE}}{{UNIT}};',
+				),
+			)
+		);
+
+		$this->add_control(
+			'step_sidebar_marker_font_size',
+			array(
+				'label'      => __( 'Font Size', 'ryv-eligibility-tool' ),
+				'type'       => \Elementor\Controls_Manager::SLIDER,
+				'size_units' => array( 'px' ),
+				'range'      => array(
+					'px' => array(
+						'min' => 8,
+						'max' => 32,
+					),
+				),
+				'selectors'  => array(
+					'{{WRAPPER}}' => '--ryv-step-sidebar-marker-font-size: {{SIZE}}{{UNIT}};',
 				),
 			)
 		);
@@ -1985,7 +2057,37 @@ class RYV_Widget extends \Elementor\Widget_Base {
 				'type'        => \Elementor\Controls_Manager::COLOR,
 				'description' => __( 'The upcoming (not yet done/active) step number and its border. Leave blank to use the widget\'s Secondary Color.', 'ryv-eligibility-tool' ),
 				'selectors'   => array(
-					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-step-sidebar-marker-color: {{VALUE}};',
+					'{{WRAPPER}}' => '--ryv-step-sidebar-marker-color: {{VALUE}};',
+				),
+			)
+		);
+
+		$this->add_control(
+			'step_sidebar_marker_bg_color',
+			array(
+				'label'       => __( 'Background Color', 'ryv-eligibility-tool' ),
+				'type'        => \Elementor\Controls_Manager::COLOR,
+				'description' => __( 'Fill of an upcoming (not yet done/active) step number - transparent by default. A done/active step always shows the Active Step Color instead, regardless of this.', 'ryv-eligibility-tool' ),
+				'selectors'   => array(
+					'{{WRAPPER}}' => '--ryv-step-sidebar-marker-bg-color: {{VALUE}};',
+				),
+			)
+		);
+
+		$this->add_control(
+			'step_sidebar_marker_border_width',
+			array(
+				'label'      => __( 'Border Width', 'ryv-eligibility-tool' ),
+				'type'       => \Elementor\Controls_Manager::SLIDER,
+				'size_units' => array( 'px' ),
+				'range'      => array(
+					'px' => array(
+						'min' => 0,
+						'max' => 10,
+					),
+				),
+				'selectors'  => array(
+					'{{WRAPPER}}' => '--ryv-step-sidebar-marker-border-width: {{SIZE}}{{UNIT}};',
 				),
 			)
 		);

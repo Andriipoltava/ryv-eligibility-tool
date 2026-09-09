@@ -91,6 +91,30 @@ class RYV_Map_Widget extends \Elementor\Widget_Base {
 		);
 
 		$this->add_control(
+			'show_eyebrow',
+			array(
+				'label'        => __( 'Show Eyebrow Label', 'ryv-eligibility-tool' ),
+				'type'         => \Elementor\Controls_Manager::SWITCHER,
+				'label_on'     => __( 'Show', 'ryv-eligibility-tool' ),
+				'label_off'    => __( 'Hide', 'ryv-eligibility-tool' ),
+				'return_value' => 'yes',
+				'default'      => '',
+				'description'  => __( 'Optional small uppercase label shown above the heading (e.g. "STATE LAWS").', 'ryv-eligibility-tool' ),
+			)
+		);
+
+		$this->add_control(
+			'eyebrow_text',
+			array(
+				'label'       => __( 'Eyebrow Text', 'ryv-eligibility-tool' ),
+				'type'        => \Elementor\Controls_Manager::TEXT,
+				'default'     => '',
+				'label_block' => true,
+				'condition'   => array( 'show_eyebrow' => 'yes' ),
+			)
+		);
+
+		$this->add_control(
 			'show_heading',
 			array(
 				'label'        => __( 'Show Heading', 'ryv-eligibility-tool' ),
@@ -132,6 +156,19 @@ class RYV_Map_Widget extends \Elementor\Widget_Base {
 				'type'      => \Elementor\Controls_Manager::TEXTAREA,
 				'default'   => __( 'Hover or click a state to see a quick overview.', 'ryv-eligibility-tool' ),
 				'condition' => array( 'show_description' => 'yes' ),
+			)
+		);
+
+		$this->add_control(
+			'show_divider',
+			array(
+				'label'        => __( 'Show Divider Line', 'ryv-eligibility-tool' ),
+				'type'         => \Elementor\Controls_Manager::SWITCHER,
+				'label_on'     => __( 'Show', 'ryv-eligibility-tool' ),
+				'label_off'    => __( 'Hide', 'ryv-eligibility-tool' ),
+				'return_value' => 'yes',
+				'default'      => '',
+				'description'  => __( 'Optional horizontal line below the heading/description, above the map.', 'ryv-eligibility-tool' ),
 			)
 		);
 
@@ -341,8 +378,50 @@ class RYV_Map_Widget extends \Elementor\Widget_Base {
 		$this->start_controls_section(
 			'heading_style_section',
 			array(
+				'label' => __( 'Heading', 'ryv-eligibility-tool' ),
+				'tab'   => \Elementor\Controls_Manager::TAB_STYLE,
+				// Not conditioned on show_heading alone - the eyebrow and
+				// divider controls below are independently optional and can
+				// be on even when the heading itself is off.
+			)
+		);
+
+		$this->add_control(
+			'eyebrow_style_heading',
+			array(
+				'label'     => __( 'Eyebrow Label', 'ryv-eligibility-tool' ),
+				'type'      => \Elementor\Controls_Manager::HEADING,
+				'condition' => array( 'show_eyebrow' => 'yes' ),
+			)
+		);
+
+		$this->add_control(
+			'eyebrow_color',
+			array(
+				'label'     => __( 'Eyebrow Color', 'ryv-eligibility-tool' ),
+				'type'      => \Elementor\Controls_Manager::COLOR,
+				'condition' => array( 'show_eyebrow' => 'yes' ),
+				'selectors' => array(
+					'{{WRAPPER}} .ryv-map-widget-eyebrow' => 'color: {{VALUE}};',
+				),
+			)
+		);
+
+		$this->add_group_control(
+			\Elementor\Group_Control_Typography::get_type(),
+			array(
+				'name'      => 'eyebrow_typography',
+				'selector'  => '{{WRAPPER}} .ryv-map-widget-eyebrow',
+				'condition' => array( 'show_eyebrow' => 'yes' ),
+			)
+		);
+
+		$this->add_control(
+			'heading_style_heading',
+			array(
 				'label'     => __( 'Heading', 'ryv-eligibility-tool' ),
-				'tab'       => \Elementor\Controls_Manager::TAB_STYLE,
+				'type'      => \Elementor\Controls_Manager::HEADING,
+				'separator' => 'before',
 				'condition' => array( 'show_heading' => 'yes' ),
 			)
 		);
@@ -352,6 +431,7 @@ class RYV_Map_Widget extends \Elementor\Widget_Base {
 			array(
 				'label'     => __( 'Heading Color', 'ryv-eligibility-tool' ),
 				'type'      => \Elementor\Controls_Manager::COLOR,
+				'condition' => array( 'show_heading' => 'yes' ),
 				'selectors' => array(
 					'{{WRAPPER}} .ryv-map-widget-heading' => 'color: {{VALUE}};',
 				),
@@ -361,8 +441,38 @@ class RYV_Map_Widget extends \Elementor\Widget_Base {
 		$this->add_group_control(
 			\Elementor\Group_Control_Typography::get_type(),
 			array(
-				'name'     => 'heading_typography',
-				'selector' => '{{WRAPPER}} .ryv-map-widget-heading',
+				'name'      => 'heading_typography',
+				'selector'  => '{{WRAPPER}} .ryv-map-widget-heading',
+				'condition' => array( 'show_heading' => 'yes' ),
+			)
+		);
+
+		$this->add_responsive_control(
+			'heading_margin_bottom',
+			array(
+				'label'      => __( 'Spacing Below Heading', 'ryv-eligibility-tool' ),
+				'type'       => \Elementor\Controls_Manager::SLIDER,
+				'size_units' => array( 'px' ),
+				'range'      => array(
+					'px' => array(
+						'min' => 0,
+						'max' => 60,
+					),
+				),
+				'condition'  => array( 'show_heading' => 'yes' ),
+				'selectors'  => array(
+					'{{WRAPPER}} .ryv-map-widget-heading' => '--ryv-map-heading-spacing: {{SIZE}}{{UNIT}};',
+				),
+			)
+		);
+
+		$this->add_control(
+			'description_style_heading',
+			array(
+				'label'     => __( 'Description', 'ryv-eligibility-tool' ),
+				'type'      => \Elementor\Controls_Manager::HEADING,
+				'separator' => 'before',
+				'condition' => array( 'show_description' => 'yes' ),
 			)
 		);
 
@@ -371,7 +481,7 @@ class RYV_Map_Widget extends \Elementor\Widget_Base {
 			array(
 				'label'     => __( 'Description Color', 'ryv-eligibility-tool' ),
 				'type'      => \Elementor\Controls_Manager::COLOR,
-				'separator' => 'before',
+				'condition' => array( 'show_description' => 'yes' ),
 				'selectors' => array(
 					'{{WRAPPER}} .ryv-map-widget-description' => 'color: {{VALUE}};',
 				),
@@ -381,15 +491,77 @@ class RYV_Map_Widget extends \Elementor\Widget_Base {
 		$this->add_group_control(
 			\Elementor\Group_Control_Typography::get_type(),
 			array(
-				'name'     => 'description_typography',
-				'selector' => '{{WRAPPER}} .ryv-map-widget-description',
+				'name'      => 'description_typography',
+				'selector'  => '{{WRAPPER}} .ryv-map-widget-description',
+				'condition' => array( 'show_description' => 'yes' ),
+			)
+		);
+
+		$this->add_responsive_control(
+			'description_margin_bottom',
+			array(
+				'label'      => __( 'Spacing Below Description', 'ryv-eligibility-tool' ),
+				'type'       => \Elementor\Controls_Manager::SLIDER,
+				'size_units' => array( 'px' ),
+				'range'      => array(
+					'px' => array(
+						'min' => 0,
+						'max' => 60,
+					),
+				),
+				'condition'  => array( 'show_description' => 'yes' ),
+				'selectors'  => array(
+					'{{WRAPPER}} .ryv-map-widget-description' => '--ryv-map-description-spacing: {{SIZE}}{{UNIT}};',
+				),
+			)
+		);
+
+		$this->add_control(
+			'divider_style_heading',
+			array(
+				'label'     => __( 'Divider Line', 'ryv-eligibility-tool' ),
+				'type'      => \Elementor\Controls_Manager::HEADING,
+				'separator' => 'before',
+				'condition' => array( 'show_divider' => 'yes' ),
+			)
+		);
+
+		$this->add_control(
+			'divider_color',
+			array(
+				'label'     => __( 'Divider Color', 'ryv-eligibility-tool' ),
+				'type'      => \Elementor\Controls_Manager::COLOR,
+				'default'   => '#e5e7eb',
+				'condition' => array( 'show_divider' => 'yes' ),
+				'selectors' => array(
+					'{{WRAPPER}} .ryv-map-widget-divider' => '--ryv-map-divider-color: {{VALUE}};',
+				),
+			)
+		);
+
+		$this->add_responsive_control(
+			'divider_width',
+			array(
+				'label'      => __( 'Divider Thickness', 'ryv-eligibility-tool' ),
+				'type'       => \Elementor\Controls_Manager::SLIDER,
+				'size_units' => array( 'px' ),
+				'range'      => array(
+					'px' => array(
+						'min' => 0,
+						'max' => 10,
+					),
+				),
+				'condition'  => array( 'show_divider' => 'yes' ),
+				'selectors'  => array(
+					'{{WRAPPER}} .ryv-map-widget-divider' => '--ryv-map-divider-width: {{SIZE}}{{UNIT}};',
+				),
 			)
 		);
 
 		$this->add_responsive_control(
 			'heading_spacing',
 			array(
-				'label'      => __( 'Spacing Below', 'ryv-eligibility-tool' ),
+				'label'      => __( 'Spacing Below Whole Block', 'ryv-eligibility-tool' ),
 				'type'       => \Elementor\Controls_Manager::SLIDER,
 				'size_units' => array( 'px' ),
 				'range'      => array(
@@ -398,7 +570,8 @@ class RYV_Map_Widget extends \Elementor\Widget_Base {
 						'max' => 80,
 					),
 				),
-				'separator'  => 'before',
+				'separator'   => 'before',
+				'description' => __( 'Space between the whole heading/description/divider block above and the map below.', 'ryv-eligibility-tool' ),
 				'selectors'  => array(
 					'{{WRAPPER}} .ryv-map-widget-intro' => '--ryv-map-intro-spacing: {{SIZE}}{{UNIT}};',
 				),
@@ -884,6 +1057,10 @@ class RYV_Map_Widget extends \Elementor\Widget_Base {
 				'type'      => \Elementor\Controls_Manager::COLOR,
 				'selectors' => array(
 					'{{WRAPPER}} .ryv-map-widget-picker-select' => 'color: {{VALUE}};',
+					// Also colors the dropdown menu's own option rows, so
+					// an admin styling the search input's text doesn't have
+					// to separately find/style the menu that opens under it.
+					'{{WRAPPER}} .ryv-map-widget-picker-option' => 'color: {{VALUE}};',
 				),
 			)
 		);
@@ -896,6 +1073,7 @@ class RYV_Map_Widget extends \Elementor\Widget_Base {
 				'default'   => '#d1d5db',
 				'selectors' => array(
 					'{{WRAPPER}} .ryv-map-widget-picker-select' => 'border-color: {{VALUE}};',
+					'{{WRAPPER}} .ryv-map-widget-picker-menu'   => 'border-color: {{VALUE}};',
 				),
 			)
 		);
@@ -908,6 +1086,7 @@ class RYV_Map_Widget extends \Elementor\Widget_Base {
 				'default'   => '#ffffff',
 				'selectors' => array(
 					'{{WRAPPER}} .ryv-map-widget-picker-select' => 'background-color: {{VALUE}};',
+					'{{WRAPPER}} .ryv-map-widget-picker-menu'   => 'background-color: {{VALUE}};',
 				),
 			)
 		);
@@ -917,6 +1096,26 @@ class RYV_Map_Widget extends \Elementor\Widget_Base {
 			array(
 				'name'     => 'picker_select_typography',
 				'selector' => '{{WRAPPER}} .ryv-map-widget-picker-select',
+			)
+		);
+
+		$this->add_control(
+			'picker_select_padding',
+			array(
+				'label'      => __( 'Padding', 'ryv-eligibility-tool' ),
+				'type'       => \Elementor\Controls_Manager::DIMENSIONS,
+				'size_units' => array( 'px', 'em' ),
+				'default'    => array(
+					'top'    => '10',
+					'right'  => '40',
+					'bottom' => '10',
+					'left'   => '12',
+					'unit'   => 'px',
+				),
+				'description' => __( 'Padding inside the dropdown\'s search field.', 'ryv-eligibility-tool' ),
+				'selectors'  => array(
+					'{{WRAPPER}} .ryv-map-widget-picker-select' => '--ryv-map-picker-select-padding: {{TOP}}{{UNIT}} {{RIGHT}}{{UNIT}} {{BOTTOM}}{{UNIT}} {{LEFT}}{{UNIT}};',
+				),
 			)
 		);
 
@@ -933,10 +1132,14 @@ class RYV_Map_Widget extends \Elementor\Widget_Base {
 					),
 				),
 				'selectors'  => array(
-					// input.css reads this var directly on .ryv-map-widget-picker-select
-					// itself (unlike legend_width/picker_width above), so no
-					// wrong-target risk here.
-					'{{WRAPPER}} .ryv-map-widget-picker-select' => '--ryv-map-picker-select-border-width: {{SIZE}}{{UNIT}};',
+					// Set on .ryv-map-widget-picker-select-wrap, not the
+					// select input itself: input.css reads this var on both
+					// the input AND the sibling .ryv-map-widget-picker-menu
+					// (custom properties only cascade to descendants, and
+					// the menu is a sibling of the input, not a descendant
+					// of it) - same wrong-target trap as legend_width/
+					// picker_width above, see this file's CLAUDE.md note.
+					'{{WRAPPER}} .ryv-map-widget-picker-select-wrap' => '--ryv-map-picker-select-border-width: {{SIZE}}{{UNIT}};',
 				),
 			)
 		);
@@ -948,7 +1151,8 @@ class RYV_Map_Widget extends \Elementor\Widget_Base {
 				'type'       => \Elementor\Controls_Manager::DIMENSIONS,
 				'size_units' => array( 'px' ),
 				'selectors'  => array(
-					'{{WRAPPER}} .ryv-map-widget-picker-select' => '--ryv-map-picker-select-border-radius: {{TOP}}{{UNIT}} {{RIGHT}}{{UNIT}} {{BOTTOM}}{{UNIT}} {{LEFT}}{{UNIT}};',
+					// Same wrap-not-input targeting as Border Width above.
+					'{{WRAPPER}} .ryv-map-widget-picker-select-wrap' => '--ryv-map-picker-select-border-radius: {{TOP}}{{UNIT}} {{RIGHT}}{{UNIT}} {{BOTTOM}}{{UNIT}} {{LEFT}}{{UNIT}};',
 				),
 			)
 		);
@@ -1288,12 +1492,18 @@ class RYV_Map_Widget extends \Elementor\Widget_Base {
 	private function render_intro( array $settings ) {
 		$show_heading     = 'yes' === ( $settings['show_heading'] ?? '' );
 		$show_description = 'yes' === ( $settings['show_description'] ?? '' );
+		$show_eyebrow     = 'yes' === ( $settings['show_eyebrow'] ?? '' ) && '' !== trim( (string) ( $settings['eyebrow_text'] ?? '' ) );
+		$show_divider     = 'yes' === ( $settings['show_divider'] ?? '' );
 
-		if ( ! $show_heading && ! $show_description ) {
+		if ( ! $show_heading && ! $show_description && ! $show_eyebrow && ! $show_divider ) {
 			return;
 		}
 
 		echo '<div class="ryv-map-widget-intro">';
+
+		if ( $show_eyebrow ) {
+			printf( '<div class="ryv-map-widget-eyebrow">%s</div>', esc_html( $settings['eyebrow_text'] ) );
+		}
 
 		if ( $show_heading && '' !== trim( (string) ( $settings['heading_text'] ?? '' ) ) ) {
 			printf( '<h2 class="ryv-map-widget-heading">%s</h2>', esc_html( $settings['heading_text'] ) );
@@ -1301,6 +1511,10 @@ class RYV_Map_Widget extends \Elementor\Widget_Base {
 
 		if ( $show_description && '' !== trim( (string) ( $settings['description_text'] ?? '' ) ) ) {
 			printf( '<p class="ryv-map-widget-description">%s</p>', esc_html( $settings['description_text'] ) );
+		}
+
+		if ( $show_divider ) {
+			echo '<hr class="ryv-map-widget-divider" />';
 		}
 
 		echo '</div>';
@@ -1373,8 +1587,9 @@ class RYV_Map_Widget extends \Elementor\Widget_Base {
 			'ryv-map-widget',
 			'ryvMapWidgetL10n',
 			array(
-				'close'     => __( 'Close', 'ryv-eligibility-tool' ),
-				'learnMore' => __( 'Learn more →', 'ryv-eligibility-tool' ),
+				'close'      => __( 'Close', 'ryv-eligibility-tool' ),
+				'learnMore'  => __( 'Learn more →', 'ryv-eligibility-tool' ),
+				'noResults'  => __( 'No matches found', 'ryv-eligibility-tool' ),
 			)
 		);
 	}
@@ -1524,31 +1739,57 @@ class RYV_Map_Widget extends \Elementor\Widget_Base {
 		$label       = trim( (string) ( $settings['picker_label'] ?? '' ) );
 		$placeholder = trim( (string) ( $settings['picker_placeholder'] ?? '' ) );
 
+		$options = array();
+		foreach ( $states as $state ) {
+			$options[] = array(
+				'value' => get_permalink( $state ),
+				'label' => $state->post_title,
+			);
+		}
+
 		echo '<div class="ryv-map-widget-picker">';
 
 		if ( '' !== $label ) {
 			printf( '<div class="ryv-map-widget-picker-label">%s</div>', esc_html( $label ) );
 		}
 
-		// Wrapping element for the custom arrow (::after, see input.css) -
-		// a native <select>'s own arrow can't be recolored directly, so it's
-		// hidden (appearance: none) and this wrapper positions a replacement,
-		// same pattern as the main questionnaire's .ryv-select2 dropdown.
+		// A select2-style searchable combobox (assets/js/map-widget.js's
+		// wireStatePicker()) rather than a native <select> - typing filters
+		// the ~50-state list instead of only scanning it visually, the same
+		// UX renderSearchableSelect() gives the main questionnaire's own
+		// dropdown. `data-options` carries the state list (already
+		// permalink-escaped via esc_url_raw before JSON-encoding) for the
+		// JS to filter/render client-side - same JS-required baseline as
+		// the rest of this plugin's frontend (the questionnaire itself
+		// renders nothing at all without decision-engine.js).
 		echo '<div class="ryv-map-widget-picker-select-wrap">';
-		echo '<select class="ryv-map-widget-picker-select" onchange="if(this.value){window.location.href=this.value;}">';
-		printf( '<option value="">%s</option>', esc_html( $placeholder ) );
-
-		foreach ( $states as $state ) {
-			printf(
-				'<option value="%s">%s</option>',
-				esc_url( get_permalink( $state ) ),
-				esc_html( $state->post_title )
-			);
-		}
-
-		echo '</select>';
+		printf(
+			'<input type="text" class="ryv-map-widget-picker-select" role="combobox" autocomplete="off" aria-expanded="false" aria-haspopup="listbox" placeholder="%1$s" data-options="%2$s" />',
+			esc_attr( $placeholder ),
+			esc_attr( wp_json_encode( $this->sanitize_picker_options( $options ) ) )
+		);
+		echo '<div class="ryv-map-widget-picker-menu" hidden role="listbox"></div>';
 		echo '</div>'; // .ryv-map-widget-picker-select-wrap
+
 		echo '</div>'; // .ryv-map-widget-picker
+
+		$this->enqueue_frontend_enhancements();
+	}
+
+	/**
+	 * @param array<int,array{value:string,label:string}> $options
+	 * @return array<int,array{value:string,label:string}>
+	 */
+	private function sanitize_picker_options( array $options ): array {
+		return array_map(
+			static function ( array $option ): array {
+				return array(
+					'value' => esc_url_raw( $option['value'] ),
+					'label' => wp_strip_all_tags( $option['label'] ),
+				);
+			},
+			$options
+		);
 	}
 
 	/**
