@@ -217,4 +217,58 @@ if ( ! defined( 'ABSPATH' ) ) {
 		<?php wp_nonce_field( RYV_States_Generate_Page::EVENTS_NONCE_ACTION, 'ryv_repair_events_nonce' ); ?>
 		<?php submit_button( __( 'Repair Imported Events', 'ryv-eligibility-tool' ), 'secondary', 'ryv_repair_events_submit' ); ?>
 	</form>
+
+	<hr />
+
+	<h2><?php esc_html_e( 'Repair State Post Template', 'ryv-eligibility-tool' ); ?></h2>
+
+	<p class="description">
+		<?php esc_html_e( 'Brings the State Post template to the configuration state pages need: removes Elementor Display Conditions (which crash the whole template when pointed at an Events or Resources field, leaving every state page blank below the header) and applies this plugin\'s own hide-when-empty classes instead. Template settings do not travel with a deploy, so run this once per environment. Safe to run more than once.', 'ryv-eligibility-tool' ); ?>
+	</p>
+
+	<?php $template_result = $this->consume_template_repair_result(); ?>
+	<?php if ( $template_result ) : ?>
+		<div class="notice notice-<?php echo empty( $template_result['dry_run'] ) ? 'success' : 'info'; ?> is-dismissible">
+			<p>
+				<?php if ( ! empty( $template_result['dry_run'] ) ) : ?>
+					<strong><?php esc_html_e( 'Preview only - nothing was changed.', 'ryv-eligibility-tool' ); ?></strong><br />
+				<?php endif; ?>
+				<?php
+				printf(
+					/* translators: 1: number of display conditions, 2: number of classes */
+					esc_html__( 'Display conditions removed: %1$d. Hide-when-empty classes set: %2$d.', 'ryv-eligibility-tool' ),
+					(int) $template_result['conditions_removed'],
+					(int) $template_result['markers_set']
+				);
+				?>
+			</p>
+
+			<?php if ( ! empty( $template_result['templates'] ) ) : ?>
+				<ul style="margin-left:1.5em;list-style:disc;">
+					<?php foreach ( $template_result['templates'] as $template ) : ?>
+						<li>
+							<?php echo esc_html( $template['title'] ); ?>
+							<code>#<?php echo (int) $template['id']; ?></code>
+							<?php foreach ( $template['markers_set'] as $element_id => $marker ) : ?>
+								<br /><small><code><?php echo esc_html( $element_id ); ?></code> → <code><?php echo esc_html( $marker ? $marker : '(class removed)' ); ?></code></small>
+							<?php endforeach; ?>
+						</li>
+					<?php endforeach; ?>
+				</ul>
+			<?php endif; ?>
+
+			<?php if ( ! empty( $template_result['missing'] ) ) : ?>
+				<p>
+					<?php esc_html_e( 'Not found in any template (already correct, or that element has been rebuilt since):', 'ryv-eligibility-tool' ); ?>
+					<code><?php echo esc_html( implode( ', ', $template_result['missing'] ) ); ?></code>
+				</p>
+			<?php endif; ?>
+		</div>
+	<?php endif; ?>
+
+	<form method="post" action="">
+		<?php wp_nonce_field( RYV_States_Generate_Page::TEMPLATE_NONCE_ACTION, 'ryv_repair_template_nonce' ); ?>
+		<?php submit_button( __( 'Preview Changes', 'ryv-eligibility-tool' ), 'secondary', 'ryv_preview_template_submit', false ); ?>
+		<?php submit_button( __( 'Repair State Post Template', 'ryv-eligibility-tool' ), 'primary', 'ryv_repair_template_submit', false ); ?>
+	</form>
 </div>

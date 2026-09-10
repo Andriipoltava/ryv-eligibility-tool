@@ -200,6 +200,7 @@ final class RYV_Plugin {
 			require_once RYV_PLUGIN_DIR . 'includes/class-ryv-states-generator.php';
 			require_once RYV_PLUGIN_DIR . 'includes/class-ryv-states-template.php';
 			require_once RYV_PLUGIN_DIR . 'includes/class-ryv-states-i18n.php';
+			require_once RYV_PLUGIN_DIR . 'includes/class-ryv-states-template-repair.php';
 		}
 
 		// Not is_admin()-gated like the other admin/*-page.php controllers

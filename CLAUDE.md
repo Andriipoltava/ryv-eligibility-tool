@@ -673,6 +673,17 @@ Two implementation notes that cost real debugging time:
   `get_field( 'ryv_resources', <a resource> )` is empty - which discarded
   the Resources section on states that plainly had resources.
 
+Those markers - and the absence of any Display Condition - are *template
+data*, so unlike everything else here they don't travel with a deploy.
+`includes/class-ryv-states-template-repair.php` reproduces them in one click
+from **RYV States → Generate States → "Repair State Post Template"** (with a
+"Preview Changes" dry run beside it): it strips every `e_display_conditions`
+and sets each marker on the element that should carry it. Elements are
+matched by Elementor id - stable across an export/import of the same
+template, unlike the template's own post ID, which differs per environment -
+and any id it can't find is reported rather than treated as an error.
+Idempotent, so re-running it changes nothing once a site is in shape.
+
 Debugging aid: the `ryv_hide_empty_should_hide` filter (`$hide, $marker,
 $post_id`) is the only way to see why a section vanished, since a hidden one
 leaves no trace in the markup.

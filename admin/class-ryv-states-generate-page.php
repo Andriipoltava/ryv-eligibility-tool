@@ -42,6 +42,11 @@ class RYV_States_Generate_Page {
 	const EVENTS_NONCE_ACTION = 'ryv_repair_events';
 
 	/**
+	 * Nonce action for the "Repair State Post Template" button.
+	 */
+	const TEMPLATE_NONCE_ACTION = 'ryv_repair_state_template';
+
+	/**
 	 * Transient key prefix for post/redirect/get result passing.
 	 */
 	const RESULT_TRANSIENT_PREFIX = 'ryv_generate_states_result_';
@@ -62,6 +67,11 @@ class RYV_States_Generate_Page {
 	const EVENTS_RESULT_TRANSIENT_PREFIX = 'ryv_repair_events_result_';
 
 	/**
+	 * Per-user transient prefix for the template-repair result.
+	 */
+	const TEMPLATE_RESULT_TRANSIENT_PREFIX = 'ryv_repair_template_result_';
+
+	/**
 	 * Hook slug for this submenu page.
 	 */
 	const PAGE_SLUG = 'ryv-generate-states';
@@ -75,6 +85,7 @@ class RYV_States_Generate_Page {
 		add_action( 'admin_init', array( $this, 'handle_sync_submission' ) );
 		add_action( 'admin_init', array( $this, 'handle_autopopulate_submission' ) );
 		add_action( 'admin_init', array( $this, 'handle_events_repair_submission' ) );
+		add_action( 'admin_init', array( $this, 'handle_template_repair_submission' ) );
 	}
 
 	/**
@@ -357,6 +368,64 @@ class RYV_States_Generate_Page {
 	 */
 	public function consume_events_repair_result(): ?array {
 		$key    = self::EVENTS_RESULT_TRANSIENT_PREFIX . get_current_user_id();
+		$result = get_transient( $key );
+
+		if ( false === $result ) {
+			return null;
+		}
+
+		delete_transient( $key );
+
+		return $result;
+	}
+
+	/**
+	 * "Repair State Post Template": hands every Elementor template to
+	 * RYV_States_Template_Repair, which strips the Display Conditions that
+	 * blank state pages and applies this plugin's own hide-empty markers
+	 * instead.
+	 *
+	 * Exists because those are *template data*, not code - so unlike
+	 * everything else in this plugin they don't travel with a deploy, and
+	 * would otherwise have to be re-authored by hand in the editor on every
+	 * environment.
+	 */
+	public function handle_template_repair_submission() {
+		if ( ! isset( $_POST['ryv_repair_template_submit'] ) && ! isset( $_POST['ryv_preview_template_submit'] ) ) {
+			return;
+		}
+
+		if ( ! current_user_can( self::CAPABILITY ) ) {
+			wp_die( esc_html__( 'You are not allowed to modify templates.', 'ryv-eligibility-tool' ) );
+		}
+
+		check_admin_referer( self::TEMPLATE_NONCE_ACTION, 'ryv_repair_template_nonce' );
+
+		// The preview button reports what would change without writing -
+		// worth having for a one-click action that edits a template someone
+		// may have re-authored since.
+		$dry_run = isset( $_POST['ryv_preview_template_submit'] );
+		$result  = RYV_States_Template_Repair::repair( $dry_run );
+
+		$result['dry_run'] = $dry_run;
+
+		set_transient(
+			self::TEMPLATE_RESULT_TRANSIENT_PREFIX . get_current_user_id(),
+			$result,
+			MINUTE_IN_SECONDS * 5
+		);
+
+		wp_safe_redirect( admin_url( 'edit.php?post_type=' . RYV_States_CPT::POST_TYPE . '&page=' . self::PAGE_SLUG ) );
+		exit;
+	}
+
+	/**
+	 * Pop (read + delete) this user's pending template-repair result.
+	 *
+	 * @return array|null
+	 */
+	public function consume_template_repair_result(): ?array {
+		$key    = self::TEMPLATE_RESULT_TRANSIENT_PREFIX . get_current_user_id();
 		$result = get_transient( $key );
 
 		if ( false === $result ) {
