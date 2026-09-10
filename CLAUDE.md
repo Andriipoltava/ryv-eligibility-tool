@@ -637,6 +637,46 @@ repeated), not bound to anything - which is why real events never appeared.
 Replacing it with a Loop Grid carrying the Query ID above is what wires it
 up.
 
+### Hiding empty sections on a state page
+
+`includes/class-ryv-states-template.php`'s `ryv-hide-empty--...` markers
+(added to an element's Advanced ▸ CSS Classes) gate a section on whether the
+ACF field it displays has content for the state being viewed. Three forms:
+`field-{name}`, `any-{a},{b}` (empty only when *every* listed field is), and
+`repeater-{name}-{row}`.
+
+**Never use Elementor's own Display Conditions for this.** Its comparator is
+typed `string` and fatals on an ACF field that returns an array - a
+relationship like `ryv_events`/`ryv_resources`:
+`Comparators_Checker::check_string_contains_and_empty(): Argument #3
+($actual_value) must be of type string, array given`. That kills the whole
+template's render, so **every state page went blank below the header** while
+the posts and template data were perfectly intact. Two such conditions had
+been added in the editor; removing them restored the pages.
+
+Two implementation notes that cost real debugging time:
+
+- **Elementor fires `elementor/frontend/before_render`/`after_render` only
+  for widgets, never for containers** (verified by logging every element
+  reaching those hooks: 52 widgets, 0 containers - containers come out of
+  the document's cached content instead). So the original output-buffering
+  approach silently did nothing for the section-level markers it was written
+  for. `output_hide_empty_css()` now emits a `display:none` rule per empty
+  marker on `wp_head` instead, which is immune to how Elementor cached the
+  element; the buffering stays for widget-level markers, where it still
+  removes markup. Markers are discovered by scanning `elementor_library`
+  templates (cached in a transient, flushed on template save), so a marker
+  an admin adds needs no code change.
+- **Resolve the state from the query, not the global post.** A marked
+  section can contain a Loop Grid, which swaps the global post per item;
+  `get_the_ID()` inside `after_render` can therefore be a *resource*, and
+  `get_field( 'ryv_resources', <a resource> )` is empty - which discarded
+  the Resources section on states that plainly had resources.
+
+Debugging aid: the `ryv_hide_empty_should_hide` filter (`$hide, $marker,
+$post_id`) is the only way to see why a section vanished, since a hidden one
+leaves no trace in the markup.
+
 ### Non-Elementor embed: `[ryv_form]` shortcode
 
 `includes/class-ryv-shortcode.php` renders the exact same
