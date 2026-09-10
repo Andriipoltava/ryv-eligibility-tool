@@ -267,7 +267,24 @@ a per-widget-instance Elementor "Question Layout" control, `stacked` [the
 model just described] vs. `wizard` - see `widgets/class-ryv-widget.php`
 around `question_layout`) shows only the single most recent card plus a named
 step sidebar, rather than every card ever reached. This is layered on top of
-the same underlying graph walk, not a separate engine: `computeNext()` still
+the same underlying graph walk, not a separate engine.
+
+The sidebar shows the **whole checklist up front** (1, 2, 3 with the
+upcoming entries greyed), not just the steps reached so far:
+`buildAllSteps()` walks the graph breadth-first from the entry node once
+per load, collecting distinct `step_name`s in discovery order - with the
+3-tier shape the Step Names page assigns (entry / what the entry routes to
+/ terminals) BFS visits them in exactly step order, whatever branch the
+visitor eventually takes, and names rather than nodes are the unit so
+dozens of per-state nodes sharing one label collapse to a single entry.
+Which entry is *active* still comes from the visitor's own path
+(`renderedOrder`), as does each done step's `firstNodeId` - a step is only
+clickable back to a card they actually saw, never to whichever node BFS
+happened to find the name on, so a step their branch skipped renders
+un-clickable. A form with no named steps reachable from the entry falls
+back to the old path-derived list.
+
+`computeNext()` still
 defers markup nodes with a `next_node` set until their own "Continue" button
 is clicked (`advanceWizardMarkup()`) instead of auto-advancing, since
 auto-advancing would otherwise skip straight past a step the visitor is
@@ -390,6 +407,19 @@ header block), write it onto bare `{{WRAPPER}}`, never
 check in the browser, not just "the Elementor control saved without an error,"
 since a wrong-target custom property fails completely silently.
 
+**A second, mirror-image way a Style control silently no-ops**: the
+selector is right, but nothing in `input.css` ever *reads* the custom
+property it writes. `RYV_Map_Widget`'s "Spacing Below Heading"/"Spacing
+Below Description" wrote `--ryv-map-heading-spacing`/
+`--ryv-map-description-spacing` onto the very elements that needed them,
+while `.ryv-map-widget-heading`/`-description` kept hardcoded `margin`
+shorthands - so both controls did nothing in the editor *and* on the front
+end (confirmed live: a description spacing an admin had already set to 13px
+was being ignored entirely). Whenever a control writes a
+`--ryv-*` property, grep `input.css` for that exact name before assuming it
+works; a one-line audit catches the whole class of bug:
+`comm -23 <(grep -o -- '--ryv-map-[a-z-]*' widgets/class-ryv-map-widget.php | sort -u) <(grep -o -- '--ryv-map-[a-z-]*' assets/src/input.css | sort -u)`.
+
 **Spacing above the Continue button and above a question's choice buttons**
 is controllable too now (`continue_button_margin_top` in "Continue Button",
 `button_margin_top` in "Choice Buttons" - both correctly target
@@ -416,6 +446,21 @@ appends each `.ryv-radio-option` label straight to the card with no
 enclosing group wrapper, so a plain margin-top on the class would add space
 between *every* option, not just above the first - the CSS rule targets
 `.ryv-radio-option:first-of-type` specifically to avoid that.
+
+The Step Sidebar's step number/checkmark marker is styled **per state**:
+Normal / Active / Completed tabs, each with its own number (checkmark),
+background and border color - nine `--ryv-step-sidebar-marker-*` vars in
+all. Before this, one flat "Number Color" drove both the number *and* its
+border for upcoming steps, while done/active steps had no color of their
+own at all beyond the single "Active Step Color". Both of those remain the
+*fallbacks* rather than being replaced (see the chains in `input.css`):
+an unset border color still follows the number color in Normal and the
+background color in Active/Completed, and unset Active/Completed colors
+still resolve to Active Step Color - so an already-styled placement renders
+identically. `step_sidebar_marker_color`/`_bg_color` also deliberately keep
+the control ids they had as flat controls; moving them into the Normal tab
+preserves what existing placements saved under those ids, where removing
+and re-adding them would silently drop it.
 
 The Step Sidebar's "Step Number" controls gained **Font Size**
 (`step_sidebar_marker_font_size` - `--ryv-step-sidebar-marker-font-size`,
@@ -542,6 +587,42 @@ Two more CPTs sit alongside `ryv_forms`, both registered in
   MapSVG map, with a fuller Style-tab surface than MapSVG's own bundled
   widget plus a styled "Or pick from a list" state-dropdown fallback.
 
+### State-page related lists (`includes/class-ryv-state-queries.php`)
+
+Two Elementor custom queries let a Loop Grid / Posts widget in the
+`ryv_states` single template list exactly what an admin picked in that
+state's own ACF relationship fields, rather than a whole archive - set the
+widget's **Query ID** to `ryv_state_events` or `ryv_state_resources`. Query
+filters rather than widgets of this plugin's own, so each card's design
+stays an editable Loop Item template; this class only decides *which
+posts*.
+
+Three non-obvious details, each found the hard way:
+
+- **`post__in` must never be handed an empty array.** WP_Query ignores an
+  empty one rather than matching nothing, so a state with nothing picked
+  would list every event/resource on the site. `array( 0 )` is the "no
+  posts" value.
+- **Dead ids are filtered out.** A relationship field keeps storing an id
+  after the post it points at is deleted (a real state here referenced an
+  event id that no longer exists), and a dead id in `post__in` silently
+  shrinks the list.
+- **Event date filtering/sorting happens in PHP, deliberately.** A
+  `meta_query` on `_EventEndDate` is not answered from postmeta: TEC's
+  custom-tables layer rewrites it into an `INNER JOIN` on
+  `wp_tec_occurrences`. TEC in fact adds that join to *every*
+  `tribe_events` query regardless, so **any event inserted without going
+  through TEC's own save pipeline (direct SQL, a raw import) is invisible
+  everywhere, including TEC's own Upcoming Events archive** - if state
+  events render empty, check `SELECT COUNT(*) FROM wp_tec_occurrences`
+  before suspecting this class.
+
+Note the events block in the current State Post template is **hardcoded
+mockup text** ("SEP 12 · Restoration clinic — Nashville Public Library",
+repeated), not bound to anything - which is why real events never appeared.
+Replacing it with a Loop Grid carrying the Query ID above is what wires it
+up.
+
 ### Non-Elementor embed: `[ryv_form]` shortcode
 
 `includes/class-ryv-shortcode.php` renders the exact same
@@ -593,11 +674,65 @@ no-ops on a frontend request.
 
 ### WPML translation support
 
-`wpml-config.xml` pre-registers `ryv_forms` and its `_ryv_form_schema`
-postmeta so WPML's translation editor can offer them; widget Content-tab
-labels are marked translatable by default
-(`register_string_translation()`/ICL string translation) rather than left as
-plain hardcoded control defaults.
+`wpml-config.xml` pre-registers every RYV post type (`ryv_forms`,
+`ryv_states`, `ryv_stories`, `ryv_resources`) plus the
+`ryv_resource_category` taxonomy as translatable, and marks the widgets'
+free-text Content-tab controls translatable so WPML's editor offers them
+per widget instance rather than leaving them as hardcoded control defaults.
+
+Two deliberate splits in that file. **ACF-backed fields are left out** -
+ACFML owns their per-field copy/translate modes once the post type is
+translatable, so declaring them here would only fight that UI; `ryv_stories`
+is the exception that *does* get a `<custom-fields>` block, because its meta
+is plain `register_post_meta()` that ACFML never sees. And a **visitor-facing
+string gets a control rather than a `__()` call** - the stories widget's
+"Featured Video Story" label and its "captioned" wording were moved out of
+the render methods for exactly this reason: per-instance controls are
+translatable through WPML's editor, while `__()` would need a compiled `.mo`
+for this plugin's textdomain, which the site doesn't ship.
+
+**Making a post type translatable hides every existing post of it that has
+no language row.** WPML's language filtering is an `INNER JOIN` on
+`wp_icl_translations`, so the moment `ryv_resources`/`ryv_stories` were
+declared translatable, everything already in the database became invisible
+to language-filtered queries - which for these two means disappearing from
+the *frontend* state-page lists, not just an admin list table.
+`RYV_CPT::assign_default_language_if_missing()` (now derives the element
+type from the post rather than hardcoding `ryv_forms`) is hooked on their
+saves to stop it recurring, and **RYV Forms → Translations → "Assign
+Default Language"** backfills every existing form/state/resource/story in
+one pass. Run it after declaring any further post type translatable.
+
+**A form embed resolves its own language at render time**
+(`RYV_Form_Translations::resolve_for_current_language()`, called from both
+the widget and the `[ryv_form]` shortcode). `form_id` is *also* declared as
+a `post-ids` field in `wpml-config.xml`, which makes WPML rewrite it to the
+right edition - but only at the moment a translation is created or updated,
+so a Spanish page built independently, or duplicated before that
+declaration existed, would keep serving the English form (the reported
+symptom on `/?lang=es`). Re-resolving at render covers those and is a no-op
+when the id is already right. The state-page path is deliberately excluded:
+there the form comes from that page's own ACF link, so it's already in the
+page's language, and re-pointing it would strand the entry-node id, which
+only exists in that specific form's graph.
+
+The same resolution feeds `data-labels`: the rendered form's own language
+pack (`RYV_Form_Translations::UI_LABELS`) is the base layer, with a widget
+label control overriding it *only when its value differs from the control's
+default* (`get_typed_label_overrides()`) - an untouched default is not a
+choice an admin made, and letting the English default "Start Over" beat
+"Empezar de nuevo" is precisely the bug that would otherwise show on every
+Spanish placement nobody retyped.
+
+Those same typed overrides also ride along in `data-language-editions`, on
+the entry for the language they were written in. `switchLanguage()` replaces
+its label set wholesale rather than diffing it, so without them a visitor
+switching *back* to the page's own language landed on the engine's bare
+built-in defaults - the admin's own wording reverting to "Loading…"/
+"— Select —" mid-session, which reads as the widget losing its settings.
+They deliberately do **not** ride along onto the other editions: English
+custom wording layered over the Spanish pack would just be text in the
+wrong language.
 
 **Linking two independently-created language editions**
 (`admin/class-ryv-translations-page.php`, **RYV Forms → Translations**,
@@ -628,6 +763,63 @@ the link's `href` (so neither click nor keyboard Enter can reach WPML's
 queue) and rewrites its click handler to land on this Translations page
 instead - a JS fix, not `pointer-events` CSS alone, since that wouldn't
 stop keyboard activation.
+
+**Tool-only language switch** (`includes/class-ryv-form-translations.php`,
+`renderLanguageSwitch()` in `renderer.js`, `switchLanguage()` in
+`engine.js`): an "En Español" / "In English" button sitting inline
+immediately after the current question's Continue button, that re-renders
+*only the questionnaire* in another language
+edition of the same form. The page never navigates and stays in its own
+language; this exists precisely because a Spanish page edition would
+otherwise mean duplicating every state page's English content just to
+carry a Spanish tool.
+
+It works because a language edition is just another `ryv_forms` post
+(WPML-linked, see the Translations page below) and the engine fetches by
+form id, so switching is a re-fetch, not a second engine. The load-bearing
+data fact: **both editions' state-picker options carry the same
+*untranslated* `value`** (verified against the real editions - both use
+`Alabama`, `Alaska`, ... while their per-state `next_node` ids differ
+entirely), so `RYV_States_Sync::find_start_node()` resolves the same state
+in either graph. The widget pre-resolves each edition's own entry node for
+the current state page server-side and ships it in
+`data-language-editions` (`get_language_editions()`), which is what keeps
+a switch on a state page *on that state* instead of dropping the visitor
+back at the full picker.
+
+Two things travel with the switch that aren't in the graph. The UI strings
+(Continue/Start Over/loading) come from `RYV_Form_Translations::UI_LABELS`,
+not WPML string translation - string translation resolves against the
+*page's* language, which a tool-only switch deliberately doesn't change,
+so it would leave an English "Continue" under Spanish questions. And
+answers are dropped rather than replayed: the editions' per-state node ids
+differ, so there's nothing to replay them against; the visitor restarts in
+the new language with a fresh `session_id` (the abandoned trail stays on
+record as its own row, same reasoning as `restart()`).
+
+The server-rendered title/description above the tool is deliberately *not*
+swapped, even though the REST fetch returns the new edition's title: a
+translated form's post title is an internal admin name ("Voting Rights
+Spanish"), not visitor-facing copy, and its excerpt is usually empty -
+swapping put an admin label over a still-English description. Header is
+page chrome; it stays in the page's language.
+
+The button is a *single* long-lived element that gets re-homed after every
+list mutation (`positionLanguageSwitch()`, called from `appendCard()`/
+`truncateFrom()` - the only two places cards are added or removed) rather
+than re-rendered per card: it has to survive truncation, and rebuilding it
+would mean re-wiring its handler each time. It lands as the Continue
+button's next sibling inside the last card, falling back to the end of
+that card when it has no Continue button (a radio question advances on
+click) and to the widget root when no card exists yet.
+
+The widget's "Show Language Switch" control defaults to **on**, which is
+safe for existing placements because `get_language_editions()` returns an
+empty payload (so no button renders at all) unless the form actually has a
+second linked, visible edition. Note the step sidebar's own labels are
+*not* covered by any of this - `step_name` is per-node schema data, so a
+Spanish edition shows Spanish steps only once someone types them on the
+Step Names page below.
 
 ### Step Names (`admin/class-ryv-step-names-page.php`)
 
@@ -715,7 +907,9 @@ email notifications + Submissions page), visitor/admin activity logging,
 states⟷schema node sync, states bulk-generator, MapSVG map sync + Elementor
 map widget, Global Styles admin page, WPML translation support plus a
 Translations admin page for manually linking independently-created language
-editions, a Step Names admin page for bulk-assigning the wizard sidebar's
+editions, a frontend tool-only language switch (re-renders just the
+questionnaire in a linked edition without navigating), a Step Names admin
+page for bulk-assigning the wizard sidebar's
 3-step structure across a form (and its linked translations) in one pass,
 a Current Assignments table for viewing/hand-adjusting every state's map
 category in one place, Help admin page. All phases from the original plan are built, plus the later flat-DAG

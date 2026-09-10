@@ -305,7 +305,8 @@ export function updateStepSidebar(listEl, steps, activeIndex, onStepClick) {
       className: 'ryv-step-list-marker',
       text: isDone ? '✓' : String(index + 1),
     });
-    const itemAttrs = isDone ? { role: 'button', tabindex: '0' } : {};
+    const isClickable = isDone && !!onStepClick && !!step.firstNodeId;
+    const itemAttrs = isClickable ? { role: 'button', tabindex: '0' } : {};
     const item = el('li', { className: 'ryv-step-list-item', attrs: itemAttrs }, [
       marker,
       el('span', { text: step.name }),
@@ -313,7 +314,11 @@ export function updateStepSidebar(listEl, steps, activeIndex, onStepClick) {
     if (isDone) item.classList.add('is-done');
     if (isActive) item.classList.add('is-active');
 
-    if (isDone && onStepClick) {
+    // `firstNodeId` is null for a step the visitor never actually passed
+    // through (the full checklist is built from the graph, their path may
+    // have skipped a named step) - nothing to jump back to, so it stays
+    // unclickable even when it sits before the active one.
+    if (isClickable) {
       item.addEventListener('click', () => onStepClick(step.firstNodeId));
       item.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' || e.key === ' ') {
@@ -325,6 +330,41 @@ export function updateStepSidebar(listEl, steps, activeIndex, onStepClick) {
 
     listEl.appendChild(item);
   });
+}
+
+/**
+ * The tool-only language switch (widget's "Language Switch" section, see
+ * class-ryv-widget.php's get_language_editions()): one button per *other*
+ * language edition of the same form, rendered once below the question list -
+ * i.e. directly under the current question's Continue button.
+ *
+ * Deliberately a `<button>` and not a link: clicking it re-renders only the
+ * questionnaire, in place (engine.js's switchLanguage()) - the page itself
+ * never navigates, which is the whole point. `lang` is set on each button so
+ * a screen reader announces "En Español" in Spanish rather than reading it
+ * with English phonetics.
+ *
+ * @param {Array<{code:string,label:string}>} others Editions other than the current one.
+ * @param {(code: string) => void} onSwitch Called with the chosen language code.
+ * @returns {HTMLElement|null} Null when there's nothing to switch to.
+ */
+export function renderLanguageSwitch(others, onSwitch) {
+  if (!others || others.length === 0) return null;
+
+  const wrap = el('div', { className: 'ryv-lang-switch' });
+
+  others.forEach((edition) => {
+    wrap.appendChild(
+      el('button', {
+        className: 'ryv-lang-switch-btn',
+        text: edition.label,
+        attrs: { type: 'button', lang: edition.code },
+        on: { click: () => onSwitch(edition.code) },
+      }),
+    );
+  });
+
+  return wrap;
 }
 
 export function renderLoadingCard(labels = DEFAULT_LABELS) {
@@ -343,8 +383,8 @@ export function renderErrorCard(message, onRetry, labels = DEFAULT_LABELS, icons
           attrs: { type: 'button' },
           on: { click: onRetry },
         },
-        buttonChildren(labels.retry, icons.retry)
-      )
+        buttonChildren(labels.retry, icons.retry),
+      ),
     );
   }
   return box;
@@ -373,7 +413,12 @@ function renderSearchableSelect(wrap, options, selectedValue, onSelect, labels =
 
   const input = el('input', {
     className: 'ryv-select2-input',
-    attrs: { type: 'text', role: 'searchbox', autocomplete: 'off', placeholder: placeholder || labels.selectPlaceholder },
+    attrs: {
+      type: 'text',
+      role: 'searchbox',
+      autocomplete: 'off',
+      placeholder: placeholder || labels.selectPlaceholder,
+    },
   });
   input.value = currentOption() ? currentOption().label : '';
 
@@ -449,7 +494,10 @@ function renderSearchableSelect(wrap, options, selectedValue, onSelect, labels =
   input.addEventListener('keydown', (event) => {
     if (event.key === 'ArrowDown') {
       event.preventDefault();
-      if (menu.hidden) { openMenu(input.value); return; }
+      if (menu.hidden) {
+        openMenu(input.value);
+        return;
+      }
       highlightedIndex = Math.min(highlightedIndex + 1, visibleOptions.length - 1);
       openMenu(input.value);
     } else if (event.key === 'ArrowUp') {
@@ -499,7 +547,17 @@ function renderSearchableSelect(wrap, options, selectedValue, onSelect, labels =
  * @param {boolean} searchable When displayStyle is 'dropdown', use the search-enabled combobox instead of a native <select> (node.select2).
  * @param {string|null} placeholder Per-question override (node.placeholder) - falls back to labels.selectPlaceholder when unset.
  */
-function renderSingleChoiceOptions(wrap, options, selectedValue, onSelect, displayStyle, radioGroupName, labels = DEFAULT_LABELS, searchable = false, placeholder = null) {
+function renderSingleChoiceOptions(
+  wrap,
+  options,
+  selectedValue,
+  onSelect,
+  displayStyle,
+  radioGroupName,
+  labels = DEFAULT_LABELS,
+  searchable = false,
+  placeholder = null,
+) {
   if (displayStyle === 'dropdown') {
     if (searchable) {
       renderSearchableSelect(wrap, options, selectedValue, onSelect, labels, placeholder);
@@ -507,7 +565,9 @@ function renderSingleChoiceOptions(wrap, options, selectedValue, onSelect, displ
     }
 
     const select = el('select', { className: 'ryv-select' });
-    select.appendChild(el('option', { text: placeholder || labels.selectPlaceholder, attrs: { value: '', disabled: true } }));
+    select.appendChild(
+      el('option', { text: placeholder || labels.selectPlaceholder, attrs: { value: '', disabled: true } }),
+    );
     options.forEach((option) => {
       const opt = el('option', { text: option.label, attrs: { value: option.value } });
       if (option.value === selectedValue) opt.setAttribute('selected', 'selected');
@@ -577,11 +637,22 @@ export function renderQuestionCard(
   labels = DEFAULT_LABELS,
   allNodes = null,
   deferCommit = false,
-  icons = DEFAULT_ICONS
+  icons = DEFAULT_ICONS,
 ) {
   const wrap = cardWrap(node);
   wrap.appendChild(titleEl(node.title, node.help));
   if (node.description) wrap.appendChild(descriptionEl(node.description));
+
+  // I added this start
+  if (node.content) {
+    const contentClass = node.wrapper_class ? `ryv-content ${node.wrapper_class}` : 'ryv-content';
+    const contentEl = el('div', {
+      className: contentClass,
+    });
+    contentEl.innerHTML = node.content;
+    wrap.appendChild(contentEl);
+  }
+  // I added this stop
 
   const isMulti = node.type === 'checkbox';
   const selected = new Set(selectedValues || []);
@@ -605,7 +676,7 @@ export function renderQuestionCard(
         attrs: { type: 'button' },
         on: { click: () => onChange(pending) },
       },
-      buttonChildren(labels.continue, icons.continue)
+      buttonChildren(labels.continue, icons.continue),
     );
     continueBtn.disabled = pending.length === 0;
     wrap.appendChild(continueBtn);
@@ -624,7 +695,7 @@ export function renderQuestionCard(
       `ryv-node-${nodeId}`,
       labels,
       !!node.select2,
-      node.placeholder || null
+      node.placeholder || null,
     );
     appendReferenceContent(wrap, node, allNodes);
     appendContinueButton();
@@ -707,7 +778,14 @@ function appendReferenceContent(wrap, node, allNodes) {
  *   blur/Enter active too, since committing the same value twice is a no-op
  *   (see `lastCommitted` below).
  */
-export function renderInputCard(node, previousValue, onChange, labels = DEFAULT_LABELS, deferCommit = false, icons = DEFAULT_ICONS) {
+export function renderInputCard(
+  node,
+  previousValue,
+  onChange,
+  labels = DEFAULT_LABELS,
+  deferCommit = false,
+  icons = DEFAULT_ICONS,
+) {
   const wrap = cardWrap(node);
   wrap.appendChild(titleEl(node.title, node.help));
   if (node.description) wrap.appendChild(descriptionEl(node.description));
@@ -751,7 +829,7 @@ export function renderInputCard(node, previousValue, onChange, labels = DEFAULT_
         attrs: { type: 'button' },
         on: { click: commit },
       },
-      buttonChildren(labels.continue, icons.continue)
+      buttonChildren(labels.continue, icons.continue),
     );
     wrap.appendChild(continueBtn);
   }
@@ -820,7 +898,14 @@ function buildFieldControl(field) {
  *   `node.next_node`. Never called if `node.next_node` is empty.
  * @param {object} labels
  */
-export function renderLeadCaptureCard(node, submittedValue, onSubmit, onContinue, labels = DEFAULT_LABELS, icons = DEFAULT_ICONS) {
+export function renderLeadCaptureCard(
+  node,
+  submittedValue,
+  onSubmit,
+  onContinue,
+  labels = DEFAULT_LABELS,
+  icons = DEFAULT_ICONS,
+) {
   const wrap = cardWrap(node);
   if (node.title) wrap.appendChild(titleEl(node.title, node.help));
   if (node.description) wrap.appendChild(descriptionEl(node.description));
@@ -835,7 +920,7 @@ export function renderLeadCaptureCard(node, submittedValue, onSubmit, onContinue
           className: 'ryv-continue-btn',
           attrs: { type: 'button' },
         },
-        buttonChildren(labels.continue, icons.continue)
+        buttonChildren(labels.continue, icons.continue),
       );
       continueBtn.addEventListener('click', () => {
         continueBtn.disabled = true;
@@ -934,7 +1019,7 @@ export function renderMarkupCard(
   labels = DEFAULT_LABELS,
   deferCommit = false,
   onContinue = null,
-  icons = DEFAULT_ICONS
+  icons = DEFAULT_ICONS,
 ) {
   const wrap = el('div');
   if (node.title) {
@@ -958,8 +1043,8 @@ export function renderMarkupCard(
           attrs: { type: 'button' },
           on: { click: onRestart },
         },
-        buttonChildren(labels.startOver, icons.startOver)
-      )
+        buttonChildren(labels.startOver, icons.startOver),
+      ),
     );
   } else if (deferCommit) {
     wrap.appendChild(
@@ -970,8 +1055,8 @@ export function renderMarkupCard(
           attrs: { type: 'button' },
           on: { click: onContinue },
         },
-        buttonChildren(labels.continue, icons.continue)
-      )
+        buttonChildren(labels.continue, icons.continue),
+      ),
     );
   }
 
@@ -983,7 +1068,7 @@ export function renderUnsupportedCard(node, isTerminal, onRestart, labels = DEFA
   wrap.appendChild(
     el('p', {
       text: `This step ("${node.title || node.source_type}") needs configuration before it can be shown.`,
-    })
+    }),
   );
   if (isTerminal) {
     wrap.appendChild(
@@ -994,8 +1079,8 @@ export function renderUnsupportedCard(node, isTerminal, onRestart, labels = DEFA
           attrs: { type: 'button' },
           on: { click: onRestart },
         },
-        buttonChildren(labels.startOver, icons.startOver)
-      )
+        buttonChildren(labels.startOver, icons.startOver),
+      ),
     );
   }
   return wrap;

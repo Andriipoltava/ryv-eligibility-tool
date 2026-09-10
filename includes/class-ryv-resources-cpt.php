@@ -44,6 +44,11 @@ class RYV_Resources_CPT {
 	public function __construct() {
 		add_action( 'init', array( $this, 'register_taxonomy' ), 0 );
 		add_action( 'init', array( $this, 'register_post_type' ) );
+		// Same backstop RYV_CPT applies to `ryv_forms`: a post with no WPML
+		// language row is excluded by the INNER JOIN every language-filtered
+		// query uses, which for this post type means silently vanishing from
+		// a state page's own related list on the frontend.
+		add_action( 'save_post_' . self::POST_TYPE, array( 'RYV_CPT', 'assign_default_language_if_missing' ) );
 		add_action( 'init', array( $this, 'maybe_seed_default_terms' ), 20 );
 		add_filter( 'manage_' . self::POST_TYPE . '_posts_columns', array( $this, 'admin_columns' ) );
 		add_action( 'manage_' . self::POST_TYPE . '_posts_custom_column', array( $this, 'render_admin_column' ), 10, 2 );
@@ -143,7 +148,15 @@ class RYV_Resources_CPT {
 			'show_ui'           => true,
 			'show_admin_column' => true,
 			'show_in_rest'      => true,
-			'show_in_nav_menus' => false,
+			// Must stay true, and not for nav menus' sake: Elementor Pro's
+			// query control builds its "Term" filter from
+			// `get_taxonomies( [ 'show_in_nav_menus' => true ] )` (see
+			// elementor-pro/modules/query-control/controls/group-control-posts.php),
+			// so with this off the taxonomy is simply absent from the Posts/
+			// Loop Grid query dropdown and there's no way to filter resources
+			// by category in the editor at all. The only cost of true is that
+			// the taxonomy also becomes available under Appearance → Menus.
+			'show_in_nav_menus' => true,
 			'rewrite'           => array( 'slug' => 'resource-category', 'with_front' => false ),
 		) );
 	}

@@ -1,35 +1,83 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
 	Read by WPML on plugin activation / Settings > Multilingual Content Setup
-	scan. Declares two things:
+	scan. Declares three things:
 
-	1. `ryv_states` and `ryv_forms` as translatable post types, so a fresh
-	   install doesn't need an admin to hand-flip "Translatable" for them
-	   under WPML > Settings > Post Types Translation.
+	1. `ryv_states`, `ryv_forms`, `ryv_stories` and `ryv_resources` as
+	   translatable post types (plus `ryv_resource_category` as a
+	   translatable taxonomy), so a fresh install doesn't need an admin to
+	   hand-flip "Translatable" for them under WPML > Settings > Post Types
+	   Translation.
 
-	   ACF field-level translation modes (which ryv_states/ryv_forms fields
-	   get copied vs. translated per-language) are deliberately NOT set
-	   here - ACFML (Advanced Custom Fields Multilingual) exposes those as
-	   a per-field UI once the post type itself is translatable, and this
-	   site configures them there rather than baking defaults into this
-	   file that would only get in the way of that admin UI.
+	   ACF field-level translation modes (which ryv_states/ryv_forms/
+	   ryv_resources fields get copied vs. translated per-language) are
+	   deliberately NOT set here - ACFML (Advanced Custom Fields
+	   Multilingual) exposes those as a per-field UI once the post type
+	   itself is translatable, and this site configures them there rather
+	   than baking defaults into this file that would only get in the way of
+	   that admin UI. That's why `ryv_resources` has no <custom-fields>
+	   block below despite having a full field set: every one of its fields
+	   is ACF.
 
-	2. The free-text Content-tab controls on RYV's two Elementor widgets
-	   (widgets/class-ryv-widget.php, widgets/class-ryv-map-widget.php) as
-	   translatable strings, so WPML's Advanced Translation Editor picks
-	   them up per-widget-instance - these are literally-typed labels an
-	   admin fills in per placement (button/loading/placeholder text,
-	   map heading/description/legend/picker copy), not content that lives
-	   in a CPT. Every other control on these widgets is a Style-tab
-	   value, a boolean switcher, or a technical id (`map_id`,
-	   `selected_region`, `form_id`) - deliberately left out, since none of
-	   those should ever differ per language.
+	2. `ryv_stories`' own postmeta, which is NOT ACF (plain
+	   register_post_meta() in includes/class-ryv-stories-cpt.php), so ACFML
+	   never sees it and it does need explicit actions here. The split:
+	   quote/location are visitor-facing prose and get translated; duration
+	   is the same number of minutes in any language and is copied; the
+	   captioned/featured flags are copied so a story that's the featured
+	   one in English is also the featured one in its translation (the
+	   widget picks its featured story per language, from that language's
+	   own posts). The video URL is `copy-once` rather than `copy`: usually
+	   the same video, but a language edition may point at a subtitled or
+	   dubbed cut, and copy-once seeds it while still letting a translator
+	   change it.
+
+	3. The free-text Content-tab controls on RYV's Elementor widgets
+	   (widgets/class-ryv-widget.php, widgets/class-ryv-map-widget.php,
+	   widgets/class-ryv-stories-widget.php) as translatable strings, so
+	   WPML's Advanced Translation Editor picks them up per-widget-instance
+	   - these are literally-typed labels an admin fills in per placement
+	   (button/loading/placeholder text, map heading/description/legend/
+	   picker copy, the stories header and its two in-widget labels), not
+	   content that lives in a CPT. Every other control on these widgets is
+	   a Style-tab value, a boolean switcher, or a technical id (`map_id`,
+	   `selected_region`, `form_id`, `list_count`, aspect ratios) -
+	   deliberately left out, since none of those should ever differ per
+	   language.
+
+	   `all_link_url` is the one non-text control included, because an "All
+	   Stories" link has to point at the *translated* archive page. A URL
+	   control stores an array rather than a string, so it's declared with
+	   `key_of` (the control name) plus the array key to translate inside it
+	   - the same shape WPML's own built-in widget definitions use for link
+	   fields, and what its config parser builds from `key_of`.
 -->
 <wpml-config>
 	<custom-types>
 		<custom-type translate="1">ryv_states</custom-type>
 		<custom-type translate="1">ryv_forms</custom-type>
+		<custom-type translate="1">ryv_stories</custom-type>
+		<custom-type translate="1">ryv_resources</custom-type>
 	</custom-types>
+	<taxonomies>
+		<taxonomy translate="1">ryv_resource_category</taxonomy>
+	</taxonomies>
+	<custom-fields>
+		<custom-field action="translate">_ryv_story_quote</custom-field>
+		<custom-field action="translate">_ryv_story_location</custom-field>
+		<custom-field action="copy">_ryv_story_duration</custom-field>
+		<custom-field action="copy">_ryv_story_captioned</custom-field>
+		<custom-field action="copy">_ryv_story_featured</custom-field>
+		<custom-field action="copy-once">_ryv_story_youtube_url</custom-field>
+		<!--
+			Derived on save from this resource's own ACF fields
+			(RYV_Resources_CPT::sync_cta_text_meta()), but still visitor-
+			facing button text, so a translator gets to see and translate it
+			rather than inheriting English until the translated post happens
+			to be re-saved through ACF.
+		-->
+		<custom-field action="translate">_ryv_resource_cta_text</custom-field>
+	</custom-fields>
 	<elementor-widgets>
 		<widget name="ryv_eligibility_tool">
 			<fields>
@@ -37,6 +85,22 @@
 				<field editor_type="LINE">label_loading</field>
 				<field editor_type="LINE">label_retry</field>
 				<field editor_type="LINE">label_select_placeholder</field>
+				<!--
+					Not a string to translate but an id to *convert*: when
+					WPML creates or updates a translation of a page holding
+					this widget, it rewrites this id to that language's own
+					edition of the form (WPML's config parser excludes
+					`post-ids` fields from string translation and hands them
+					to its id converter instead).
+
+					This alone isn't enough, which is why
+					RYV_Form_Translations::resolve_for_current_language()
+					re-resolves at render time too: conversion only happens
+					when a translation is written, so a Spanish page built
+					independently - or duplicated before this declaration
+					existed - would keep pointing at the English form.
+				-->
+				<field type="post-ids" sub-type="ryv_forms">form_id</field>
 			</fields>
 		</widget>
 		<widget name="ryv_state_map">
@@ -46,6 +110,16 @@
 				<field editor_type="LINE">legend_title</field>
 				<field editor_type="LINE">picker_label</field>
 				<field editor_type="LINE">picker_placeholder</field>
+			</fields>
+		</widget>
+		<widget name="ryv_stories">
+			<fields>
+				<field editor_type="LINE">eyebrow_text</field>
+				<field editor_type="LINE">heading_text</field>
+				<field editor_type="LINE">featured_label_text</field>
+				<field editor_type="LINE">captioned_text</field>
+				<field editor_type="LINE">all_link_text</field>
+				<field key_of="all_link_url" editor_type="LINK">url</field>
 			</fields>
 		</widget>
 	</elementor-widgets>

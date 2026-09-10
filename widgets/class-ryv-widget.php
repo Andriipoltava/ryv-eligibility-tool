@@ -149,6 +149,7 @@ class RYV_Widget extends \Elementor\Widget_Base {
 
 		$this->register_step_indicator_controls();
 		$this->register_label_controls();
+		$this->register_language_switch_controls();
 		$this->register_wrapper_style_controls();
 		$this->register_color_controls();
 		$this->register_typography_controls();
@@ -161,6 +162,293 @@ class RYV_Widget extends \Elementor\Widget_Base {
 		$this->register_help_tooltip_style_controls();
 		$this->register_step_indicator_style_controls();
 		$this->register_step_sidebar_style_controls();
+		$this->register_language_switch_style_controls();
+	}
+
+	/**
+	 * Style-tab controls for the language-switch button. Safe to target
+	 * `{{WRAPPER}} .ryv-app-wrapper` (unlike the step sidebar's controls -
+	 * see CLAUDE.md): engine.js appends `.ryv-lang-switch` to the wrapper
+	 * itself, so it really is a descendant.
+	 *
+	 * Deliberately a quieter default look than the Continue button - it's a
+	 * secondary action sitting right under a primary one, so it defaults to
+	 * a text-weight link-ish button rather than a second filled button
+	 * competing with Continue for the click.
+	 */
+	private function register_language_switch_style_controls() {
+		$this->start_controls_section(
+			'language_switch_style_section',
+			array(
+				'label'     => __( 'Language Switch', 'ryv-eligibility-tool' ),
+				'tab'       => \Elementor\Controls_Manager::TAB_STYLE,
+				'condition' => array( 'language_switch' => 'yes' ),
+			)
+		);
+
+		$this->add_group_control(
+			\Elementor\Group_Control_Typography::get_type(),
+			array(
+				'name'     => 'language_switch_typography',
+				'label'    => __( 'Typography', 'ryv-eligibility-tool' ),
+				'selector' => '{{WRAPPER}} .ryv-lang-switch-btn',
+			)
+		);
+
+		// The switch normally renders inline, immediately after the current
+		// question's Continue button (engine.js's positionLanguageSwitch()) -
+		// so its usual spacing knob is horizontal. Top Spacing below only
+		// applies to the fallback placement, on a card with no Continue
+		// button of its own.
+		$this->add_control(
+			'language_switch_gap',
+			array(
+				'label'       => __( 'Spacing From Continue', 'ryv-eligibility-tool' ),
+				'type'        => \Elementor\Controls_Manager::SLIDER,
+				'size_units'  => array( 'px' ),
+				'range'       => array(
+					'px' => array(
+						'min' => 0,
+						'max' => 80,
+					),
+				),
+				'selectors'   => array(
+					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-lang-switch-gap: {{SIZE}}{{UNIT}};',
+				),
+			)
+		);
+
+		$this->add_control(
+			'language_switch_margin_top',
+			array(
+				'label'      => __( 'Top Spacing', 'ryv-eligibility-tool' ),
+				'description' => __( 'Only applies where the switch falls back below a question that has no Continue button.', 'ryv-eligibility-tool' ),
+				'type'       => \Elementor\Controls_Manager::SLIDER,
+				'size_units' => array( 'px' ),
+				'range'      => array(
+					'px' => array(
+						'min' => 0,
+						'max' => 80,
+					),
+				),
+				'selectors'  => array(
+					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-lang-switch-margin-top: {{SIZE}}{{UNIT}};',
+				),
+			)
+		);
+
+		$this->add_control(
+			'language_switch_align',
+			array(
+				'label'     => __( 'Alignment', 'ryv-eligibility-tool' ),
+				'type'      => \Elementor\Controls_Manager::CHOOSE,
+				'options'   => array(
+					'flex-start' => array(
+						'title' => __( 'Left', 'ryv-eligibility-tool' ),
+						'icon'  => 'eicon-text-align-left',
+					),
+					'center'     => array(
+						'title' => __( 'Center', 'ryv-eligibility-tool' ),
+						'icon'  => 'eicon-text-align-center',
+					),
+					'flex-end'   => array(
+						'title' => __( 'Right', 'ryv-eligibility-tool' ),
+						'icon'  => 'eicon-text-align-right',
+					),
+				),
+				'selectors' => array(
+					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-lang-switch-align: {{VALUE}};',
+				),
+			)
+		);
+
+		$this->add_responsive_control(
+			'language_switch_padding',
+			array(
+				'label'      => __( 'Padding', 'ryv-eligibility-tool' ),
+				'type'       => \Elementor\Controls_Manager::DIMENSIONS,
+				'size_units' => array( 'px', 'em', 'rem' ),
+				'selectors'  => array(
+					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-lang-switch-padding: {{TOP}}{{UNIT}} {{RIGHT}}{{UNIT}} {{BOTTOM}}{{UNIT}} {{LEFT}}{{UNIT}};',
+				),
+			)
+		);
+
+		$this->add_control(
+			'language_switch_border_radius',
+			array(
+				'label'      => __( 'Border Radius', 'ryv-eligibility-tool' ),
+				'type'       => \Elementor\Controls_Manager::DIMENSIONS,
+				'size_units' => array( 'px', 'em', 'rem', '%' ),
+				'selectors'  => array(
+					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-lang-switch-border-radius: {{TOP}}{{UNIT}} {{RIGHT}}{{UNIT}} {{BOTTOM}}{{UNIT}} {{LEFT}}{{UNIT}};',
+				),
+			)
+		);
+
+		$this->add_control(
+			'language_switch_border_width',
+			array(
+				'label'      => __( 'Border Width', 'ryv-eligibility-tool' ),
+				'type'       => \Elementor\Controls_Manager::SLIDER,
+				'size_units' => array( 'px' ),
+				'range'      => array(
+					'px' => array(
+						'min' => 0,
+						'max' => 10,
+					),
+				),
+				'selectors'  => array(
+					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-lang-switch-border-width: {{SIZE}}{{UNIT}};',
+				),
+			)
+		);
+
+		$this->start_controls_tabs( 'tabs_language_switch_style' );
+
+		$this->start_controls_tab(
+			'tab_language_switch_normal',
+			array( 'label' => __( 'Normal', 'ryv-eligibility-tool' ) )
+		);
+
+		$this->add_control(
+			'language_switch_text_color',
+			array(
+				'label'     => __( 'Text Color', 'ryv-eligibility-tool' ),
+				'type'      => \Elementor\Controls_Manager::COLOR,
+				'selectors' => array(
+					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-lang-switch-text-color: {{VALUE}};',
+				),
+			)
+		);
+
+		$this->add_control(
+			'language_switch_bg_color',
+			array(
+				'label'     => __( 'Background Color', 'ryv-eligibility-tool' ),
+				'type'      => \Elementor\Controls_Manager::COLOR,
+				'selectors' => array(
+					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-lang-switch-bg: {{VALUE}};',
+				),
+			)
+		);
+
+		$this->add_control(
+			'language_switch_border_color',
+			array(
+				'label'     => __( 'Border Color', 'ryv-eligibility-tool' ),
+				'type'      => \Elementor\Controls_Manager::COLOR,
+				'selectors' => array(
+					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-lang-switch-border-color: {{VALUE}};',
+				),
+			)
+		);
+
+		$this->end_controls_tab();
+
+		$this->start_controls_tab(
+			'tab_language_switch_hover',
+			array( 'label' => __( 'Hover', 'ryv-eligibility-tool' ) )
+		);
+
+		$this->add_control(
+			'language_switch_text_color_hover',
+			array(
+				'label'     => __( 'Text Color', 'ryv-eligibility-tool' ),
+				'type'      => \Elementor\Controls_Manager::COLOR,
+				'selectors' => array(
+					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-lang-switch-text-color-hover: {{VALUE}};',
+				),
+			)
+		);
+
+		$this->add_control(
+			'language_switch_bg_color_hover',
+			array(
+				'label'     => __( 'Background Color', 'ryv-eligibility-tool' ),
+				'type'      => \Elementor\Controls_Manager::COLOR,
+				'selectors' => array(
+					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-lang-switch-bg-hover: {{VALUE}};',
+				),
+			)
+		);
+
+		$this->add_control(
+			'language_switch_border_color_hover',
+			array(
+				'label'     => __( 'Border Color', 'ryv-eligibility-tool' ),
+				'type'      => \Elementor\Controls_Manager::COLOR,
+				'selectors' => array(
+					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-lang-switch-border-color-hover: {{VALUE}};',
+				),
+			)
+		);
+
+		$this->end_controls_tab();
+
+		$this->end_controls_tabs();
+
+		$this->end_controls_section();
+	}
+
+	/**
+	 * Content-tab controls for the *tool-only* language switch: a button
+	 * rendered directly below the questionnaire (i.e. right under the
+	 * current question's Continue button) that re-renders the tool in
+	 * another language edition of the same form without navigating away -
+	 * the page itself stays in whatever language it was.
+	 *
+	 * Enabled by default, which is safe precisely because render() only
+	 * prints the button when the form actually has a second linked language
+	 * edition (see RYV_Form_Translations::get_editions()) - on a
+	 * single-language site this section has no visible effect at all.
+	 *
+	 * One Button Text control per *site* language, not per form: WPML's
+	 * active-language list is site config, so unlike anything form-specific
+	 * it's readable this early (Elementor registers controls before any
+	 * particular instance's settings are known). Each defaults to
+	 * RYV_Form_Translations::default_switch_label() - "En Español" rather
+	 * than WPML's own native name "Español".
+	 */
+	private function register_language_switch_controls() {
+		$this->start_controls_section(
+			'language_switch_section',
+			array(
+				'label' => __( 'Language Switch', 'ryv-eligibility-tool' ),
+				'tab'   => \Elementor\Controls_Manager::TAB_CONTENT,
+			)
+		);
+
+		$this->add_control(
+			'language_switch',
+			array(
+				'label'        => __( 'Show Language Switch', 'ryv-eligibility-tool' ),
+				'type'         => \Elementor\Controls_Manager::SWITCHER,
+				'label_on'     => __( 'Show', 'ryv-eligibility-tool' ),
+				'label_off'    => __( 'Hide', 'ryv-eligibility-tool' ),
+				'return_value' => 'yes',
+				'default'      => 'yes',
+				'description'  => __( 'Switches only the questionnaire to another language, leaving the rest of the page as-is. Only appears when this form has a linked translation (RYV Forms → Translations).', 'ryv-eligibility-tool' ),
+			)
+		);
+
+		foreach ( RYV_Form_Translations::get_active_languages() as $code => $language ) {
+			$code = (string) $code;
+			$name = ! empty( $language['translated_name'] ) ? $language['translated_name'] : strtoupper( $code );
+
+			$this->add_control(
+				'language_switch_label_' . $code,
+				array(
+					/* translators: %s: language name, e.g. "Spanish". */
+					'label'     => sprintf( __( 'Button Text → %s', 'ryv-eligibility-tool' ), $name ),
+					'type'      => \Elementor\Controls_Manager::TEXT,
+					'default'   => RYV_Form_Translations::default_switch_label( $code ),
+					'condition' => array( 'language_switch' => 'yes' ),
+				)
+			);
+		}
+
+		$this->end_controls_section();
 	}
 
 	/**
@@ -2051,30 +2339,6 @@ class RYV_Widget extends \Elementor\Widget_Base {
 		);
 
 		$this->add_control(
-			'step_sidebar_marker_color',
-			array(
-				'label'       => __( 'Number Color', 'ryv-eligibility-tool' ),
-				'type'        => \Elementor\Controls_Manager::COLOR,
-				'description' => __( 'The upcoming (not yet done/active) step number and its border. Leave blank to use the widget\'s Secondary Color.', 'ryv-eligibility-tool' ),
-				'selectors'   => array(
-					'{{WRAPPER}}' => '--ryv-step-sidebar-marker-color: {{VALUE}};',
-				),
-			)
-		);
-
-		$this->add_control(
-			'step_sidebar_marker_bg_color',
-			array(
-				'label'       => __( 'Background Color', 'ryv-eligibility-tool' ),
-				'type'        => \Elementor\Controls_Manager::COLOR,
-				'description' => __( 'Fill of an upcoming (not yet done/active) step number - transparent by default. A done/active step always shows the Active Step Color instead, regardless of this.', 'ryv-eligibility-tool' ),
-				'selectors'   => array(
-					'{{WRAPPER}}' => '--ryv-step-sidebar-marker-bg-color: {{VALUE}};',
-				),
-			)
-		);
-
-		$this->add_control(
 			'step_sidebar_marker_border_width',
 			array(
 				'label'      => __( 'Border Width', 'ryv-eligibility-tool' ),
@@ -2092,6 +2356,149 @@ class RYV_Widget extends \Elementor\Widget_Base {
 			)
 		);
 
+		// The marker's three states - upcoming, the step being answered, and
+		// an already-completed step (the one showing a checkmark instead of
+		// its number) - each get their own number/background/border colors.
+		//
+		// `step_sidebar_marker_color`/`_bg_color` keep the control ids they
+		// had as flat, state-less controls: moving them into the Normal tab
+		// preserves whatever an existing placement already saved under those
+		// ids, where deleting and re-adding them would silently drop it. The
+		// pre-existing "Active Step Color" above still drives every state
+		// left blank here (see input.css's fallback chains), so an untouched
+		// placement looks exactly as it did.
+		$this->start_controls_tabs( 'tabs_step_sidebar_marker_colors' );
+
+		$this->start_controls_tab(
+			'tab_step_sidebar_marker_normal',
+			array( 'label' => __( 'Normal', 'ryv-eligibility-tool' ) )
+		);
+
+		$this->add_control(
+			'step_sidebar_marker_color',
+			array(
+				'label'       => __( 'Number Color', 'ryv-eligibility-tool' ),
+				'type'        => \Elementor\Controls_Manager::COLOR,
+				'description' => __( 'A step the visitor hasn\'t reached yet. Leave blank to use the widget\'s Secondary Color.', 'ryv-eligibility-tool' ),
+				'selectors'   => array(
+					'{{WRAPPER}}' => '--ryv-step-sidebar-marker-color: {{VALUE}};',
+				),
+			)
+		);
+
+		$this->add_control(
+			'step_sidebar_marker_bg_color',
+			array(
+				'label'     => __( 'Background Color', 'ryv-eligibility-tool' ),
+				'type'      => \Elementor\Controls_Manager::COLOR,
+				'selectors' => array(
+					'{{WRAPPER}}' => '--ryv-step-sidebar-marker-bg-color: {{VALUE}};',
+				),
+			)
+		);
+
+		$this->add_control(
+			'step_sidebar_marker_border_color',
+			array(
+				'label'       => __( 'Border Color', 'ryv-eligibility-tool' ),
+				'type'        => \Elementor\Controls_Manager::COLOR,
+				'description' => __( 'Leave blank to follow the Number Color.', 'ryv-eligibility-tool' ),
+				'selectors'   => array(
+					'{{WRAPPER}}' => '--ryv-step-sidebar-marker-border-color: {{VALUE}};',
+				),
+			)
+		);
+
+		$this->end_controls_tab();
+
+		$this->start_controls_tab(
+			'tab_step_sidebar_marker_active',
+			array( 'label' => __( 'Active', 'ryv-eligibility-tool' ) )
+		);
+
+		$this->add_control(
+			'step_sidebar_marker_active_color',
+			array(
+				'label'       => __( 'Number Color', 'ryv-eligibility-tool' ),
+				'type'        => \Elementor\Controls_Manager::COLOR,
+				'description' => __( 'The step the visitor is on right now. Defaults to white.', 'ryv-eligibility-tool' ),
+				'selectors'   => array(
+					'{{WRAPPER}}' => '--ryv-step-sidebar-marker-active-color: {{VALUE}};',
+				),
+			)
+		);
+
+		$this->add_control(
+			'step_sidebar_marker_active_bg_color',
+			array(
+				'label'       => __( 'Background Color', 'ryv-eligibility-tool' ),
+				'type'        => \Elementor\Controls_Manager::COLOR,
+				'description' => __( 'Leave blank to use the Active Step Color above.', 'ryv-eligibility-tool' ),
+				'selectors'   => array(
+					'{{WRAPPER}}' => '--ryv-step-sidebar-marker-active-bg-color: {{VALUE}};',
+				),
+			)
+		);
+
+		$this->add_control(
+			'step_sidebar_marker_active_border_color',
+			array(
+				'label'       => __( 'Border Color', 'ryv-eligibility-tool' ),
+				'type'        => \Elementor\Controls_Manager::COLOR,
+				'description' => __( 'Leave blank to follow the Background Color.', 'ryv-eligibility-tool' ),
+				'selectors'   => array(
+					'{{WRAPPER}}' => '--ryv-step-sidebar-marker-active-border-color: {{VALUE}};',
+				),
+			)
+		);
+
+		$this->end_controls_tab();
+
+		$this->start_controls_tab(
+			'tab_step_sidebar_marker_done',
+			array( 'label' => __( 'Completed', 'ryv-eligibility-tool' ) )
+		);
+
+		$this->add_control(
+			'step_sidebar_marker_done_color',
+			array(
+				'label'       => __( 'Checkmark Color', 'ryv-eligibility-tool' ),
+				'type'        => \Elementor\Controls_Manager::COLOR,
+				'description' => __( 'A step already answered - it shows a checkmark in place of its number. Defaults to white.', 'ryv-eligibility-tool' ),
+				'selectors'   => array(
+					'{{WRAPPER}}' => '--ryv-step-sidebar-marker-done-color: {{VALUE}};',
+				),
+			)
+		);
+
+		$this->add_control(
+			'step_sidebar_marker_done_bg_color',
+			array(
+				'label'       => __( 'Background Color', 'ryv-eligibility-tool' ),
+				'type'        => \Elementor\Controls_Manager::COLOR,
+				'description' => __( 'Leave blank to use the Active Step Color above.', 'ryv-eligibility-tool' ),
+				'selectors'   => array(
+					'{{WRAPPER}}' => '--ryv-step-sidebar-marker-done-bg-color: {{VALUE}};',
+				),
+			)
+		);
+
+		$this->add_control(
+			'step_sidebar_marker_done_border_color',
+			array(
+				'label'       => __( 'Border Color', 'ryv-eligibility-tool' ),
+				'type'        => \Elementor\Controls_Manager::COLOR,
+				'description' => __( 'Leave blank to follow the Background Color.', 'ryv-eligibility-tool' ),
+				'selectors'   => array(
+					'{{WRAPPER}}' => '--ryv-step-sidebar-marker-done-border-color: {{VALUE}};',
+				),
+			)
+		);
+
+		$this->end_controls_tab();
+
+		$this->end_controls_tabs();
+
 		// Direct box-shadow, not a custom property - same exception as
 		// register_wrapper_style_controls()'s own Box Shadow control:
 		// input.css has no var()-driven box-shadow to hook into here, and a
@@ -2100,8 +2507,9 @@ class RYV_Widget extends \Elementor\Widget_Base {
 		$this->add_group_control(
 			\Elementor\Group_Control_Box_Shadow::get_type(),
 			array(
-				'name'     => 'step_sidebar_marker_box_shadow',
-				'selector' => '{{WRAPPER}} .ryv-step-list-marker',
+				'name'      => 'step_sidebar_marker_box_shadow',
+				'selector'  => '{{WRAPPER}} .ryv-step-list-marker',
+				'separator' => 'before',
 			)
 		);
 
@@ -2116,6 +2524,7 @@ class RYV_Widget extends \Elementor\Widget_Base {
 	protected function render() {
 		$form_id    = $this->get_settings_for_display( 'form_id' );
 		$entry_node = null;
+		$state_slug = '';
 
 		if ( 'yes' === $this->get_settings_for_display( 'auto_state_entry' ) ) {
 			$override = $this->get_state_entry_override();
@@ -2126,7 +2535,20 @@ class RYV_Widget extends \Elementor\Widget_Base {
 				// widget was originally configured with."
 				$form_id    = $override['form_id'];
 				$entry_node = $override['entry_node'];
+				// Carried through so the language switch can resolve the
+				// *same* state in another edition's graph, rather than
+				// dropping the visitor back on the full state picker - see
+				// get_language_editions().
+				$state_slug = $override['state_slug'];
 			}
+		}
+
+		// Only when the state page didn't already pick a form: that one
+		// comes from the *page's own* ACF link, so it's already in the
+		// page's language, and re-pointing it would strand `$entry_node`,
+		// which is an id in that specific form's graph.
+		if ( ! $entry_node ) {
+			$form_id = RYV_Form_Translations::resolve_for_current_language( absint( $form_id ) );
 		}
 
 		if ( empty( $form_id ) ) {
@@ -2161,15 +2583,16 @@ class RYV_Widget extends \Elementor\Widget_Base {
 		}
 
 		printf(
-			'<div class="ryv-app-wrapper" data-form-id="%d" data-show-start-over="%d" data-labels="%s" data-icons="%s" data-entry-node="%s" data-step-mode="%s" data-total-steps="%d" data-question-layout="%s"></div>',
+			'<div class="ryv-app-wrapper" data-form-id="%d" data-show-start-over="%d" data-labels="%s" data-icons="%s" data-entry-node="%s" data-step-mode="%s" data-total-steps="%d" data-question-layout="%s" data-language-editions="%s"></div>',
 			absint( $form_id ),
 			$show_start_over ? 1 : 0,
-			esc_attr( wp_json_encode( $this->get_label_overrides() ) ),
+			esc_attr( wp_json_encode( $this->get_label_overrides( absint( $form_id ) ) ) ),
 			esc_attr( wp_json_encode( $this->get_icon_overrides() ) ),
 			esc_attr( (string) $entry_node ),
 			esc_attr( $step_mode ),
 			$total_steps,
-			esc_attr( $question_layout )
+			esc_attr( $question_layout ),
+			esc_attr( wp_json_encode( $this->get_language_editions( absint( $form_id ), $state_slug ) ) )
 		);
 
 		if ( 'sidebar' === $step_mode ) {
@@ -2219,7 +2642,103 @@ class RYV_Widget extends \Elementor\Widget_Base {
 		return array(
 			'form_id'    => $form_id,
 			'entry_node' => $entry_node,
+			'state_slug' => $state_slug,
 		);
+	}
+
+	/**
+	 * The `data-language-editions` payload: every language edition of
+	 * $form_id this widget instance is willing to switch the tool to,
+	 * ordered with the currently-rendered one first.
+	 *
+	 * Each entry carries everything engine.js needs to re-render in that
+	 * language without a page load - the form id to re-fetch, the button
+	 * text, that language's own UI strings (Continue/Start Over/...), and,
+	 * on a state page, that edition's own entry node for the *same* state.
+	 *
+	 * Returns `[]` (so no button renders at all) when the switch is turned
+	 * off, or when there's no second edition to switch to - a form with no
+	 * linked translation, or a single-language site. That's what makes
+	 * defaulting the control to "Show" safe for existing placements.
+	 *
+	 * @param int    $form_id    The form currently being rendered.
+	 * @param string $state_slug State slug when on a `ryv_states` page, '' otherwise.
+	 * @return array<int,array<string,mixed>>
+	 */
+	private function get_language_editions( int $form_id, string $state_slug ): array {
+		if ( 'yes' !== $this->get_settings_for_display( 'language_switch' ) || ! $form_id ) {
+			return array();
+		}
+
+		$editions = RYV_Form_Translations::get_editions( $form_id );
+
+		if ( count( $editions ) < 2 ) {
+			return array();
+		}
+
+		$current_code = RYV_Form_Translations::get_language( $form_id );
+		$payload      = array();
+
+		foreach ( $editions as $code => $post ) {
+			$code = (string) $code;
+
+			// An admin-typed override wins over this class's own default
+			// wording; an emptied field falls back to the default rather
+			// than rendering a blank button.
+			$label = trim( (string) $this->get_settings_for_display( 'language_switch_label_' . $code ) );
+			if ( '' === $label ) {
+				$label = RYV_Form_Translations::default_switch_label( $code );
+			}
+
+			// Resolving this server-side rather than client-side keeps the
+			// switch a pure re-fetch: both editions' picker options share
+			// the same untranslated `value`, so the same state resolves in
+			// either graph even though their per-state node ids differ (see
+			// RYV_Form_Translations' docblock). Null on the homepage, where
+			// the full picker is the right entry point anyway.
+			$edition_entry = null;
+			if ( '' !== $state_slug && class_exists( 'RYV_States_Sync' ) ) {
+				$schema        = RYV_CPT::get_schema( $post->ID );
+				$edition_entry = RYV_States_Sync::find_start_node(
+					$schema['nodes'] ?? array(),
+					$schema['entry_node'] ?? null,
+					$state_slug
+				);
+			}
+
+			// Each edition ships the *complete* label set the engine should
+			// switch to, because switchLanguage() replaces its labels wholesale
+			// rather than diffing them. Without the typed overrides here, a
+			// visitor switching back to the page's own language would land on
+			// the engine's bare built-in defaults - the admin's own wording
+			// silently reverting to "Start Over"/"Loading…" mid-session.
+			//
+			// Those typed overrides ride along only for the edition whose
+			// language they were actually written in: carrying English custom
+			// wording over onto the Spanish edition would override that
+			// language's pack with text in the wrong language.
+			$edition_labels = RYV_Form_Translations::ui_labels( $code );
+
+			if ( $code === $current_code ) {
+				$edition_labels = array_merge( $edition_labels, $this->get_typed_label_overrides( (bool) $edition_labels ) );
+			}
+
+			$entry = array(
+				'code'       => $code,
+				'form_id'    => (int) $post->ID,
+				'label'      => $label,
+				'entry_node' => $edition_entry ?: '',
+				'labels'     => $edition_labels,
+			);
+
+			if ( $code === $current_code ) {
+				array_unshift( $payload, $entry );
+			} else {
+				$payload[] = $entry;
+			}
+		}
+
+		return $payload;
 	}
 
 	/**
@@ -2287,7 +2806,42 @@ class RYV_Widget extends \Elementor\Widget_Base {
 	 *
 	 * @return array<string,string>
 	 */
-	private function get_label_overrides(): array {
+	private function get_label_overrides( int $form_id = 0 ): array {
+		$language = $form_id ? RYV_Form_Translations::get_language( $form_id ) : '';
+
+		// Base layer: the rendered form's *own* language pack, so a Spanish
+		// form shows "Continuar"/"Empezar de nuevo" even when this widget
+		// instance's own settings are still the English ones - which is the
+		// normal case for a Spanish page that was duplicated rather than
+		// translated control-by-control, and the only source at all for
+		// labels with no control of their own (`continue`, `submit`, the
+		// lead-capture messages). Empty for the site's own language, where
+		// the control defaults are already right.
+		$pack = RYV_Form_Translations::ui_labels( $language );
+
+		return array_merge( $pack, $this->get_typed_label_overrides( (bool) $pack ) );
+	}
+
+	/**
+	 * Only the label controls an admin actually *typed something different
+	 * into* - a control still sitting at its own default is not a choice
+	 * anyone made.
+	 *
+	 * That distinction only matters when there's a language pack underneath
+	 * to lose: otherwise the English default "Start Over" would silently win
+	 * over "Empezar de nuevo" on every placement nobody has retyped. With no
+	 * pack (the site's own language) every non-empty value is passed
+	 * through, exactly as before this method existed.
+	 *
+	 * Kept separate from get_label_overrides() because the language switch
+	 * needs these on their own: switching back to the page's own language
+	 * has to restore what the admin typed, not fall back to the engine's
+	 * bare defaults - see get_language_editions().
+	 *
+	 * @param bool $has_pack Whether a language pack is being layered under these.
+	 * @return array<string,string>
+	 */
+	private function get_typed_label_overrides( bool $has_pack ): array {
 		$map = array(
 			'label_start_over'         => 'startOver',
 			'label_loading'            => 'loading',
@@ -2295,16 +2849,26 @@ class RYV_Widget extends \Elementor\Widget_Base {
 			'label_select_placeholder' => 'selectPlaceholder',
 		);
 
-		$overrides = array();
+		$typed = array();
 
 		foreach ( $map as $setting_key => $label_key ) {
-			$value = $this->get_settings_for_display( $setting_key );
-			if ( '' !== trim( (string) $value ) ) {
-				$overrides[ $label_key ] = $value;
+			$value = (string) $this->get_settings_for_display( $setting_key );
+
+			if ( '' === trim( $value ) ) {
+				continue;
 			}
+
+			$control = $this->get_controls( $setting_key );
+			$default = isset( $control['default'] ) ? (string) $control['default'] : '';
+
+			if ( $has_pack && $value === $default ) {
+				continue;
+			}
+
+			$typed[ $label_key ] = $value;
 		}
 
-		return $overrides;
+		return $typed;
 	}
 
 	/**

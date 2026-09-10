@@ -1,8 +1,8 @@
 // See the matching comment in ../decision-engine.js - these query strings
 // are the only thing cache-busting these nested imports; bump them with
 // every RYV_VERSION change.
-import { fetchForm, logSubmission, submitLead } from './api-client.js?ver=0.8.36';
-import * as renderer from './renderer.js?ver=0.8.36';
+import { fetchForm, logSubmission, submitLead } from './api-client.js?ver=0.8.47';
+import * as renderer from './renderer.js?ver=0.8.47';
 
 const LOADING_CARD_ID = '__loading__';
 const ERROR_CARD_ID = '__error__';
@@ -48,11 +48,26 @@ export class RYVDecisionEngine {
     this.totalSteps = parseInt(root.dataset.totalSteps, 10) || 0;
     this.stepEl = null;
     this.stepSidebarEl = null;
+    // Every named step in the graph, in reach order - the full checklist
+    // the sidebar shows up front. Built once per form load, see
+    // buildAllSteps().
+    this.allSteps = [];
     // One-question-at-a-time layout (widget's "Layout" control): every
     // rendered card stays in cardElements/renderedOrder exactly as in
     // stacked mode (the DAG-walking logic never changes) - only their
     // visibility is toggled, in appendCard()/truncateFrom() below.
     this.wizardMode = root.dataset.questionLayout === 'wizard';
+    // Every language edition of this form the visitor may switch the tool
+    // to, built server-side (class-ryv-widget.php's get_language_editions()).
+    // Empty for a form with no linked translation, a single-language site,
+    // or a placement with the switch turned off - which is what makes the
+    // switch self-limiting rather than something to feature-detect here.
+    this.languageEditions = this.parseJSONAttribute(root, 'languageEditions');
+    if (!Array.isArray(this.languageEditions)) this.languageEditions = [];
+    // Matched by form id rather than trusting the payload's order, so this
+    // stays correct however the editions arrive.
+    this.languageCode = (this.languageEditions.find((e) => String(e.form_id) === String(this.formId)) || {}).code || '';
+    this.langSwitchEl = null;
     // One id per attempt at the questionnaire - restart() rolls a new one so
     // an abandoned-then-restarted trail stays on record as its own row
     // (see RYV_Submission_Log) instead of being overwritten in place.
@@ -127,6 +142,113 @@ export class RYVDecisionEngine {
     }
     this.list = renderer.createList();
     this.root.appendChild(this.list);
+    this.mountLanguageSwitch();
+    this.loadForm();
+  }
+
+  /**
+   * The language switch is built once and then *moved*, never rebuilt, by
+   * positionLanguageSwitch() below - so it keeps its identity (and its
+   * click handler) across every re-render.
+   */
+  mountLanguageSwitch() {
+    const others = this.languageEditions.filter((e) => e.code !== this.languageCode);
+    this.langSwitchEl = renderer.renderLanguageSwitch(others, (code) => this.switchLanguage(code));
+    this.positionLanguageSwitch();
+  }
+
+  /**
+   * Park the switch immediately after the current question's Continue
+   * button, on the same line - not at the bottom of the widget.
+   *
+   * It can't simply be rendered inside the card, because a card is built
+   * once by buildCard() and the switch has to outlive every truncate/
+   * re-render: so it's a single long-lived element that gets re-homed after
+   * each list mutation (appendCard()/truncateFrom(), the only two places
+   * cards are added or removed). truncateFrom() removing the card it was
+   * sitting in detaches it too - harmless, since the same call then
+   * re-positions it into whatever card is now last.
+   *
+   * Falls back to the end of the last card when that card has no Continue
+   * button of its own (a radio question advances on click; a terminal card
+   * only has Start Over), and to the widget root when there's no card at
+   * all yet (initial load, error state).
+   */
+  positionLanguageSwitch() {
+    if (!this.langSwitchEl) return;
+
+    let lastCard = null;
+    this.renderedOrder.forEach((id) => {
+      const element = this.cardElements.get(id);
+      if (element) lastCard = element;
+    });
+
+    if (!lastCard) {
+      this.langSwitchEl.classList.remove('ryv-lang-switch--inline');
+      this.root.appendChild(this.langSwitchEl);
+      return;
+    }
+
+    // Its own buttons are never `.ryv-continue-btn`, so this can't select
+    // the switch itself however many times it's been re-homed.
+    const continueBtns = lastCard.querySelectorAll('.ryv-continue-btn');
+    const anchor = continueBtns.length ? continueBtns[continueBtns.length - 1] : null;
+
+    this.langSwitchEl.classList.toggle('ryv-lang-switch--inline', !!anchor);
+
+    if (anchor) anchor.insertAdjacentElement('afterend', this.langSwitchEl);
+    else lastCard.appendChild(this.langSwitchEl);
+  }
+
+  /**
+   * Re-render the questionnaire in another language edition of the same
+   * form, without navigating: the page stays in whatever language it was,
+   * only the tool changes. This is a plain re-fetch of a different form id -
+   * nothing about the graph walk is language-aware.
+   *
+   * Two things have to move with it. The entry node, because each edition
+   * has its own per-state node ids: on a state page the widget pre-resolved
+   * each edition's own first question for *this* state (see
+   * get_language_editions()), so the visitor stays on their state instead of
+   * being dropped back at the full picker. And the UI strings (Continue,
+   * Start Over, ...), which can't come from WPML string translation here -
+   * that resolves against the *page's* language, which deliberately hasn't
+   * changed - so the server ships the target language's set instead
+   * (RYV_Form_Translations::UI_LABELS).
+   *
+   * The server-rendered title/description above the tool
+   * (class-ryv-widget.php's render_header()) is deliberately *not* swapped
+   * along with it, even though the REST fetch returns the new edition's
+   * own title: a translated form's post title is an internal admin name
+   * ("Voting Rights Spanish"), not visitor-facing copy, and its excerpt is
+   * usually empty - swapping produced an admin label over a still-English
+   * description. The header is page chrome and stays in the page's own
+   * language, which is what "tool-only" means here.
+   *
+   * Answers are not carried across: the two editions' node ids differ per
+   * state, so there's nothing to replay them against. The visitor restarts
+   * in the new language, with a fresh session id so the abandoned English
+   * trail stays on record as its own row rather than being overwritten.
+   */
+  switchLanguage(code) {
+    const target = this.languageEditions.find((e) => e.code === code);
+    if (!target || code === this.languageCode) return;
+
+    this.languageCode = code;
+    this.formId = String(target.form_id);
+    this.entryNodeOverride = target.entry_node || null;
+    this.labels = { ...renderer.DEFAULT_LABELS, ...(target.labels || {}) };
+    this.answers = new Map();
+    this.sessionId = this.generateSessionId();
+
+    // Rebuilt rather than relabeled: the button set is "every edition except
+    // the current one", which just changed.
+    if (this.langSwitchEl) {
+      this.langSwitchEl.remove();
+      this.langSwitchEl = null;
+    }
+    this.mountLanguageSwitch();
+
     this.loadForm();
   }
 
@@ -142,6 +264,10 @@ export class RYVDecisionEngine {
       this.entryNode = (this.entryNodeOverride && this.nodes[this.entryNodeOverride])
         ? this.entryNodeOverride
         : data.entry_node;
+      // Depends on both `nodes` and `entryNode`, so it can only be built
+      // here - and is rebuilt on every load, which is what keeps it correct
+      // after a language switch (a different graph entirely).
+      this.allSteps = this.buildAllSteps();
       this.truncateFrom(0);
       this.renderFrom(this.entryNode, true);
     } catch (err) {
@@ -178,28 +304,91 @@ export class RYVDecisionEngine {
   }
 
   /**
-   * Builds the sidebar's step list from the visitor's own path so far:
-   * walks `renderedOrder`, collecting each real on-screen node's
-   * `step_name` - a node with no name (or the same name as the entry just
-   * added) doesn't start a new entry, it stays folded into the running one
-   * (see NodeEditor.js's Step Name help text). The last real node's step is
-   * "active" (not yet marked done); everything before it is done.
+   * Every named step in the whole graph, in the order a visitor reaches
+   * them - so the sidebar can show the full "1, 2, 3" checklist up front
+   * (upcoming steps greyed) instead of revealing each entry only once the
+   * visitor gets there.
+   *
+   * Breadth-first from the entry node, deduped by name on first discovery:
+   * with the 3-step shape the Step Names page assigns (entry / everything
+   * the entry routes to / every terminal - see class-ryv-step-names-page.php)
+   * BFS visits those three tiers in exactly that order, whatever branch a
+   * visitor eventually takes. Names, not nodes, are the unit here: dozens of
+   * different per-state nodes all share the one "Tell us about your
+   * conviction" label and must collapse to a single entry.
+   *
+   * Cached per load (see loadForm()) rather than recomputed on every
+   * render - a real form is 450+ nodes and this runs on every card change.
+   */
+  buildAllSteps() {
+    const steps = [];
+    const seenNames = new Set();
+    const visited = new Set();
+    const queue = [this.entryNode];
+
+    while (queue.length) {
+      const id = queue.shift();
+      if (!id || visited.has(id)) continue;
+      visited.add(id);
+
+      const node = this.nodes[id];
+      if (!node) continue;
+
+      // `hidden` nodes never get a card, so one can't anchor a sidebar
+      // entry - same reasoning as the Step Names page's own resolution.
+      if (node.step_name && !node.hidden && !seenNames.has(node.step_name)) {
+        seenNames.add(node.step_name);
+        steps.push({ name: node.step_name, firstNodeId: null });
+      }
+
+      (node.options || []).forEach((option) => {
+        if (option && option.next_node) queue.push(option.next_node);
+      });
+      if (node.next_node) queue.push(node.next_node);
+    }
+
+    return steps;
+  }
+
+  /**
+   * Renders the full step checklist (buildAllSteps()) and marks the
+   * visitor's position in it: everything before their current step is done,
+   * their current step is active, the rest are upcoming.
+   *
+   * Which step is current still comes from the visitor's *own* path, not
+   * from the graph - `renderedOrder` is walked exactly as before, so a node
+   * with no `step_name` stays folded into whichever named step is already
+   * running (see NodeEditor.js's Step Name help text). That walk also
+   * supplies each done step's `firstNodeId`: a step is only clickable back
+   * to a card the visitor actually saw, never to whichever node BFS
+   * happened to discover the name on.
+   *
+   * Falls back to the path-derived list when the graph has no named steps
+   * reachable from the entry node, so a form that never ran through the
+   * Step Names page behaves exactly as it did before.
    */
   updateStepSidebar() {
     if (!this.stepSidebarEl) return;
 
-    const steps = [];
+    const pathSteps = [];
     let activeIndex = -1;
 
     this.renderedOrder.forEach((id) => {
       const node = this.nodes[id];
       if (!node || !this.cardElements.has(id)) return; // sentinel, or node.hidden (no card)
-      const last = steps[steps.length - 1];
+      const last = pathSteps[pathSteps.length - 1];
       if (node.step_name && (!last || last.name !== node.step_name)) {
-        steps.push({ name: node.step_name, firstNodeId: id });
+        pathSteps.push({ name: node.step_name, firstNodeId: id });
       }
-      if (steps.length) activeIndex = steps.length - 1;
     });
+
+    const steps = (this.allSteps && this.allSteps.length) ? this.allSteps.map((step) => {
+      const visited = pathSteps.find((s) => s.name === step.name);
+      return { name: step.name, firstNodeId: visited ? visited.firstNodeId : null };
+    }) : pathSteps;
+
+    const currentName = pathSteps.length ? pathSteps[pathSteps.length - 1].name : null;
+    if (currentName) activeIndex = steps.findIndex((s) => s.name === currentName);
 
     renderer.updateStepSidebar(this.stepSidebarEl, steps, activeIndex, (nodeId) => this.goToStep(nodeId));
   }
@@ -486,6 +675,7 @@ export class RYVDecisionEngine {
     renderer.appendCard(this.list, element, animate);
     this.updateSteps();
     this.updateWizardVisibility();
+    this.positionLanguageSwitch();
   }
 
   indexOf(id) {
@@ -503,6 +693,7 @@ export class RYVDecisionEngine {
     });
     this.updateSteps();
     this.updateWizardVisibility();
+    this.positionLanguageSwitch();
   }
 }
 

@@ -526,7 +526,7 @@ class RYV_States_ACF {
 					'label'         => 'Events',
 					'name'          => 'ryv_events',
 					'type'          => 'relationship',
-					'post_type'     => array( 'tribe_events' ),
+					'post_type'     => array( RYV_State_Queries::EVENTS_POST_TYPE ),
 					'filters'       => array( 'search' ),
 					'return_format' => 'id',
 					'min'           => 0,

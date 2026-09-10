@@ -385,27 +385,41 @@ class RYV_Translations_Page {
 	 * @return array{success: bool, message: string}
 	 */
 	private function backfill_default_languages(): array {
-		$forms = $this->get_all_forms();
-		$fixed = array();
+		// Every RYV post type wpml-config.xml declares translatable, not
+		// just forms: `ryv_resources`/`ryv_stories` became translatable
+		// later, which means every one of them that already existed at that
+		// moment has no language row and is therefore invisible to any
+		// language-filtered query - including the state-page lists that
+		// render them on the frontend (see RYV_State_Queries).
+		$post_types = array( RYV_CPT::POST_TYPE, RYV_States_CPT::POST_TYPE, RYV_Resources_CPT::POST_TYPE, RYV_Stories_CPT::POST_TYPE );
+		$posts      = get_posts(
+			array(
+				'post_type'        => $post_types,
+				'post_status'      => 'any',
+				'numberposts'      => -1,
+				'suppress_filters' => true,
+			)
+		);
+		$fixed      = array();
 
-		foreach ( $forms as $form ) {
-			if ( RYV_CPT::assign_default_language_if_missing( $form->ID ) ) {
-				$fixed[] = $form->post_title;
+		foreach ( $posts as $post ) {
+			if ( RYV_CPT::assign_default_language_if_missing( $post->ID ) ) {
+				$fixed[] = $post->post_title;
 			}
 		}
 
 		if ( ! $fixed ) {
 			return array(
 				'success' => true,
-				'message' => __( 'Every form already has a language assigned - nothing to do.', 'ryv-eligibility-tool' ),
+				'message' => __( 'Every form, state, resource and story already has a language assigned - nothing to do.', 'ryv-eligibility-tool' ),
 			);
 		}
 
 		return array(
-			/* translators: 1: number of forms fixed, 2: comma-separated list of their titles */
+			/* translators: 1: number of posts fixed, 2: comma-separated list of their titles */
 			'success' => true,
 			'message' => sprintf(
-				__( 'Assigned a default language to %1$d form(s): %2$s.', 'ryv-eligibility-tool' ),
+				__( 'Assigned a default language to %1$d post(s): %2$s.', 'ryv-eligibility-tool' ),
 				count( $fixed ),
 				implode( ', ', $fixed )
 			),

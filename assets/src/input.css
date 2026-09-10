@@ -153,23 +153,36 @@
     font-size: var(--ryv-step-sidebar-marker-font-size, 0.75rem);
     border-style: solid;
     border-width: var(--ryv-step-sidebar-marker-border-width, 1px);
-    border-color: var(--ryv-step-sidebar-marker-color, var(--ryv-secondary-color, #cbd5e1));
-    /* Fill/background of an upcoming (not yet done/active) step number -
-     * transparent by default (only its border/number color were
-     * customizable before). is-done/is-active below always override this
-     * with the Active Step Color, same as before. */
+    /*
+     * Each of the marker's three states (upcoming here, done and active
+     * below) takes its number/background/border colors from its own trio of
+     * vars - the widget's "Step Number" Normal/Active/Completed tabs.
+     *
+     * The fallback chains are what keep an already-styled placement looking
+     * exactly as it did before those per-state controls existed: an unset
+     * border color still follows the number color (which used to drive both
+     * at once), and unset done/active colors still resolve to the single
+     * "Active Step Color" control, which was the only knob these two states
+     * ever had.
+     */
+    border-color: var(--ryv-step-sidebar-marker-border-color, var(--ryv-step-sidebar-marker-color, var(--ryv-secondary-color, #cbd5e1)));
     background-color: var(--ryv-step-sidebar-marker-bg-color, transparent);
     color: var(--ryv-step-sidebar-marker-color, inherit);
   }
+  /*
+   * is-done and is-active are mutually exclusive (engine.js's
+   * updateStepSidebar() marks exactly one entry active, everything before it
+   * done), so these two equal-specificity rules never compete on one marker.
+   */
   .ryv-step-list-item.is-done .ryv-step-list-marker {
-    background-color: var(--ryv-step-sidebar-active-color, var(--ryv-primary-color, #002a41));
-    border-color: var(--ryv-step-sidebar-active-color, var(--ryv-primary-color, #002a41));
-    color: #fff;
+    background-color: var(--ryv-step-sidebar-marker-done-bg-color, var(--ryv-step-sidebar-active-color, var(--ryv-primary-color, #002a41)));
+    border-color: var(--ryv-step-sidebar-marker-done-border-color, var(--ryv-step-sidebar-marker-done-bg-color, var(--ryv-step-sidebar-active-color, var(--ryv-primary-color, #002a41))));
+    color: var(--ryv-step-sidebar-marker-done-color, #fff);
   }
   .ryv-step-list-item.is-active .ryv-step-list-marker {
-    background-color: var(--ryv-step-sidebar-active-color, var(--ryv-primary-color, #002a41));
-    border-color: var(--ryv-step-sidebar-active-color, var(--ryv-primary-color, #002a41));
-    color: #fff;
+    background-color: var(--ryv-step-sidebar-marker-active-bg-color, var(--ryv-step-sidebar-active-color, var(--ryv-primary-color, #002a41)));
+    border-color: var(--ryv-step-sidebar-marker-active-border-color, var(--ryv-step-sidebar-marker-active-bg-color, var(--ryv-step-sidebar-active-color, var(--ryv-primary-color, #002a41))));
+    color: var(--ryv-step-sidebar-marker-active-color, #fff);
   }
 
   /*
@@ -434,6 +447,63 @@
     @apply ryv-opacity-40 ryv-cursor-not-allowed;
   }
 
+  /*
+   * The tool-only language switch (renderer.js's renderLanguageSwitch()),
+   * appended to .ryv-app-wrapper after the card list so it sits right under
+   * the current question's Continue button.
+   *
+   * Defaults to an underlined text button rather than a second filled one:
+   * it's a secondary action directly below a primary one, and a second solid
+   * button there reads as the next step in the questionnaire. Same doubled
+   * selector + !important treatment as .ryv-continue-btn above, for the same
+   * reason - a host theme's own `button` rules would otherwise win on load
+   * order alone.
+   */
+  .ryv-lang-switch {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    justify-content: var(--ryv-lang-switch-align, flex-start);
+    margin-top: var(--ryv-lang-switch-margin-top, 1rem);
+  }
+  /*
+   * Sitting immediately after a Continue button, on the same line
+   * (engine.js's positionLanguageSwitch()). inline-flex rather than flex so
+   * it shares the button's line box at all, and the block variant's
+   * top margin/alignment are dropped - horizontal spacing from the button
+   * is what matters here, and vertical alignment is the button's baseline.
+   */
+  .ryv-lang-switch.ryv-lang-switch--inline {
+    display: inline-flex;
+    vertical-align: middle;
+    justify-content: flex-start;
+    margin-top: 0;
+    margin-left: var(--ryv-lang-switch-gap, 1rem);
+  }
+  .ryv-lang-switch-btn.ryv-lang-switch-btn {
+    display: inline-flex !important;
+    align-items: center !important;
+    cursor: pointer !important;
+    font-weight: 500 !important;
+    text-decoration: underline !important;
+    transition-property: color, background-color, border-color !important;
+    transition-duration: 150ms !important;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1) !important;
+    color: var(--ryv-lang-switch-text-color, var(--ryv-primary-color, #002a41)) !important;
+    background-color: var(--ryv-lang-switch-bg, transparent) !important;
+    border-style: solid !important;
+    border-width: var(--ryv-lang-switch-border-width, 0px) !important;
+    border-color: var(--ryv-lang-switch-border-color, transparent) !important;
+    border-radius: var(--ryv-lang-switch-border-radius, var(--ryv-radius, 0)) !important;
+    padding: var(--ryv-lang-switch-padding, 0.25rem 0) !important;
+  }
+  .ryv-lang-switch-btn.ryv-lang-switch-btn:hover,
+  .ryv-lang-switch-btn.ryv-lang-switch-btn:focus-visible {
+    color: var(--ryv-lang-switch-text-color-hover, var(--ryv-lang-switch-text-color, var(--ryv-secondary-color, #c8102e))) !important;
+    background-color: var(--ryv-lang-switch-bg-hover, var(--ryv-lang-switch-bg, transparent)) !important;
+    border-color: var(--ryv-lang-switch-border-color-hover, var(--ryv-lang-switch-border-color, transparent)) !important;
+  }
+
   .ryv-input.ryv-input {
     @apply ryv-w-full ryv-mb-4;
     max-width: var(--ryv-input-max-width, none);
@@ -657,11 +727,24 @@
     letter-spacing: 0.08em;
     font-size: 0.75rem;
   }
+  /*
+   * The bottom margins here are var-driven because the widget's "Spacing
+   * Below" controls (heading_margin_bottom / description_margin_bottom)
+   * write exactly these two properties. They were hardcoded, so both
+   * controls silently did nothing - the same failure mode as the step
+   * sidebar's wrong-target properties in CLAUDE.md, except the target was
+   * right and it was the *reader* that was missing. Fallbacks are the
+   * previous hardcoded values, so an untouched placement is unchanged.
+   *
+   * The doubled class is deliberate (a host theme's own h2/p margins would
+   * otherwise win on load order), which is also why these stay `margin`
+   * shorthands rather than a bare `margin-bottom`.
+   */
   .ryv-map-widget-heading.ryv-map-widget-heading {
-    margin: 0 0 0.5rem;
+    margin: 0 0 var(--ryv-map-heading-spacing, 0.5rem);
   }
   .ryv-map-widget-description.ryv-map-widget-description {
-    margin: 0;
+    margin: 0 0 var(--ryv-map-description-spacing, 0px);
   }
   /* Optional divider line below the description - see the Heading section's
    * "Show Divider" content control. */
@@ -895,5 +978,379 @@
     padding: 0.625rem 0.75rem;
     font-size: 0.875rem;
     color: #6b7280;
+  }
+
+  /*
+   * RYV_Stories_Widget (widgets/class-ryv-stories-widget.php) - the "Real
+   * People, Real Impact" section: one featured video panel beside a list of
+   * story rows, each opening its YouTube video in a new tab. Lives outside
+   * .ryv-app-wrapper, same as the map widget above, so every rule here is
+   * plain CSS rather than a Tailwind utility under the
+   * `important: '.ryv-app-wrapper'` scope.
+   */
+  .ryv-stories-widget-placeholder {
+    padding: 1.5rem;
+    text-align: center;
+    color: #666;
+    border: 1px dashed #ccc;
+  }
+  .ryv-stories-widget-intro {
+    margin-bottom: var(--ryv-stories-intro-spacing, 2rem);
+  }
+  .ryv-stories-widget-heading-row {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+  .ryv-stories-widget-eyebrow.ryv-stories-widget-eyebrow {
+    margin: 0 0 0.375rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-size: 0.75rem;
+  }
+  /* Georgia/serif stack by default, matching the reference design's heading
+   * face - overridable per-instance via the Style tab's Typography group,
+   * same as every other default in this file. */
+  .ryv-stories-widget-heading.ryv-stories-widget-heading {
+    margin: 0;
+    font-family: Georgia, 'Times New Roman', Times, serif;
+    font-size: 2rem;
+    font-weight: 700;
+    line-height: 1.25;
+  }
+  .ryv-stories-widget-all-link.ryv-stories-widget-all-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding-bottom: 0.25rem;
+    font-size: 0.9375rem;
+    font-weight: 700;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    white-space: nowrap;
+    transition: color 0.15s ease;
+  }
+  .ryv-stories-widget-all-link.ryv-stories-widget-all-link span {
+    transition: transform 0.15s ease;
+  }
+  .ryv-stories-widget-all-link.ryv-stories-widget-all-link:hover span {
+    transform: translateX(3px);
+  }
+  .ryv-stories-widget-divider {
+    margin: 1.25rem 0 0;
+    border: none;
+    border-top-style: solid;
+    border-top-width: var(--ryv-stories-divider-width, 1px);
+    border-top-color: var(--ryv-stories-divider-color, #e5e7eb);
+  }
+
+  .ryv-stories-widget-body {
+    display: flex;
+    align-items: stretch;
+    gap: var(--ryv-stories-body-gap, 2.5rem);
+    flex-wrap: wrap;
+  }
+  .ryv-stories-widget-featured {
+    flex: 1 1 0;
+    min-width: 280px;
+  }
+  .ryv-stories-widget-list-col {
+    flex: 0 0 var(--ryv-stories-list-width, 34%);
+    min-width: 260px;
+  }
+
+  /*
+   * Featured video panel - two layouts, both driven entirely by Elementor
+   * Style-tab controls via CSS custom properties (widgets/class-ryv-stories-widget.php's
+   * register_featured_style_controls()), so nothing about the split
+   * position, angle, caption column, overlay, or play button placement is
+   * hardcoded beyond the defaults below:
+   *
+   * `.ryv-stories-widget-video--diagonal` (default) - the reference design's
+   * signature angled cut between a solid dark caption panel and the photo.
+   * `.ryv-stories-widget-video--bottom` - a plain full-bleed photo with the
+   * caption pinned over a bottom gradient, for photos the diagonal crop
+   * doesn't suit (portrait crops, busy compositions, etc. - see the
+   * "Featured Video Layout" content control).
+   */
+  .ryv-stories-widget-video {
+    position: relative;
+    width: 100%;
+    aspect-ratio: var(--ryv-stories-video-ratio, 16/9);
+    background-color: #0f172a;
+    border-radius: 0.5rem;
+    overflow: hidden;
+    height: 100%;
+  }
+  .ryv-stories-widget-video-thumb,
+  .ryv-stories-widget-video-frame {
+    position: absolute;
+    height: 100%;
+    object-fit: cover;
+    border: none;
+  }
+  /* The muted embed paints over the static thumbnail once loaded - both stay
+   * in the DOM rather than removing the image, so a slow/blocked embed load
+   * never leaves the panel blank. */
+  .ryv-stories-widget-video.is-playing .ryv-stories-widget-video-thumb {
+    visibility: hidden;
+  }
+  .ryv-stories-widget-video-overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+  .ryv-stories-widget-caption {
+    position: absolute;
+    pointer-events: none;
+  }
+  .ryv-stories-widget-caption-label {
+    margin: 0 0 0.625rem;
+    color: #d4effc;
+    font-family: 'District Pro', Georgia, sans-serif;
+    font-size: 1rem;
+    font-weight: 700;
+    line-height: normal;
+    text-transform: uppercase;
+    letter-spacing: 1.68px;
+    opacity: 1;
+  }
+  .ryv-stories-widget-caption-name {
+    margin: 0 0 0.375rem;
+    font-family: Georgia, 'Times New Roman', Times, serif;
+    font-size: 1.375rem;
+    font-weight: 700;
+    line-height: 1.25;
+  }
+  .ryv-stories-widget-caption-meta {
+    color: #d4effc;
+    font-family: 'District Pro', Georgia, sans-serif;
+    font-size: 0.9375rem;
+    font-weight: 400;
+    line-height: 150%;
+    opacity: 1;
+  }
+  .ryv-stories-widget-play.ryv-stories-widget-play {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--ryv-stories-play-size, 3.75rem);
+    height: var(--ryv-stories-play-size, 3.75rem);
+    border-radius: 9999px;
+    font-size: calc(var(--ryv-stories-play-size, 3.75rem) * 0.35);
+    text-decoration: none;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+    transition: transform 0.15s ease;
+  }
+  .ryv-stories-widget-play.ryv-stories-widget-play:hover {
+    transform: translate(-50%, -50%) scale(1.06);
+  }
+  .ryv-stories-widget-play.ryv-stories-widget-play svg {
+    margin-left: 0.15em; /* optically center the triangle */
+  }
+
+  /* --- Diagonal Split (default) --- */
+  .ryv-stories-widget-video--diagonal .ryv-stories-widget-video-thumb,
+  .ryv-stories-widget-video--diagonal .ryv-stories-widget-video-frame {
+    top: 0;
+    right: 0;
+    width: var(--ryv-stories-photo-width, 78%);
+    clip-path: polygon(var(--ryv-stories-cut-angle, 14%) 0%, 100% 0%, 100% 100%, 0% 100%);
+  }
+  .ryv-stories-widget-video--diagonal .ryv-stories-widget-video-overlay {
+    left: auto;
+    right: 0;
+    width: var(--ryv-stories-photo-width, 78%);
+    clip-path: polygon(var(--ryv-stories-cut-angle, 14%) 0%, 100% 0%, 100% 100%, 0% 100%);
+    background: linear-gradient(to right, var(--ryv-stories-overlay-color, rgba(15, 23, 42, 0.6)) 0%, rgba(15, 23, 42, 0.15) 18%, transparent 40%);
+  }
+  .ryv-stories-widget-video--diagonal .ryv-stories-widget-caption {
+    top: var(--ryv-stories-caption-top, 90px);
+    left: var(--ryv-stories-caption-left, 80px);
+    width: var(--ryv-stories-caption-width, 40%);
+    transform: none;
+    padding: 0 !important;
+  }
+  .ryv-stories-widget-video--diagonal .ryv-stories-widget-play.ryv-stories-widget-play {
+    top: var(--ryv-stories-play-y, 68%);
+    left: var(--ryv-stories-play-x, 80px);
+    transform: none;
+  }
+  .ryv-stories-widget-video--diagonal .ryv-stories-widget-play.ryv-stories-widget-play:hover {
+    transform: scale(1.06);
+  }
+
+  /* --- Full-Bleed (bottom overlay) --- */
+  .ryv-stories-widget-video--bottom .ryv-stories-widget-video-thumb,
+  .ryv-stories-widget-video--bottom .ryv-stories-widget-video-frame {
+    inset: 0;
+    width: 100%;
+  }
+  .ryv-stories-widget-video--bottom .ryv-stories-widget-video-overlay {
+    background: linear-gradient(to top, var(--ryv-stories-overlay-color, rgba(15, 23, 42, 0.85)) 0%, rgba(15, 23, 42, 0.15) 45%, transparent 70%);
+  }
+  .ryv-stories-widget-video--bottom .ryv-stories-widget-caption {
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+  }
+  .ryv-stories-widget-video--bottom .ryv-stories-widget-play.ryv-stories-widget-play {
+    top: 50%;
+    left: 50%;
+  }
+
+  @media (max-width: 560px) {
+    /* The diagonal split only reads correctly at wide-ish aspect ratios -
+     * on a narrow phone-width panel it just crowds the caption text, so
+     * fall back to the plain full-bleed treatment regardless of which
+     * layout is selected. 560px (not 480px) because .ryv-stories-widget-body
+     * below already stacks to one column at 782px, so the video panel is
+     * often still fairly wide right up until a genuinely small phone
+     * viewport - the fixed 80px/90px caption position tuned for a wide
+     * desktop panel has no room to work with much narrower than that. */
+    .ryv-stories-widget-video--diagonal .ryv-stories-widget-video-thumb,
+    .ryv-stories-widget-video--diagonal .ryv-stories-widget-video-frame,
+    .ryv-stories-widget-video--diagonal .ryv-stories-widget-video-overlay {
+      left: 0;
+      right: 0;
+      width: 100%;
+      clip-path: none;
+    }
+    .ryv-stories-widget-video--diagonal .ryv-stories-widget-video-overlay {
+      background: linear-gradient(to top, var(--ryv-stories-overlay-color, rgba(15, 23, 42, 0.85)) 0%, rgba(15, 23, 42, 0.15) 45%, transparent 70%);
+    }
+    .ryv-stories-widget-video--diagonal .ryv-stories-widget-caption {
+      top: auto;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      transform: none;
+      padding: 1.25rem !important;
+    }
+    .ryv-stories-widget-video--diagonal .ryv-stories-widget-play.ryv-stories-widget-play {
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+    }
+    .ryv-stories-widget-video--diagonal .ryv-stories-widget-play.ryv-stories-widget-play:hover {
+      transform: translate(-50%, -50%) scale(1.06);
+    }
+
+    /* Header: stack the heading above "All Stories" instead of squeezing
+     * them onto one row, and trim the heading size so it doesn't wrap
+     * awkwardly on a narrow screen. */
+    .ryv-stories-widget-heading-row {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.75rem;
+    }
+    .ryv-stories-widget-heading.ryv-stories-widget-heading {
+      font-size: 1.5rem;
+    }
+
+    /* List rows: smaller avatar and tighter padding so a row's text has
+     * more room on a narrow column. */
+    .ryv-stories-widget-item-avatar {
+      --ryv-stories-avatar-size: 2rem;
+    }
+    .ryv-stories-widget-item.ryv-stories-widget-item {
+      padding: 1rem 0;
+    }
+    .ryv-stories-widget-item-name.ryv-stories-widget-item-name {
+      font-size: 1rem;
+    }
+    .ryv-stories-widget-item-quote.ryv-stories-widget-item-quote {
+      font-size: 0.875rem;
+    }
+  }
+
+  /* Story list rows - each row is one big <a>, so the whole card is
+   * clickable, not just the name/quote text. */
+  .ryv-stories-widget-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .ryv-stories-widget-item-wrap + .ryv-stories-widget-item-wrap {
+    border-top: 1px solid var(--ryv-stories-item-border-color, #e5e7eb);
+  }
+  .ryv-stories-widget-item.ryv-stories-widget-item {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--ryv-stories-item-gap, 15px);
+    padding: var(--ryv-stories-item-padding-y, 1.25rem) var(--ryv-stories-item-padding-x, 0.5rem);
+    text-decoration: none;
+    border-radius: 0.5rem;
+    transition: background-color 0.15s ease;
+  }
+  .ryv-stories-widget-item-avatar {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--ryv-stories-avatar-size, 2.5rem);
+    height: var(--ryv-stories-avatar-size, 2.5rem);
+    border-radius: var(--ryv-stories-avatar-radius, 9999px);
+    overflow: hidden;
+    font-size: calc(var(--ryv-stories-avatar-size, 2.5rem) * 0.55);
+    /*
+     * Defaults for the no-photo placeholder (render_list_item()), which is
+     * drawn in `currentColor` on this background. Plain values rather than
+     * var()s: the widget's own "Background Color"/"Icon Color" controls
+     * write these two properties directly, at a higher specificity, so they
+     * override on their own.
+     */
+    background-color: #d4effc;
+    color: #2a6a8f;
+  }
+  .ryv-stories-widget-item-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  /* Fills the avatar box rather than sitting inside it at font-size, so the
+   * silhouette reads as a real placeholder photo. */
+  .ryv-stories-widget-item-avatar-placeholder {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+  .ryv-stories-widget-item-content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    min-width: 0;
+  }
+  .ryv-stories-widget-item-meta {
+    font-size: 1rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .ryv-stories-widget-item-name.ryv-stories-widget-item-name {
+    font-family: Georgia, 'Times New Roman', Times, serif;
+    font-size: 1.125rem;
+    font-weight: 700;
+    line-height: 1.3;
+  }
+  .ryv-stories-widget-item-quote.ryv-stories-widget-item-quote {
+    font-size: 0.9375rem;
+    line-height: 1.45;
+  }
+
+  @media (max-width: 782px) {
+    .ryv-stories-widget-featured,
+    .ryv-stories-widget-list-col {
+      flex: 1 1 100%;
+    }
+    .ryv-stories-widget-body {
+      gap: 1.5rem;
+    }
   }
 }

@@ -117,6 +117,13 @@ final class RYV_Plugin {
 	private $resources_cpt = null;
 
 	/**
+	 * Stories CPT controller instance.
+	 *
+	 * @var RYV_Stories_CPT|null
+	 */
+	private $stories_cpt = null;
+
+	/**
 	 * Get (or create) the singleton instance.
 	 *
 	 * @return RYV_Plugin
@@ -166,6 +173,7 @@ final class RYV_Plugin {
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-drupal-yaml-exporter.php';
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-graph-validator.php';
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-us-states.php';
+		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-form-translations.php';
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-db.php';
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-submission-log.php';
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-leads.php';
@@ -176,8 +184,11 @@ final class RYV_Plugin {
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-assets.php';
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-elementor.php';
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-shortcode.php';
+		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-resource-button-shortcode.php';
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-states-cpt.php';
+		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-state-queries.php';
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-resources-cpt.php';
+		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-stories-cpt.php';
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-design-tokens.php';
 
 		// ACF + sync only when ACF is available.
@@ -225,11 +236,18 @@ final class RYV_Plugin {
 		$this->cpt           = new RYV_CPT();
 		$this->states_cpt    = new RYV_States_CPT();
 		$this->resources_cpt = new RYV_Resources_CPT();
+		$this->stories_cpt   = new RYV_Stories_CPT();
 		new RYV_API();
 		new RYV_Admin_API();
 		new RYV_Assets();
 		new RYV_Elementor();
 		new RYV_Shortcode();
+		new RYV_Resource_Button_Shortcode();
+		// Not ACF-gated: the Elementor query id has to be registered on
+		// every frontend request, and the class degrades to "no events
+		// picked" (an empty list, never the whole events archive) when ACF
+		// isn't there to have stored any.
+		new RYV_State_Queries();
 		new RYV_Settings_Page();
 		$this->design_tokens = new RYV_Design_Tokens();
 
@@ -293,6 +311,10 @@ final class RYV_Plugin {
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-resources-cpt.php';
 		$resources_cpt = new RYV_Resources_CPT();
 		$resources_cpt->register_post_type();
+
+		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-stories-cpt.php';
+		$stories_cpt = new RYV_Stories_CPT();
+		$stories_cpt->register_post_type();
 
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-db.php';
 		RYV_DB::install();

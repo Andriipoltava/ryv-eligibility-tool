@@ -88,7 +88,11 @@ class RYV_Shortcode {
 	 */
 	public function render( $atts ): string {
 		$atts    = shortcode_atts( array( 'id' => '' ), $atts, self::TAG );
-		$form_id = absint( $atts['id'] );
+		// Same render-time language resolution the Elementor widget does:
+		// a shortcode typed into an English page and then translated keeps
+		// the id that was typed, so the id alone can't be trusted to be in
+		// the language actually being rendered.
+		$form_id = RYV_Form_Translations::resolve_for_current_language( absint( $atts['id'] ) );
 
 		if ( ! $form_id ) {
 			return $this->error_markup(
@@ -122,10 +126,50 @@ class RYV_Shortcode {
 		$this->enqueue_assets();
 
 		return sprintf(
-			'<div class="ryv-app-wrapper" data-form-id="%d" data-show-start-over="1" data-labels="%s"></div>',
+			'<div class="ryv-app-wrapper" data-form-id="%d" data-show-start-over="1" data-labels="%s" data-language-editions="%s"></div>',
 			$form_id,
-			esc_attr( wp_json_encode( array() ) )
+			// No label controls on a shortcode embed, so the rendered form's
+			// own language pack is the whole of `data-labels` here.
+			esc_attr( wp_json_encode( RYV_Form_Translations::ui_labels( RYV_Form_Translations::get_language( $form_id ) ) ) ),
+			esc_attr( wp_json_encode( $this->get_language_editions( $form_id ) ) )
 		);
+	}
+
+	/**
+	 * The same `data-language-editions` payload RYV_Widget builds, minus
+	 * everything that comes from Elementor controls: there's no per-instance
+	 * Show/Hide switch or Button Text here, so the button simply appears
+	 * whenever the form has a second linked language edition, labelled with
+	 * RYV_Form_Translations' own default wording.
+	 *
+	 * No `entry_node` either - the "Auto-Detect State From Page" mode is a
+	 * widget-only control, so a shortcode embed always starts at the form's
+	 * own entry node in both languages.
+	 *
+	 * @param int $form_id The form being embedded.
+	 * @return array<int,array<string,mixed>>
+	 */
+	private function get_language_editions( int $form_id ): array {
+		$editions = RYV_Form_Translations::get_editions( $form_id );
+
+		if ( count( $editions ) < 2 ) {
+			return array();
+		}
+
+		$payload = array();
+
+		foreach ( $editions as $code => $post ) {
+			$code      = (string) $code;
+			$payload[] = array(
+				'code'       => $code,
+				'form_id'    => (int) $post->ID,
+				'label'      => RYV_Form_Translations::default_switch_label( $code ),
+				'entry_node' => '',
+				'labels'     => RYV_Form_Translations::ui_labels( $code ),
+			);
+		}
+
+		return $payload;
 	}
 
 	/**

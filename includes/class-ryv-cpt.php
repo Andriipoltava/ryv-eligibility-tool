@@ -81,7 +81,21 @@ class RYV_CPT {
 			return false;
 		}
 
-		$element_type = 'post_' . self::POST_TYPE;
+		// Derived from the post rather than hardcoded to `ryv_forms`: the
+		// same "no language row = invisible to every language-filtered
+		// query" problem applies to `ryv_resources`/`ryv_stories` from the
+		// moment wpml-config.xml declares them translatable, and it's
+		// sharper there than it ever was for forms - those two are queried
+		// on the *frontend* (a state page's related lists), so an unassigned
+		// post doesn't just vanish from an admin list table, it silently
+		// disappears from the site.
+		$post_type = get_post_type( $post_id );
+
+		if ( ! $post_type ) {
+			return false;
+		}
+
+		$element_type = 'post_' . $post_type;
 
 		if ( apply_filters( 'wpml_element_trid', false, $post_id, $element_type ) ) {
 			return false;
