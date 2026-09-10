@@ -187,6 +187,7 @@ final class RYV_Plugin {
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-resource-button-shortcode.php';
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-states-cpt.php';
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-state-queries.php';
+		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-events-repair.php';
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-resources-cpt.php';
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-stories-cpt.php';
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-design-tokens.php';

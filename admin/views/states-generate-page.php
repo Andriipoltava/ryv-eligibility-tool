@@ -181,4 +181,40 @@ if ( ! defined( 'ABSPATH' ) ) {
 		<?php wp_nonce_field( RYV_States_Generate_Page::AUTOPOP_NONCE_ACTION, 'ryv_autopopulate_map_nonce' ); ?>
 		<?php submit_button( __( 'Auto-Populate Map Categories', 'ryv-eligibility-tool' ), 'secondary', 'ryv_autopopulate_map_submit' ); ?>
 	</form>
+
+	<hr />
+
+	<h2><?php esc_html_e( 'Repair Imported Events', 'ryv-eligibility-tool' ); ?></h2>
+
+	<p class="description">
+		<?php esc_html_e( 'Use this if events exist in the admin but appear nowhere on the site - not in a state\'s Events picker, not on a state page, not even on The Events Calendar\'s own list. Events written by a direct import can carry UTC dates that disagree with their local ones, which stops The Events Calendar from registering them at all. This recalculates those dates and asks it to rebuild. Safe to run more than once.', 'ryv-eligibility-tool' ); ?>
+	</p>
+
+	<?php $events_result = $this->consume_events_repair_result(); ?>
+	<?php if ( $events_result ) : ?>
+		<?php if ( ! empty( $events_result['messages'] ) ) : ?>
+			<div class="notice notice-error is-dismissible">
+				<p><?php echo esc_html( implode( ' ', $events_result['messages'] ) ); ?></p>
+			</div>
+		<?php else : ?>
+			<div class="notice notice-success is-dismissible">
+				<p>
+					<?php
+					printf(
+						/* translators: 1: events checked, 2: events whose dates were corrected, 3: events rebuilt in The Events Calendar's tables */
+						esc_html__( 'Checked %1$d event(s): corrected the dates on %2$d and rebuilt %3$d in The Events Calendar.', 'ryv-eligibility-tool' ),
+						(int) $events_result['checked'],
+						(int) $events_result['fixed'],
+						(int) $events_result['rebuilt']
+					);
+					?>
+				</p>
+			</div>
+		<?php endif; ?>
+	<?php endif; ?>
+
+	<form method="post" action="">
+		<?php wp_nonce_field( RYV_States_Generate_Page::EVENTS_NONCE_ACTION, 'ryv_repair_events_nonce' ); ?>
+		<?php submit_button( __( 'Repair Imported Events', 'ryv-eligibility-tool' ), 'secondary', 'ryv_repair_events_submit' ); ?>
+	</form>
 </div>

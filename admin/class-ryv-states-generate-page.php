@@ -37,6 +37,11 @@ class RYV_States_Generate_Page {
 	const AUTOPOP_NONCE_ACTION = 'ryv_autopopulate_map_categories';
 
 	/**
+	 * Nonce action for the "Repair Imported Events" button.
+	 */
+	const EVENTS_NONCE_ACTION = 'ryv_repair_events';
+
+	/**
 	 * Transient key prefix for post/redirect/get result passing.
 	 */
 	const RESULT_TRANSIENT_PREFIX = 'ryv_generate_states_result_';
@@ -52,6 +57,11 @@ class RYV_States_Generate_Page {
 	const AUTOPOP_RESULT_TRANSIENT_PREFIX = 'ryv_autopop_map_result_';
 
 	/**
+	 * Per-user transient prefix for the events-repair result.
+	 */
+	const EVENTS_RESULT_TRANSIENT_PREFIX = 'ryv_repair_events_result_';
+
+	/**
 	 * Hook slug for this submenu page.
 	 */
 	const PAGE_SLUG = 'ryv-generate-states';
@@ -64,6 +74,7 @@ class RYV_States_Generate_Page {
 		add_action( 'admin_init', array( $this, 'handle_submission' ) );
 		add_action( 'admin_init', array( $this, 'handle_sync_submission' ) );
 		add_action( 'admin_init', array( $this, 'handle_autopopulate_submission' ) );
+		add_action( 'admin_init', array( $this, 'handle_events_repair_submission' ) );
 	}
 
 	/**
@@ -304,5 +315,56 @@ class RYV_States_Generate_Page {
 		);
 
 		require RYV_PLUGIN_DIR . 'admin/views/states-generate-page.php';
+	}
+
+	/**
+	 * "Repair Imported Events": hands every `tribe_events` post to
+	 * RYV_Events_Repair, which recomputes the UTC/timezone meta an import
+	 * left inconsistent and asks The Events Calendar to rebuild its own
+	 * custom tables from it.
+	 *
+	 * Lives on this page rather than one of its own because it is the same
+	 * kind of one-button data maintenance as the two above, and because the
+	 * only thing on this site that reads events is a state page.
+	 */
+	public function handle_events_repair_submission() {
+		if ( ! isset( $_POST['ryv_repair_events_submit'] ) ) {
+			return;
+		}
+
+		if ( ! current_user_can( self::CAPABILITY ) ) {
+			wp_die( esc_html__( 'You are not allowed to modify event data.', 'ryv-eligibility-tool' ) );
+		}
+
+		check_admin_referer( self::EVENTS_NONCE_ACTION, 'ryv_repair_events_nonce' );
+
+		$result = RYV_Events_Repair::repair_all();
+
+		set_transient(
+			self::EVENTS_RESULT_TRANSIENT_PREFIX . get_current_user_id(),
+			$result,
+			MINUTE_IN_SECONDS * 5
+		);
+
+		wp_safe_redirect( admin_url( 'edit.php?post_type=' . RYV_States_CPT::POST_TYPE . '&page=' . self::PAGE_SLUG ) );
+		exit;
+	}
+
+	/**
+	 * Pop (read + delete) this user's pending events-repair result, if any.
+	 *
+	 * @return array|null
+	 */
+	public function consume_events_repair_result(): ?array {
+		$key    = self::EVENTS_RESULT_TRANSIENT_PREFIX . get_current_user_id();
+		$result = get_transient( $key );
+
+		if ( false === $result ) {
+			return null;
+		}
+
+		delete_transient( $key );
+
+		return $result;
 	}
 }

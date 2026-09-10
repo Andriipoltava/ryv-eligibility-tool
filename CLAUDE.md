@@ -613,9 +613,23 @@ Three non-obvious details, each found the hard way:
   `wp_tec_occurrences`. TEC in fact adds that join to *every*
   `tribe_events` query regardless, so **any event inserted without going
   through TEC's own save pipeline (direct SQL, a raw import) is invisible
-  everywhere, including TEC's own Upcoming Events archive** - if state
-  events render empty, check `SELECT COUNT(*) FROM wp_tec_occurrences`
-  before suspecting this class.
+  everywhere, including TEC's own Upcoming Events archive and the ACF
+  relationship picker on a state ("No matches found")** - if state events
+  render empty, check `SELECT COUNT(*) FROM wp_tec_occurrences` before
+  suspecting this class.
+
+  `includes/class-ryv-events-repair.php` fixes exactly that, run from **RYV
+  States → Generate States → "Repair Imported Events"**. TEC only writes an
+  occurrence row when its Event model validates, and on the imported data
+  here validation failed with "The start_date and start_date_utc has a
+  conflict when using the timezone of the event": the import had written
+  `_EventStartDateUTC` with the *local* time string while the site runs on
+  America/New_York, and no `_EventTimezone` at all. The repair recomputes
+  the UTC meta from local time + timezone, fills a missing timezone from the
+  site's, then calls TEC's own updater rather than writing to its tables
+  directly. Idempotent, so it's safe to re-run per environment - and it has
+  to be run per environment, since the broken rows exist wherever that
+  import was applied.
 
 Note the events block in the current State Post template is **hardcoded
 mockup text** ("SEP 12 · Restoration clinic — Nashville Public Library",
