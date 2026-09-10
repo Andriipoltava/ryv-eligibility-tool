@@ -1027,12 +1027,12 @@ class RYV_Widget extends \Elementor\Widget_Base {
 						'icon'  => 'eicon-text-align-right',
 					),
 				),
-				'default'   => 'center',
+				'default'   => 'left',
 				'toggle'    => false,
 				'selectors' => array(
 					'{{WRAPPER}}' => '--ryv-header-align: {{VALUE}};',
 				),
-				'description' => __( 'Where the header block sits when it\'s narrower than the full width (Container Width above) - matches the current look when left as Center.', 'ryv-eligibility-tool' ),
+				'description' => __( 'Where the header block sits when it\'s narrower than the full width (Container Width above).', 'ryv-eligibility-tool' ),
 			)
 		);
 

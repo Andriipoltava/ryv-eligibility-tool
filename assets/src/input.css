@@ -313,13 +313,17 @@
    * block parent can only reposition an inline-level child, never itself,
    * so the width-constrained box and its alignment context can't be the
    * same element; this is the same technique Elementor's own boxed widgets
-   * use. 36rem/center are the pre-existing defaults (this used to be a
+   * use. 36rem is the pre-existing width default (this used to be a
    * fixed `ryv-max-w-xl ryv-mx-auto` on each of .ryv-header-title/
    * -description individually), so an untouched widget instance still
    * lines up with .ryv-app-wrapper's own 36rem default below it.
    */
   .ryv-header-align {
-    text-align: var(--ryv-header-align, center);
+    /* `start` rather than `left` so the default follows the text direction
+       (it resolves to right-hand side in an RTL language), while the widget's
+       Alignment control still writes plain left/center/right when an admin
+       picks one explicitly. */
+    text-align: var(--ryv-header-align, start);
   }
 
   .ryv-header {
