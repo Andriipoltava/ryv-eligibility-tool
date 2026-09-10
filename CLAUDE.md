@@ -677,6 +677,35 @@ Debugging aid: the `ryv_hide_empty_should_hide` filter (`$hide, $marker,
 $post_id`) is the only way to see why a section vanished, since a hidden one
 leaves no trace in the markup.
 
+### Translated state pages fall back to the original's content
+
+`includes/class-ryv-states-i18n.php` reads any **empty** ACF field on a
+translated `ryv_states` post through to its original-language post
+(`acf/load_value`, frontend only). Without it a Spanish state page was a
+heading and the questionnaire and nothing else: the generator creates a
+translation with only the fields it needs to work (form link, state slug,
+map category) - English Alabama carries 32 `ryv_*` meta rows, its Spanish
+edition 10 - so every hide-empty marker correctly hid its section.
+
+This is the client's own stated plan ("we will have to do duplicate content
+on all state pages because those pages will not have Spanish content, only
+the tool is in Spanish") done in one place instead of by hand across 50-odd
+pages. Translate a field on the Spanish post and that value wins from then
+on; the fallback only ever fills a blank.
+
+`ryv_form_connection` and `ryv_state_slug` are excluded (`NEVER_FALL_BACK`):
+falling those back would point a Spanish page at the *English* form, which
+is the one thing that must stay per-language. The filter is also frontend
+-only - on an edit screen a translation must keep showing its own empty
+fields, or an editor would be looking at English copy in Spanish inputs and
+saving it as their own.
+
+**Anything reading flattened repeater meta directly needs the fallback
+applied by hand**, since `get_post_meta()` never passes through ACF's
+filters: both repeater dynamic tags and the `repeater-` branch of
+`is_marker_empty()` do this. Missing it there is subtle - the page shows
+every other section's English copy but silently hides all of its stats.
+
 ### Non-Elementor embed: `[ryv_form]` shortcode
 
 `includes/class-ryv-shortcode.php` renders the exact same

@@ -99,6 +99,17 @@ class RYV_Tag_ACF_Repeater_Text extends \Elementor\Core\DynamicTags\Tag {
 		$meta_key = $repeater . '_' . $row_index . '_' . $sub;
 		$value    = (string) get_post_meta( $post_id, $meta_key, true );
 
+		// This reads the flattened row meta directly, so it bypasses ACF's
+		// filters - and with them RYV_States_I18n's fallback. Apply the same
+		// rule here, or a translated state page would show every other
+		// section's English copy but blank stats.
+		if ( '' === $value && class_exists( 'RYV_States_I18n' ) ) {
+			$source_id = RYV_States_I18n::get_source_post_id( (int) $post_id );
+			if ( $source_id ) {
+				$value = (string) get_post_meta( $source_id, $meta_key, true );
+			}
+		}
+
 		switch ( $this->get_settings( 'extract' ) ) {
 			case 'digits_only':
 				$value = preg_replace( '/[^0-9]/', '', $value );

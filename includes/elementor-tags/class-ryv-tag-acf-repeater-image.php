@@ -84,6 +84,16 @@ class RYV_Tag_ACF_Repeater_Image extends \Elementor\Core\DynamicTags\Data_Tag {
 		$meta_key       = $repeater . '_' . $row_index . '_' . $sub;
 		$attachment_id  = (int) get_post_meta( $post_id, $meta_key, true );
 
+		// Same bypass as the text tag: flattened row meta never passes
+		// through ACF's filters, so RYV_States_I18n's fallback has to be
+		// applied by hand for a translated state page.
+		if ( ! $attachment_id && class_exists( 'RYV_States_I18n' ) ) {
+			$source_id = RYV_States_I18n::get_source_post_id( (int) $post_id );
+			if ( $source_id ) {
+				$attachment_id = (int) get_post_meta( $source_id, $meta_key, true );
+			}
+		}
+
 		if ( $attachment_id ) {
 			$image_data['id']  = $attachment_id;
 			$image_data['url'] = wp_get_attachment_url( $attachment_id );

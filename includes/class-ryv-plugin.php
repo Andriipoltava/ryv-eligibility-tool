@@ -199,6 +199,7 @@ final class RYV_Plugin {
 			require_once RYV_PLUGIN_DIR . 'includes/class-ryv-mapsvg-sync.php';
 			require_once RYV_PLUGIN_DIR . 'includes/class-ryv-states-generator.php';
 			require_once RYV_PLUGIN_DIR . 'includes/class-ryv-states-template.php';
+			require_once RYV_PLUGIN_DIR . 'includes/class-ryv-states-i18n.php';
 		}
 
 		// Not is_admin()-gated like the other admin/*-page.php controllers
@@ -257,6 +258,7 @@ final class RYV_Plugin {
 			new RYV_States_Sync();
 			new RYV_MapSVG_Sync();
 			new RYV_States_Template();
+			new RYV_States_I18n();
 
 			// Self-healing: makes sure the map's 8 canonical categories and
 			// each state's CLC-reference category are populated/correct

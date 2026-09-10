@@ -374,6 +374,19 @@ class RYV_States_Template {
 			$repeater_name = substr( $rest, 0, $sep );
 			$row_index     = (int) substr( $rest, $sep + 1 );
 			$row_count     = (int) get_post_meta( $post_id, $repeater_name, true );
+
+			// A repeater's row count is plain postmeta, read directly rather
+			// than through `get_field()` - so it never passes through ACF's
+			// filters, and with them RYV_States_I18n's translated-page
+			// fallback. Without this, a Spanish state page showed every
+			// other section's English copy but hid all of its stats.
+			if ( ! $row_count && class_exists( 'RYV_States_I18n' ) ) {
+				$source_id = RYV_States_I18n::get_source_post_id( $post_id );
+				if ( $source_id ) {
+					$row_count = (int) get_post_meta( $source_id, $repeater_name, true );
+				}
+			}
+
 			return $row_index >= $row_count;
 		}
 
