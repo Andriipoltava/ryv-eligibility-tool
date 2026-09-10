@@ -92,6 +92,18 @@ class RYV_State_Queries {
 		$query->set( 'post_status', 'publish' );
 		$query->set( 'ignore_sticky_posts', true );
 
+		// Stop WPML re-filtering a list this class has already decided by id.
+		// The ids come from the state's own field, i.e. the original
+		// language's posts (that is what RYV_States_I18n falls back to on a
+		// translation), and WPML's language clauses then exclude every one of
+		// them: measured on a Spanish state page, the Loop Grid rendered 0
+		// items while the English one rendered 3 events and 1 resource from
+		// the identical id list. The section stayed visible throughout,
+		// correctly - its ACF field is populated, so the hide-empty marker
+		// had no reason to hide it - which is what made this look like a
+		// hiding bug rather than a query one.
+		$query->set( 'lang', 'all' );
+
 		// An *empty* `post__in` is ignored by WP_Query rather than matching
 		// nothing - a state with nothing picked would silently list every
 		// post of that type. `array( 0 )` is the standard way to say "no
@@ -263,7 +275,35 @@ class RYV_State_Queries {
 			}
 		}
 
-		return array_values( array_unique( $ids ) );
+		return $this->map_ids_to_current_language( array_values( array_unique( $ids ) ) );
+	}
+
+	/**
+	 * Swap each id for its translation in the language being viewed, keeping
+	 * the original where there isn't one.
+	 *
+	 * So a Spanish state page shows the Spanish edition of a picked resource
+	 * where it has been translated, and the English one where it hasn't -
+	 * rather than dropping it, which is what WPML's own filtering does once
+	 * `lang => all` above stops it filtering by language.
+	 *
+	 * @param int[] $ids Post ids picked on the state.
+	 * @return int[]
+	 */
+	private function map_ids_to_current_language( array $ids ): array {
+		if ( ! $ids || ! has_filter( 'wpml_object_id' ) ) {
+			return $ids;
+		}
+
+		$mapped = array();
+
+		foreach ( $ids as $id ) {
+			// `true` = return the original when no translation exists.
+			$translated = apply_filters( 'wpml_object_id', $id, get_post_type( $id ), true );
+			$mapped[]   = $translated ? (int) $translated : (int) $id;
+		}
+
+		return array_values( array_unique( $mapped ) );
 	}
 
 	/**

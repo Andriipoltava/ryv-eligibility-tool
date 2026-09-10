@@ -603,6 +603,17 @@ Three non-obvious details, each found the hard way:
   empty one rather than matching nothing, so a state with nothing picked
   would list every event/resource on the site. `array( 0 )` is the "no
   posts" value.
+- **`lang => all`, plus mapping each id to the current language.** The ids
+  come from the state's own field, i.e. the original language's posts (what
+  `RYV_States_I18n` falls back to on a translation), and WPML's language
+  clauses then exclude every one of them: measured on a Spanish state page,
+  the Loop Grid rendered 0 items while the English page rendered 3 events
+  and 1 resource from the identical id list. Note this only bites the *real*
+  Loop Grid - running the same query id by hand in a fresh `WP_Query`
+  returns rows either way, because by then the ids are already set when
+  WPML parses the query. `map_ids_to_current_language()` still prefers a
+  translation where one exists, so a Spanish page shows the Spanish edition
+  of a resource and falls back to the English one only when untranslated.
 - **Dead ids are filtered out.** A relationship field keeps storing an id
   after the post it points at is deleted (a real state here referenced an
   event id that no longer exists), and a dead id in `post__in` silently
