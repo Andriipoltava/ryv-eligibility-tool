@@ -18,6 +18,14 @@
  *    which handle array-returning fields correctly (see
  *    RYV_States_Template).
  *
+ * 3. **Sets each Loop Grid's Query ID** (`ryv_state_resources` /
+ *    `ryv_state_events`). A Loop Grid with none runs its own default query -
+ *    every resource on the site, not the ones this state picked - which on a
+ *    translated page matches nothing at all, leaving those sections rendered
+ *    but empty *and still visible*: the section's ACF field is populated, so
+ *    the hide-empty marker correctly keeps it. That is the reported "empty
+ *    sections aren't hidden on translations".
+ *
  * Elements are matched by their Elementor id, which is stable across
  * exports/imports of the same template - and any id that isn't found is
  * simply reported rather than treated as an error, since a template that has
@@ -80,6 +88,24 @@ class RYV_States_Template_Repair {
 	);
 
 	/**
+	 * Loop Grid element id => the Query ID it must carry.
+	 *
+	 * Without one, a Loop Grid runs its own default query - every resource on
+	 * the site rather than the ones this state picked - which is why those
+	 * sections came out empty on a translated page (nothing matches that
+	 * language) while the section itself stayed visible: its ACF field is
+	 * populated, so the hide-empty marker correctly kept it.
+	 *
+	 * @var array<string,string>
+	 */
+	const QUERY_IDS = array(
+		// Row · Resources.
+		'7149e1b' => 'ryv_state_resources',
+		// Col · What's happening locally (events).
+		'242736c' => 'ryv_state_events',
+	);
+
+	/**
 	 * Apply the configuration to every `elementor_library` template that
 	 * contains at least one of the ids above.
 	 *
@@ -95,6 +121,7 @@ class RYV_States_Template_Repair {
 			'templates'          => array(),
 			'conditions_removed' => 0,
 			'markers_set'        => 0,
+			'query_ids_set'      => 0,
 			'missing'            => array_keys( self::MARKERS ),
 		);
 
@@ -124,11 +151,12 @@ class RYV_States_Template_Repair {
 			$changes = array(
 				'conditions_removed' => 0,
 				'markers_set'        => array(),
+				'query_ids_set'      => array(),
 			);
 
 			self::walk( $data, $changes, $result['missing'] );
 
-			if ( ! $changes['conditions_removed'] && ! $changes['markers_set'] ) {
+			if ( ! $changes['conditions_removed'] && ! $changes['markers_set'] && ! $changes['query_ids_set'] ) {
 				continue;
 			}
 
@@ -137,17 +165,19 @@ class RYV_States_Template_Repair {
 				'title'              => get_the_title( $template_id ),
 				'conditions_removed' => $changes['conditions_removed'],
 				'markers_set'        => $changes['markers_set'],
+				'query_ids_set'      => $changes['query_ids_set'],
 			);
 
 			$result['conditions_removed'] += $changes['conditions_removed'];
 			$result['markers_set']        += count( $changes['markers_set'] );
+			$result['query_ids_set']      += count( $changes['query_ids_set'] );
 
 			if ( ! $dry_run ) {
 				update_post_meta( $template_id, '_elementor_data', wp_slash( wp_json_encode( $data ) ) );
 			}
 		}
 
-		if ( ! $dry_run && ( $result['conditions_removed'] || $result['markers_set'] ) ) {
+		if ( ! $dry_run && ( $result['conditions_removed'] || $result['markers_set'] || $result['query_ids_set'] ) ) {
 			// The marker list is cached, and Elementor caches its generated
 			// CSS - neither would otherwise notice this.
 			if ( class_exists( 'RYV_States_Template' ) ) {
@@ -192,6 +222,11 @@ class RYV_States_Template_Repair {
 				}
 			}
 
+			if ( isset( self::QUERY_IDS[ $id ] ) && ( $element['settings']['query_id'] ?? '' ) !== self::QUERY_IDS[ $id ] ) {
+				$element['settings']['query_id'] = self::QUERY_IDS[ $id ];
+				$changes['query_ids_set'][ $id ] = self::QUERY_IDS[ $id ];
+			}
+
 			if ( ! empty( $element['elements'] ) ) {
 				self::walk( $element['elements'], $changes, $missing );
 			}
@@ -214,9 +249,21 @@ class RYV_States_Template_Repair {
 		$kept = array();
 
 		foreach ( preg_split( '/\s+/', trim( $classes ), -1, PREG_SPLIT_NO_EMPTY ) as $class ) {
-			if ( 0 !== strpos( $class, RYV_States_Template::MARKER_PREFIX ) ) {
-				$kept[] = $class;
+			if ( 0 === strpos( $class, RYV_States_Template::MARKER_PREFIX ) ) {
+				continue;
 			}
+
+			// Also drop a marker that has lost its prefix. Two were found in
+			// this state in the live template ("any-ryv_hero_stats,..." and
+			// "field-ryv_hero_issue_tag"), presumably mangled by an edit -
+			// they do nothing, since nothing looks for them, and leaving them
+			// behind would make the class list read as though the section
+			// were still gated.
+			if ( preg_match( '/^(field|any|repeater)-[A-Za-z0-9_,\-]+$/', $class ) ) {
+				continue;
+			}
+
+			$kept[] = $class;
 		}
 
 		if ( '' !== $marker ) {

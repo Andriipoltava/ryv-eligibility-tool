@@ -235,10 +235,11 @@ if ( ! defined( 'ABSPATH' ) ) {
 				<?php endif; ?>
 				<?php
 				printf(
-					/* translators: 1: number of display conditions, 2: number of classes */
-					esc_html__( 'Display conditions removed: %1$d. Hide-when-empty classes set: %2$d.', 'ryv-eligibility-tool' ),
+					/* translators: 1: number of display conditions, 2: number of classes, 3: number of query IDs */
+					esc_html__( 'Display conditions removed: %1$d. Hide-when-empty classes set: %2$d. Loop Grid query IDs set: %3$d.', 'ryv-eligibility-tool' ),
 					(int) $template_result['conditions_removed'],
-					(int) $template_result['markers_set']
+					(int) $template_result['markers_set'],
+					(int) $template_result['query_ids_set']
 				);
 				?>
 			</p>
@@ -251,6 +252,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 							<code>#<?php echo (int) $template['id']; ?></code>
 							<?php foreach ( $template['markers_set'] as $element_id => $marker ) : ?>
 								<br /><small><code><?php echo esc_html( $element_id ); ?></code> → <code><?php echo esc_html( $marker ? $marker : '(class removed)' ); ?></code></small>
+							<?php endforeach; ?>
+							<?php foreach ( $template['query_ids_set'] as $element_id => $query_id ) : ?>
+								<br /><small><code><?php echo esc_html( $element_id ); ?></code> → <?php esc_html_e( 'Query ID', 'ryv-eligibility-tool' ); ?> <code><?php echo esc_html( $query_id ); ?></code></small>
 							<?php endforeach; ?>
 						</li>
 					<?php endforeach; ?>
