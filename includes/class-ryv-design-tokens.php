@@ -39,6 +39,74 @@ class RYV_Design_Tokens {
 		add_action( 'wp_head', array( __CLASS__, 'output_css_custom_properties' ), 5 );
 		add_action( 'elementor/editor/after_enqueue_styles', array( __CLASS__, 'output_css_custom_properties' ), 5 );
 		add_action( 'wp_head', array( __CLASS__, 'output_font_preconnect' ), 1 );
+		// Site chrome rather than tokens, but it belongs on the same hook:
+		// the language switcher sits in the header, i.e. on every page,
+		// while assets/css/app.css only loads where an RYV widget or
+		// shortcode is actually present.
+		// Priority 20, i.e. after WordPress prints enqueued stylesheets on
+		// this same hook: WPML's own switcher CSS is enqueued, so an earlier
+		// block would lose the source-order tie on every rule of equal
+		// specificity (its flag styling in particular).
+		add_action( 'wp_head', array( __CLASS__, 'output_language_switcher_styles' ), 20 );
+	}
+
+	/**
+	 * ============================================================
+	 * 3b. HEADER LANGUAGE SWITCHER (site chrome)
+	 * ============================================================
+	 *
+	 * WPML's legacy switcher renders as two 18x12 flag images, which next to
+	 * the header's 22px/800 menu and its solid red CTA reads as a leftover
+	 * plugin default rather than part of the design. This restyles it into a
+	 * compact `EN / ES` pair in the menu's own typography and token colors:
+	 * current language in the primary navy, the other muted, red on hover.
+	 *
+	 * The codes are CSS-generated because WPML is emitting flags only. Both
+	 * the flag *and* any name/code WPML might render are hidden, so the
+	 * result stays identical whichever "Display as" option is set in WPML >
+	 * Languages - rather than showing a name and a code side by side if that
+	 * setting is ever changed. Accessibility is unaffected either way: each
+	 * link keeps WPML's own `aria-label`/`title` ("Switch to English"), which
+	 * is what a screen reader announces; the visible glyph was never the
+	 * accessible name.
+	 */
+	public static function output_language_switcher_styles() {
+		?>
+<style id="clc-language-switcher">
+.wpml-ls-legacy-list-horizontal { padding: 0; border: 0; background: transparent; }
+.wpml-ls-legacy-list-horizontal > ul { display: flex; align-items: center; gap: 0; margin: 0; padding: 0; list-style: none; }
+.wpml-ls-legacy-list-horizontal .wpml-ls-item { margin: 0; }
+/* Separator between the two codes, never before the first or after the last. */
+.wpml-ls-legacy-list-horizontal .wpml-ls-item + .wpml-ls-item::before {
+	content: "/";
+	color: var(--clc-text-secondary, #62707c);
+	opacity: 0.5;
+	font-weight: 700;
+}
+.wpml-ls-legacy-list-horizontal .wpml-ls-link {
+	display: inline-block;
+	padding: 0 0.5rem;
+	font-family: var(--clc-font-body, inherit);
+	font-size: 16px;
+	font-weight: 800;
+	letter-spacing: 1.2px;
+	line-height: 1.2;
+	text-transform: uppercase;
+	text-decoration: none;
+	color: var(--clc-text-secondary, #62707c);
+	transition: color 150ms ease;
+}
+.wpml-ls-legacy-list-horizontal .wpml-ls-current-language > .wpml-ls-link { color: var(--clc-primary, #002a41); }
+.wpml-ls-legacy-list-horizontal .wpml-ls-link:hover,
+.wpml-ls-legacy-list-horizontal .wpml-ls-link:focus-visible { color: var(--clc-red, #a21d1b); }
+/* Whatever WPML itself renders inside the link is replaced by the code below. */
+.wpml-ls-legacy-list-horizontal a.wpml-ls-link img.wpml-ls-flag,
+.wpml-ls-legacy-list-horizontal a.wpml-ls-link .wpml-ls-native,
+.wpml-ls-legacy-list-horizontal a.wpml-ls-link .wpml-ls-display { display: none !important; }
+.wpml-ls-legacy-list-horizontal .wpml-ls-link[lang="en"]::after { content: "EN"; }
+.wpml-ls-legacy-list-horizontal .wpml-ls-link[lang="es"]::after { content: "ES"; }
+</style>
+		<?php
 	}
 
 	/**
