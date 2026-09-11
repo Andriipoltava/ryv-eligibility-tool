@@ -1390,4 +1390,117 @@
       gap: 1.5rem;
     }
   }
+
+  /*
+   * Featured Partners cards (RYV_Featured_Partners_Renderer, shared by the
+   * [ryv_featured_partners] shortcode - RYV_States_Partners_Shortcode - and
+   * RYV_Featured_Partners_Widget). Lives outside .ryv-app-wrapper, same as
+   * the map/stories widgets above, so every rule here is plain CSS rather
+   * than a Tailwind utility under the `important: '.ryv-app-wrapper'`
+   * scope. Every value below is a `--ryv-partner-*` custom property so
+   * the widget's Style tab can override it per-instance; the shortcode
+   * (which has no Style tab) just gets these defaults - matched to the
+   * reference design's one original hand-built partner card (logo box,
+   * bold name, gray location line, body copy, red-bordered quote, bold
+   * underlined "Visit X →" link).
+   */
+  .ryv-partner-cards {
+    display: flex;
+    flex-direction: column;
+    gap: var(--ryv-partner-card-gap, 2rem);
+  }
+  .ryv-partner-card + .ryv-partner-card {
+    padding-top: var(--ryv-partner-card-gap, 2rem);
+    border-top: 1px solid var(--ryv-partner-card-divider-color, #E5E7EB);
+  }
+  .ryv-partner-card-header {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--ryv-partner-header-gap, 0.875rem);
+    margin-bottom: var(--ryv-partner-header-margin-bottom, 1rem);
+  }
+  .ryv-partner-card-heading {
+    min-width: 0;
+  }
+  .ryv-partner-logo {
+    flex: 0 0 auto;
+    width: var(--ryv-partner-logo-size, 3.5rem);
+    height: var(--ryv-partner-logo-size, 3.5rem);
+    object-fit: contain;
+    padding: 0.25rem;
+    border: 1px solid var(--ryv-partner-logo-border-color, #CBD5E1);
+    border-radius: var(--ryv-partner-logo-radius, 0.25rem);
+  }
+  .ryv-partner-logo-placeholder {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--ryv-partner-logo-placeholder-color, #9CA3AF);
+  }
+  .ryv-partner-logo-placeholder svg {
+    width: 45%;
+    height: 45%;
+  }
+  .ryv-partner-card-name.ryv-partner-card-name {
+    margin: 0;
+    font-size: var(--ryv-partner-name-font-size, 1.5rem);
+    font-weight: 700;
+    line-height: 1.25;
+    color: var(--ryv-partner-name-color, #0F172A);
+  }
+  .ryv-partner-card-location.ryv-partner-card-location {
+    margin: 0.25rem 0 0;
+    font-size: var(--ryv-partner-location-font-size, 0.9375rem);
+    line-height: 1.4;
+    color: var(--ryv-partner-location-color, #6B7280);
+  }
+  .ryv-partner-card-description.ryv-partner-card-description {
+    margin-bottom: var(--ryv-partner-description-margin-bottom, 1rem);
+    font-size: var(--ryv-partner-description-font-size, 1.0625rem);
+    line-height: 1.6;
+    color: var(--ryv-partner-description-color, #1F2937);
+  }
+  .ryv-partner-card-description.ryv-partner-card-description p:last-child {
+    margin-bottom: 0;
+  }
+  .ryv-partner-card-quote.ryv-partner-card-quote {
+    margin: 0 0 var(--ryv-partner-quote-margin-bottom, 1rem);
+    padding: 0.125rem 0 0.125rem 0.875rem;
+    border-left-style: solid;
+    border-left-width: var(--ryv-partner-quote-border-width, 3px);
+    border-left-color: var(--ryv-partner-quote-border-color, var(--ryv-secondary-color, #C8102E));
+  }
+  .ryv-partner-card-quote.ryv-partner-card-quote p {
+    margin: 0;
+    font-size: var(--ryv-partner-quote-font-size, 0.9375rem);
+    line-height: 1.5;
+    color: var(--ryv-partner-quote-color, #1F2937);
+  }
+  .ryv-partner-card-quote.ryv-partner-card-quote p::before {
+    content: '"';
+  }
+  .ryv-partner-card-quote.ryv-partner-card-quote p::after {
+    content: '"';
+  }
+  .ryv-partner-card-link.ryv-partner-card-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    font-size: var(--ryv-partner-link-font-size, 1rem);
+    font-weight: 700;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    color: var(--ryv-partner-link-color, #0F172A);
+    transition: color 0.15s ease;
+  }
+  .ryv-partner-card-link.ryv-partner-card-link:hover,
+  .ryv-partner-card-link.ryv-partner-card-link:focus-visible {
+    color: var(--ryv-partner-link-hover-color, #C8102E);
+  }
+  .ryv-partner-card-link-arrow {
+    transition: transform 0.15s ease;
+  }
+  .ryv-partner-card-link.ryv-partner-card-link:hover .ryv-partner-card-link-arrow {
+    transform: translateX(3px);
+  }
 }

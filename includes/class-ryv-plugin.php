@@ -186,12 +186,20 @@ final class RYV_Plugin {
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-shortcode.php';
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-resource-button-shortcode.php';
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-states-field-shortcode.php';
+		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-featured-partners-renderer.php';
+		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-states-partners-shortcode.php';
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-states-cpt.php';
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-state-queries.php';
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-events-repair.php';
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-resources-cpt.php';
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-stories-cpt.php';
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-design-tokens.php';
+
+		// Temporary Featured-Partners data migration - see
+		// class-ryv-partners-migration.php's own docblock. Delete this
+		// require (and the file, and its CLI/admin-page wrappers below)
+		// once every state has been migrated and QA'd post-launch.
+		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-partners-migration.php';
 
 		// ACF + sync only when ACF is available.
 		if ( class_exists( 'ACF' ) ) {
@@ -224,7 +232,14 @@ final class RYV_Plugin {
 
 			if ( class_exists( 'ACF' ) ) {
 				require_once RYV_PLUGIN_DIR . 'admin/class-ryv-states-generate-page.php';
+				require_once RYV_PLUGIN_DIR . 'admin/class-ryv-partners-migration-page.php';
 			}
+		}
+
+		// WP-CLI fronts the same migration - registered independently of
+		// is_admin(), since wp-cli requests never are one.
+		if ( defined( 'WP_CLI' ) && WP_CLI ) {
+			require_once RYV_PLUGIN_DIR . 'includes/class-ryv-partners-migration-cli.php';
 		}
 	}
 
@@ -248,6 +263,7 @@ final class RYV_Plugin {
 		new RYV_Shortcode();
 		new RYV_Resource_Button_Shortcode();
 		new RYV_States_Field_Shortcode();
+		new RYV_States_Partners_Shortcode();
 		// Not ACF-gated: the Elementor query id has to be registered on
 		// every frontend request, and the class degrades to "no events
 		// picked" (an empty list, never the whole events archive) when ACF
@@ -283,7 +299,12 @@ final class RYV_Plugin {
 
 			if ( class_exists( 'ACF' ) ) {
 				new RYV_States_Generate_Page();
+				new RYV_Partners_Migration_Page();
 			}
+		}
+
+		if ( defined( 'WP_CLI' ) && WP_CLI && class_exists( 'RYV_Partners_Migration_CLI' ) ) {
+			\WP_CLI::add_command( 'ryv migrate-partners', 'RYV_Partners_Migration_CLI' );
 		}
 	}
 

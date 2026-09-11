@@ -185,3 +185,32 @@
 	text-overflow: ellipsis;
 	white-space: nowrap;
 }
+
+/*
+ * Hides the "Partner Highlight" field group's legacy single-partner tab
+ * (Partner Name / Location / Description / Quote / Image / Video URL /
+ * Link URL / Link Text - class-ryv-states-acf.php's
+ * field_ryv_partner_tab_featured and its 8 fields) from the edit screen,
+ * now that "Featured Partners" (the repeater) is what the template
+ * actually renders - see RYV_Featured_Partners_Renderer.
+ *
+ * CSS-only, not an ACF field-registration change: the fields stay fully
+ * registered (get_field()/get_post_meta() on them, and the migration/
+ * fallback code that reads them, are completely unaffected), and their
+ * stored postmeta is untouched - only hidden from view here. Targeted by
+ * ACF's own `data-key` attribute, which it renders on both a tab button
+ * and every field wrapper regardless of which tab is currently active, so
+ * this hides them even though "Featured Partner" was the first (default
+ * open) tab in the group.
+ */
+.acf-tab-button[data-key="field_ryv_partner_tab_featured"],
+.acf-field[data-key="field_ryv_partner_name"],
+.acf-field[data-key="field_ryv_partner_location"],
+.acf-field[data-key="field_ryv_partner_description"],
+.acf-field[data-key="field_ryv_partner_quote"],
+.acf-field[data-key="field_ryv_partner_image"],
+.acf-field[data-key="field_ryv_partner_video_url"],
+.acf-field[data-key="field_ryv_partner_link_url"],
+.acf-field[data-key="field_ryv_partner_link_text"] {
+	display: none !important;
+}

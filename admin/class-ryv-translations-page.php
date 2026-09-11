@@ -17,6 +17,12 @@
  * for linking two posts that were each already created independently (e.g.
  * one YAML-imported per language edition).
  *
+ * Also home to two smaller, unrelated WPML admin-UX fixes that share the
+ * same "neutralize a WPML nudge that doesn't fit this plugin's custom post
+ * types" theme - disable_list_table_translate_link() (`ryv_forms` list
+ * table) and suppress_translation_editor_warning_for_states() (`ryv_states`
+ * edit screens) - rather than each getting its own file for one filter/hook.
+ *
  * @package RYV_Eligibility_Tool
  */
 
@@ -64,6 +70,34 @@ class RYV_Translations_Page {
 		add_action( 'admin_menu', array( $this, 'register_menu' ) );
 		add_action( 'admin_init', array( $this, 'handle_submission' ) );
 		add_action( 'admin_footer-edit.php', array( $this, 'disable_list_table_translate_link' ) );
+		add_filter( 'wpml_tm_show_page_builders_translation_editor_warning', array( $this, 'suppress_translation_editor_warning_for_states' ), 10, 2 );
+	}
+
+	/**
+	 * Suppresses WPML's "Edits you're about to make will be lost - use the
+	 * Advanced Translation Editor instead" modal specifically on `ryv_states`
+	 * translation edit screens.
+	 *
+	 * That nudge assumes the classic editor is a lesser substitute for WPML's
+	 * own translation UI - true for ordinary post content, but not for this
+	 * CPT: a `ryv_states` translation is edited entirely through ACF fields
+	 * (the state-page content group, the Form Node Editor's JS-driven
+	 * form↔state sync - see RYV_States_Sync) that have no equivalent inside
+	 * ATE at all, so the warning only interrupts the one editing workflow
+	 * that actually works here. Scoped to this one post type via the filter's
+	 * own `$post_id` argument, so the warning still shows normally for
+	 * ordinary translated posts/pages where ATE is the better tool.
+	 *
+	 * @param bool $show    Whether to show the warning (WPML's own default).
+	 * @param int  $post_id The post being edited.
+	 * @return bool
+	 */
+	public function suppress_translation_editor_warning_for_states( $show, $post_id ) {
+		if ( class_exists( 'RYV_States_CPT' ) && RYV_States_CPT::POST_TYPE === get_post_type( $post_id ) ) {
+			return false;
+		}
+
+		return $show;
 	}
 
 	/**

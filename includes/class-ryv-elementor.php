@@ -52,5 +52,8 @@ class RYV_Elementor {
 
 		require_once RYV_PLUGIN_DIR . 'widgets/class-ryv-stories-widget.php';
 		$widgets_manager->register( new RYV_Stories_Widget() );
+
+		require_once RYV_PLUGIN_DIR . 'widgets/class-ryv-featured-partners-widget.php';
+		$widgets_manager->register( new RYV_Featured_Partners_Widget() );
 	}
 }

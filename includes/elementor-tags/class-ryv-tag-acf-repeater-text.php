@@ -112,10 +112,30 @@ class RYV_Tag_ACF_Repeater_Text extends \Elementor\Core\DynamicTags\Tag {
 
 		switch ( $this->get_settings( 'extract' ) ) {
 			case 'digits_only':
-				$value = preg_replace( '/[^0-9]/', '', $value );
+				// Two steps, deliberately not one `preg_replace( '/[^0-9]/', '', ... )`
+				// over the whole string: that older version stripped every
+				// non-digit and concatenated whatever digits were left, so
+				// a value with two numbers in it like "1 in 10" became
+				// "110" instead of "1". First isolate the LEADING number
+				// (digits/commas/dots only - mirrors the 'suffix' case
+				// below, which strips exactly this same leading run), *then*
+				// strip the thousand-separator commas out of just that
+				// token - the Counter widget this feeds needs a bare
+				// integer string ("158300"), not "158,300", which its JS
+				// can't parse and renders as "NaN".
+				preg_match( '/^[\d,.]+/', $value, $matches );
+				$value = isset( $matches[0] ) ? preg_replace( '/[^0-9]/', '', $matches[0] ) : '';
 				break;
 			case 'suffix':
-				$value = preg_replace( '/^[\d,.\s]+/', '', $value );
+				// Strips the same leading run 'digits_only' captures above,
+				// but deliberately leaves a leading space in place (not
+				// `/^[\d,.\s]+/`, which also ate it) - the Counter widget
+				// concatenates Number+Suffix with no separator of its own,
+				// so a value like "1 in 10" needs that space kept on the
+				// suffix side to read as "1 in 10" rather than "1in 10".
+				// A no-space case like "470,000+" is unaffected either way,
+				// since there's no space there to begin with.
+				$value = preg_replace( '/^[\d,.]+/', '', $value );
 				break;
 		}
 

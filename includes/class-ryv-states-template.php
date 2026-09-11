@@ -110,41 +110,55 @@ class RYV_States_Template {
 			return;
 		}
 
-		$selectors = array();
+		$hide_selectors  = array();
+		$widen_selectors = array();
 
-		foreach ( $this->collect_markers() as $marker ) {
+		foreach ( $this->collect_markers( self::MARKER_PREFIX, self::MARKERS_TRANSIENT ) as $marker ) {
 			if ( $this->is_marker_empty( $marker ) ) {
 				// Escape only what can legally appear in a marker anyway
 				// (word characters, comma, dash) - anything else is dropped
 				// by collect_markers()' own pattern.
-				$selectors[] = '.' . str_replace( ',', '\\,', self::MARKER_PREFIX . $marker );
+				$hide_selectors[] = '.' . str_replace( ',', '\\,', self::MARKER_PREFIX . $marker );
 			}
 		}
 
-		if ( ! $selectors ) {
-			return;
+		foreach ( $this->collect_markers( self::WIDEN_PREFIX, self::WIDEN_MARKERS_TRANSIENT ) as $marker ) {
+			if ( $this->is_marker_empty( $marker ) ) {
+				$widen_selectors[] = '.' . str_replace( ',', '\\,', self::WIDEN_PREFIX . $marker );
+			}
 		}
 
-		printf(
-			'<style id="ryv-hide-empty">%s{display:none !important}</style>' . "\n",
-			implode( ',', $selectors ) // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- built from the constrained pattern in collect_markers().
-		);
+		if ( $hide_selectors ) {
+			printf(
+				'<style id="ryv-hide-empty">%s{display:none !important}</style>' . "\n",
+				implode( ',', $hide_selectors ) // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- built from the constrained pattern in collect_markers().
+			);
+		}
+
+		if ( $widen_selectors ) {
+			printf(
+				'<style id="ryv-full-width-if-empty">%s{width:100%% !important;flex-basis:100%% !important;max-width:100%% !important}</style>' . "\n",
+				implode( ',', $widen_selectors ) // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- built from the constrained pattern in collect_markers().
+			);
+		}
 	}
 
 	/**
-	 * Every `ryv-hide-empty--...` marker used anywhere in the site's
-	 * Elementor templates.
+	 * Every marker for a given prefix (MARKER_PREFIX or WIDEN_PREFIX) used
+	 * anywhere in the site's Elementor templates.
 	 *
 	 * Read from `elementor_library` posts (a handful, and only their
 	 * `_elementor_data`) rather than from the document being rendered,
 	 * because this runs on `wp_head` - before any of that markup exists.
-	 * Cached for an hour, and flushed whenever a template is saved, so the
-	 * usual request pays nothing.
+	 * Cached for an hour per prefix, and flushed whenever a template is
+	 * saved, so the usual request pays nothing.
 	 *
+	 * @param string $prefix    self::MARKER_PREFIX or self::WIDEN_PREFIX.
+	 * @param string $transient Transient key to cache this prefix's markers under.
 	 * @return string[] Marker suffixes, e.g. "field-ryv_resources".
 	 */
-	private function collect_markers(): array {
-		$cached = get_transient( self::MARKERS_TRANSIENT );
+	private function collect_markers( string $prefix, string $transient ): array {
+		$cached = get_transient( $transient );
 
 		if ( is_array( $cached ) ) {
 			return $cached;
@@ -169,7 +183,7 @@ class RYV_States_Template {
 				continue;
 			}
 
-			if ( preg_match_all( '/' . preg_quote( self::MARKER_PREFIX, '/' ) . '([A-Za-z0-9_,\-]+)/', $data, $matches ) ) {
+			if ( preg_match_all( '/' . preg_quote( $prefix, '/' ) . '([A-Za-z0-9_,\-]+)/', $data, $matches ) ) {
 				foreach ( $matches[1] as $marker ) {
 					$markers[ $marker ] = true;
 				}
@@ -178,18 +192,19 @@ class RYV_States_Template {
 
 		$markers = array_keys( $markers );
 
-		set_transient( self::MARKERS_TRANSIENT, $markers, HOUR_IN_SECONDS );
+		set_transient( $transient, $markers, HOUR_IN_SECONDS );
 
 		return $markers;
 	}
 
 	/**
-	 * Drop the marker cache when any Elementor template is saved, so a
-	 * marker an admin just added takes effect on the next page view rather
-	 * than up to an hour later.
+	 * Drop the marker caches (both prefixes) when any Elementor template is
+	 * saved, so a marker an admin just added takes effect on the next page
+	 * view rather than up to an hour later.
 	 */
 	public static function flush_marker_cache() {
 		delete_transient( self::MARKERS_TRANSIENT );
+		delete_transient( self::WIDEN_MARKERS_TRANSIENT );
 	}
 
 	/**
@@ -200,9 +215,11 @@ class RYV_States_Template {
 	public function register_dynamic_tags( $dynamic_tags_manager ) {
 		require_once __DIR__ . '/elementor-tags/class-ryv-tag-acf-repeater-text.php';
 		require_once __DIR__ . '/elementor-tags/class-ryv-tag-acf-repeater-image.php';
+		require_once __DIR__ . '/elementor-tags/class-ryv-tag-featured-partners-image.php';
 
 		$dynamic_tags_manager->register( new RYV_Tag_ACF_Repeater_Text() );
 		$dynamic_tags_manager->register( new RYV_Tag_ACF_Repeater_Image() );
+		$dynamic_tags_manager->register( new RYV_Tag_Featured_Partners_Image() );
 	}
 
 	/**
@@ -214,6 +231,25 @@ class RYV_States_Template {
 	 * Transient holding every marker found across Elementor templates.
 	 */
 	const MARKERS_TRANSIENT = 'ryv_hide_empty_markers';
+
+	/**
+	 * Sibling of MARKER_PREFIX: same field/marker syntax
+	 * (`field-{name}` / `any-{a},{b}` / `repeater-{name}-{row}`), same
+	 * "is this empty for the current state" resolution via
+	 * is_marker_empty() - but widens the marked element to 100% width
+	 * instead of hiding it. Built for the Featured Partner card, which
+	 * should take the full row when the events column next to it
+	 * (`ryv_events`) is empty rather than leaving a blank column - see
+	 * output_hide_empty_css().
+	 */
+	const WIDEN_PREFIX = 'ryv-full-width-if-empty--';
+
+	/**
+	 * Transient holding every WIDEN_PREFIX marker - kept separate from
+	 * MARKERS_TRANSIENT since the two prefixes are collected/flushed
+	 * together but must not be confused for each other's CSS treatment.
+	 */
+	const WIDEN_MARKERS_TRANSIENT = 'ryv_full_width_if_empty_markers';
 
 	/**
 	 * Start an output buffer for an element marked `ryv-hide-empty--...`,

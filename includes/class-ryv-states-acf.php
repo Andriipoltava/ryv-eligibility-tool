@@ -67,6 +67,21 @@ class RYV_States_ACF {
 		add_action( 'acf/init', array( $this, 'register_options_pages' ) );
 		add_filter( 'acf/load_field/name=ryv_state_slug', array( $this, 'populate_state_slug_choices' ) );
 		add_filter( 'acf/load_field/name=ryv_map_category', array( $this, 'populate_map_category_choices' ) );
+		add_action( 'after_setup_theme', array( $this, 'register_image_sizes' ) );
+	}
+
+	/**
+	 * Small, cropped size for the Featured Partners repeater's `logo` sub
+	 * field (see register_partner_highlight_group()) - a partner logo is a
+	 * small fixed slot next to its name, never the full uploaded file the
+	 * way the section's other (large, hero-style) images are. Registered
+	 * here (fires on `after_setup_theme`, ahead of any front-end render)
+	 * rather than left to a theme, since this size is specific to this
+	 * plugin's own markup and must exist regardless of which theme is
+	 * active.
+	 */
+	public function register_image_sizes() {
+		add_image_size( 'ryv-partner-logo', 160, 160, false );
 	}
 
 	/**
@@ -380,10 +395,112 @@ class RYV_States_ACF {
 			'key'    => 'group_ryv_partner_highlight',
 			'title'  => 'Partner Highlight',
 			'fields' => array(
-				// --- Featured Partner ---
+				// --- Featured Partners (list) ---
+				// The section's actual source of content, rendered by
+				// RYV_Featured_Partners_Renderer. Registered FIRST/default-
+				// active tab deliberately - the legacy single-partner tab
+				// below it is CSS-hidden from the edit screen entirely (see
+				// assets/css/admin/states-admin.css's
+				// `[data-key="field_ryv_partner_tab_featured"]` rule), so it
+				// must not be left as ACF's default-open tab or an admin
+				// would land on a blank-looking screen.
+				array(
+					'key'   => 'field_ryv_partner_tab_list',
+					'label' => 'Featured Partners',
+					'name'  => '',
+					'type'  => 'tab',
+				),
+				// The big left-hand photo is the *section's* image, not any
+				// one partner's - it's the client-provided group photo the
+				// whole "Featured Partner(s)" block sits next to, unrelated
+				// to which (or how many) partners are listed next to it.
+				// Its own field, deliberately separate from both the
+				// legacy `ryv_partner_image` (kept only as a migration
+				// source/fallback - see RYV_Partners_Migration) and from
+				// any partner's own `logo` sub-field (a small per-partner
+				// mark, not this photo).
+				array(
+					'key'           => 'field_ryv_featured_partners_image',
+					'label'         => 'Main Image',
+					'name'          => 'featured_partners_image',
+					'type'          => 'image',
+					'return_format' => 'id',
+					'preview_size'  => 'medium',
+					'instructions'  => 'The large photo next to the Featured Partners list - one image for the whole section, not per partner. Falls back to the legacy "Image / Video Thumbnail" field above while this is empty.',
+				),
+				array(
+					'key'          => 'field_ryv_featured_partners',
+					'label'        => 'Featured Partners',
+					'name'         => 'featured_partners',
+					'type'         => 'repeater',
+					'layout'       => 'block',
+					'button_label' => 'Add Partner',
+					'instructions' => 'One full card per partner - logo, name, location, description, quote, and a link to their site. Every field is optional except Partner Name; an empty field simply does not render for that card (see RYV_Featured_Partners_Renderer). Shown instead of the legacy single-partner fields above once at least one row exists.',
+					'sub_fields'   => array(
+						array(
+							'key'           => 'field_ryv_featured_partner_logo',
+							'label'         => 'Logo',
+							'name'          => 'logo',
+							'type'          => 'image',
+							'return_format' => 'id',
+							'preview_size'  => 'thumbnail',
+							'wrapper'       => array( 'width' => '25' ),
+						),
+						array(
+							'key'      => 'field_ryv_featured_partner_name',
+							'label'    => 'Partner Name',
+							'name'     => 'name',
+							'type'     => 'text',
+							'required' => 1,
+							'wrapper'  => array( 'width' => '35' ),
+						),
+						array(
+							'key'    => 'field_ryv_featured_partner_url',
+							'label'  => 'Website URL',
+							'name'   => 'url',
+							'type'   => 'url',
+							'wrapper' => array( 'width' => '40' ),
+						),
+						array(
+							'key'          => 'field_ryv_featured_partner_location',
+							'label'        => 'Location',
+							'name'         => 'location',
+							'type'         => 'text',
+							'instructions' => 'E.g. "Nashville · led by formerly incarcerated women"',
+						),
+						array(
+							'key'          => 'field_ryv_featured_partner_description',
+							'label'        => 'Description',
+							'name'         => 'description',
+							'type'         => 'wysiwyg',
+							'tabs'         => 'all',
+							'media_upload' => 0,
+						),
+						array(
+							'key'   => 'field_ryv_featured_partner_quote',
+							'label' => 'Quote',
+							'name'  => 'quote',
+							'type'  => 'textarea',
+							'rows'  => 3,
+						),
+					),
+				),
+
+				// --- Featured Partner (legacy) ---
+				// Hidden from the edit screen entirely via
+				// assets/css/admin/states-admin.css - this whole tab is
+				// display:none, not something an admin can open. Every
+				// field stays fully registered on purpose: nothing here is
+				// unregistered/removed, because RYV_Featured_Partners_Renderer's
+				// legacy fallback and RYV_Partners_Migration both still read
+				// these via get_field(), which needs a live field
+				// registration to resolve correctly (an unregistered key
+				// can return null instead of the stored value for some
+				// field types). Their stored postmeta is untouched either
+				// way; this is a display-only change.
 				array(
 					'key'   => 'field_ryv_partner_tab_featured',
-					'label' => 'Featured Partner',
+					'label' => 'Featured Partner (legacy, hidden)',
 					'name'  => '',
 					'type'  => 'tab',
 				),
