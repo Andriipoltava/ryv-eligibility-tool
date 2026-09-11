@@ -212,6 +212,7 @@ final class RYV_Plugin {
 			require_once RYV_PLUGIN_DIR . 'includes/class-ryv-states-acf.php';
 			require_once RYV_PLUGIN_DIR . 'includes/class-ryv-states-sync.php';
 			require_once RYV_PLUGIN_DIR . 'includes/class-ryv-mapsvg-sync.php';
+			require_once RYV_PLUGIN_DIR . 'includes/class-ryv-news-categories-sync.php';
 			require_once RYV_PLUGIN_DIR . 'includes/class-ryv-states-generator.php';
 			require_once RYV_PLUGIN_DIR . 'includes/class-ryv-states-template.php';
 			require_once RYV_PLUGIN_DIR . 'includes/class-ryv-states-i18n.php';

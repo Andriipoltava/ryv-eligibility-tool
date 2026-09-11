@@ -100,6 +100,7 @@ class RYV_States_ACF {
 		$this->register_partner_highlight_group();
 		$this->register_events_group();
 		$this->register_resources_group();
+		$this->register_news_group();
 		$this->register_form_nodes_group();
 	}
 
@@ -696,6 +697,58 @@ class RYV_States_ACF {
 				),
 			),
 			'menu_order' => 6,
+			'style'      => 'default',
+		) );
+	}
+
+	/**
+	 * News Categories - which blog `category` term(s) feed this state's
+	 * "Latest News & Updates" section (RYV_State_Queries::ryv_state_news).
+	 *
+	 * Optional and admin-curated, same shape as Events/Resources above,
+	 * rather than relying solely on the automatic slug match
+	 * (`get_state_category_ids()`'s fallback): a state's category doesn't
+	 * always share its exact slug (naming drift, a shared/renamed category,
+	 * more than one category feeding one state), and an admin should be able
+	 * to fix that from the state's own edit screen instead of a database
+	 * change.
+	 *
+	 * `save_terms`/`load_terms` are both off on purpose: this field is just
+	 * picking which categories to *query*, not tagging the `ryv_states` post
+	 * itself with them (which isn't even a `category`-enabled post type) -
+	 * ACF stores the picked ids as plain postmeta either way.
+	 */
+	private function register_news_group() {
+		acf_add_local_field_group( array(
+			'key'    => 'group_ryv_news',
+			'title'  => 'Latest News & Updates',
+			'fields' => array(
+				array(
+					'key'           => 'field_ryv_news_categories',
+					'label'         => 'News Categories',
+					'name'          => 'ryv_news_categories',
+					'type'          => 'taxonomy',
+					'taxonomy'      => 'category',
+					'field_type'    => 'checkbox',
+					'add_term'      => 0,
+					'save_terms'    => 0,
+					'load_terms'    => 0,
+					'return_format' => 'id',
+					'multiple'      => 1,
+					'allow_null'    => 1,
+					'instructions'  => 'Optional. Pick which blog categories populate this state\'s "Latest News & Updates" section. Leave blank to auto-match a category whose slug matches this state (e.g. a "Kentucky" category on the Kentucky page).',
+				),
+			),
+			'location' => array(
+				array(
+					array(
+						'param'    => 'post_type',
+						'operator' => '==',
+						'value'    => RYV_States_CPT::POST_TYPE,
+					),
+				),
+			),
+			'menu_order' => 7,
 			'style'      => 'default',
 		) );
 	}

@@ -3,8 +3,8 @@
  * View: Generate States admin page.
  *
  * Expects $result (array|null), $sync_result (array|null),
- * $autopop_result (array|null), and $forms (WP_Post[]) from
- * RYV_States_Generate_Page::render_page().
+ * $autopop_result (array|null), $news_sync_result (array|null), and $forms
+ * (WP_Post[]) from RYV_States_Generate_Page::render_page().
  *
  * @package RYV_Eligibility_Tool
  */
@@ -180,6 +180,61 @@ if ( ! defined( 'ABSPATH' ) ) {
 	<form method="post" action="">
 		<?php wp_nonce_field( RYV_States_Generate_Page::AUTOPOP_NONCE_ACTION, 'ryv_autopopulate_map_nonce' ); ?>
 		<?php submit_button( __( 'Auto-Populate Map Categories', 'ryv-eligibility-tool' ), 'secondary', 'ryv_autopopulate_map_submit' ); ?>
+	</form>
+
+	<hr />
+
+	<h2><?php esc_html_e( 'Sync News Categories', 'ryv-eligibility-tool' ); ?></h2>
+	<p><?php esc_html_e( 'Walks every state and matches its "Latest News & Updates" section to a blog category of the same slug (e.g. a "Kentucky" category on the Kentucky page) - the same match the section falls back to on its own if nothing is picked. "Sync" only fills states with no category picked yet, so it never overwrites a manual pick made on a state\'s own edit screen. "Re-sync All" additionally re-matches states that already have a value - use it after renaming or re-slugging a category.', 'ryv-eligibility-tool' ); ?></p>
+
+	<?php if ( $news_sync_result ) : ?>
+		<?php if ( empty( $news_sync_result['success'] ) ) : ?>
+			<div class="notice notice-error is-dismissible">
+				<p><?php echo esc_html( $news_sync_result['message'] ); ?></p>
+			</div>
+		<?php else : ?>
+			<div class="notice notice-success is-dismissible">
+				<p>
+					<?php
+					printf(
+						/* translators: 1: states updated, 2: states left unchanged, 3: states with no matching category */
+						esc_html__( 'Matched %1$d state(s). %2$d already had a category and were left unchanged. %3$d had no matching category.', 'ryv-eligibility-tool' ),
+						count( $news_sync_result['updated'] ),
+						(int) $news_sync_result['unchanged'],
+						count( $news_sync_result['no_match'] )
+					);
+					?>
+				</p>
+				<?php if ( ! empty( $news_sync_result['updated'] ) ) : ?>
+					<p>
+						<strong><?php esc_html_e( 'Matched:', 'ryv-eligibility-tool' ); ?></strong>
+						<?php
+						$matched_labels = array();
+						foreach ( $news_sync_result['updated'] as $row ) {
+							$matched_labels[] = sprintf( '%s → %s', $row['title'], $row['category_name'] );
+						}
+						echo esc_html( implode( ', ', $matched_labels ) );
+						?>
+					</p>
+				<?php endif; ?>
+				<?php if ( ! empty( $news_sync_result['no_match'] ) ) : ?>
+					<p>
+						<strong><?php esc_html_e( 'No matching category:', 'ryv-eligibility-tool' ); ?></strong>
+						<?php echo esc_html( implode( ', ', $news_sync_result['no_match'] ) ); ?>
+					</p>
+				<?php endif; ?>
+			</div>
+		<?php endif; ?>
+	<?php endif; ?>
+
+	<form method="post" action="" style="display:inline-block;margin-right:8px;">
+		<?php wp_nonce_field( RYV_States_Generate_Page::NEWS_SYNC_NONCE_ACTION, 'ryv_sync_news_categories_nonce' ); ?>
+		<?php submit_button( __( 'Sync News Categories', 'ryv-eligibility-tool' ), 'secondary', 'ryv_sync_news_categories_submit', false ); ?>
+	</form>
+	<form method="post" action="" style="display:inline-block;">
+		<?php wp_nonce_field( RYV_States_Generate_Page::NEWS_SYNC_NONCE_ACTION, 'ryv_sync_news_categories_nonce' ); ?>
+		<input type="hidden" name="ryv_force" value="1" />
+		<?php submit_button( __( 'Re-sync All', 'ryv-eligibility-tool' ), 'secondary', 'ryv_sync_news_categories_submit', false ); ?>
 	</form>
 
 	<hr />

@@ -47,6 +47,11 @@ class RYV_States_Generate_Page {
 	const TEMPLATE_NONCE_ACTION = 'ryv_repair_state_template';
 
 	/**
+	 * Nonce action for the "Sync News Categories" button.
+	 */
+	const NEWS_SYNC_NONCE_ACTION = 'ryv_sync_news_categories';
+
+	/**
 	 * Transient key prefix for post/redirect/get result passing.
 	 */
 	const RESULT_TRANSIENT_PREFIX = 'ryv_generate_states_result_';
@@ -72,6 +77,11 @@ class RYV_States_Generate_Page {
 	const TEMPLATE_RESULT_TRANSIENT_PREFIX = 'ryv_repair_template_result_';
 
 	/**
+	 * Per-user transient prefix for the news-categories-sync result.
+	 */
+	const NEWS_SYNC_RESULT_TRANSIENT_PREFIX = 'ryv_sync_news_categories_result_';
+
+	/**
 	 * Hook slug for this submenu page.
 	 */
 	const PAGE_SLUG = 'ryv-generate-states';
@@ -86,6 +96,7 @@ class RYV_States_Generate_Page {
 		add_action( 'admin_init', array( $this, 'handle_autopopulate_submission' ) );
 		add_action( 'admin_init', array( $this, 'handle_events_repair_submission' ) );
 		add_action( 'admin_init', array( $this, 'handle_template_repair_submission' ) );
+		add_action( 'admin_init', array( $this, 'handle_news_sync_submission' ) );
 	}
 
 	/**
@@ -298,10 +309,11 @@ class RYV_States_Generate_Page {
 			wp_die( esc_html__( 'You are not allowed to access this page.', 'ryv-eligibility-tool' ) );
 		}
 
-		$result         = $this->consume_result();
-		$sync_result    = $this->consume_sync_result();
-		$autopop_result = $this->consume_autopopulate_result();
-		$forms          = get_posts(
+		$result           = $this->consume_result();
+		$sync_result      = $this->consume_sync_result();
+		$autopop_result   = $this->consume_autopopulate_result();
+		$news_sync_result = $this->consume_news_sync_result();
+		$forms            = get_posts(
 			array(
 				'post_type'      => RYV_CPT::POST_TYPE,
 				'post_status'    => array( 'publish', 'draft' ),
@@ -412,6 +424,77 @@ class RYV_States_Generate_Page {
 	 */
 	public function consume_template_repair_result(): ?array {
 		$key    = self::TEMPLATE_RESULT_TRANSIENT_PREFIX . get_current_user_id();
+		$result = get_transient( $key );
+
+		if ( false === $result ) {
+			return null;
+		}
+
+		delete_transient( $key );
+
+		return $result;
+	}
+
+	/**
+	 * "Sync News Categories": walks every `ryv_states` post via
+	 * RYV_News_Categories_Sync::sync_all(), auto-matching each one's
+	 * `ryv_news_categories` field to a `category` term of the same slug (the
+	 * same match `RYV_State_Queries`'s `ryv_state_news` query falls back to
+	 * at render time) - the tool version of hand-picking a category on every
+	 * state's own edit screen.
+	 *
+	 * Two submit buttons share this handler, `$_POST['ryv_force']`
+	 * distinguishing them: the plain "Sync" button only fills states with no
+	 * `ryv_news_categories` value yet (safe to run any time, never overwrites
+	 * a manual pick); "Re-sync All" additionally re-matches states that
+	 * already have a value, for after a category gets renamed/re-slugged -
+	 * same fill-vs-force split as "Auto-Populate Map Categories" above.
+	 */
+	public function handle_news_sync_submission() {
+		if ( ! isset( $_POST['ryv_sync_news_categories_submit'] ) ) {
+			return;
+		}
+
+		if ( ! current_user_can( self::CAPABILITY ) ) {
+			wp_die( esc_html__( 'You are not allowed to modify state data.', 'ryv-eligibility-tool' ) );
+		}
+
+		check_admin_referer( self::NEWS_SYNC_NONCE_ACTION, 'ryv_sync_news_categories_nonce' );
+
+		if ( ! class_exists( 'RYV_News_Categories_Sync' ) ) {
+			set_transient(
+				self::NEWS_SYNC_RESULT_TRANSIENT_PREFIX . get_current_user_id(),
+				array(
+					'success' => false,
+					'message' => __( 'RYV_News_Categories_Sync is not available (ACF not active?).', 'ryv-eligibility-tool' ),
+				),
+				MINUTE_IN_SECONDS * 5
+			);
+		} else {
+			$force  = ! empty( $_POST['ryv_force'] );
+			$result = RYV_News_Categories_Sync::sync_all( $force );
+
+			$result['success'] = true;
+			$result['force']   = $force;
+
+			set_transient(
+				self::NEWS_SYNC_RESULT_TRANSIENT_PREFIX . get_current_user_id(),
+				$result,
+				MINUTE_IN_SECONDS * 5
+			);
+		}
+
+		wp_safe_redirect( admin_url( 'edit.php?post_type=' . RYV_States_CPT::POST_TYPE . '&page=' . RYV_States_Tools_Page::PAGE_SLUG . '&tab=' . self::PAGE_SLUG ) );
+		exit;
+	}
+
+	/**
+	 * Pop (read + delete) this user's pending news-categories-sync result.
+	 *
+	 * @return array|null
+	 */
+	public function consume_news_sync_result(): ?array {
+		$key    = self::NEWS_SYNC_RESULT_TRANSIENT_PREFIX . get_current_user_id();
 		$result = get_transient( $key );
 
 		if ( false === $result ) {

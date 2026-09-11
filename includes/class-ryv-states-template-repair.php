@@ -85,6 +85,9 @@ class RYV_States_Template_Repair {
 		'9a85e3e'  => 'ryv-hide-empty--repeater-ryv_hero_stats-0',
 		'21bcaf18' => 'ryv-hide-empty--repeater-ryv_hero_stats-1',
 		'6579184e' => 'ryv-hide-empty--repeater-ryv_hero_stats-2',
+		// 06 · Latest news (Latest News & Updates - hidden when the state has
+		// no posts in its matching category, see RYV_State_Queries).
+		'78152eaf' => 'ryv-hide-empty--query-ryv_state_news',
 	);
 
 	/**
@@ -103,6 +106,8 @@ class RYV_States_Template_Repair {
 		'7149e1b' => 'ryv_state_resources',
 		// Col · What's happening locally (events).
 		'242736c' => 'ryv_state_events',
+		// Loop Grid · Latest News & Updates.
+		'd7a134d' => 'ryv_state_news',
 	);
 
 	/**

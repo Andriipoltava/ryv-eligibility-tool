@@ -29,7 +29,11 @@
  * 2. `ryv-hide-empty--field-{acf_field_name}` /
  *    `ryv-hide-empty--any-{field_a},{field_b}` (empty only when every
  *    listed field is) /
- *    `ryv-hide-empty--repeater-{repeater_field_name}-{row_index}` - marker
+ *    `ryv-hide-empty--repeater-{repeater_field_name}-{row_index}` /
+ *    `ryv-hide-empty--query-{query_id}` (empty when that Elementor Query ID
+ *    - see RYV_State_Queries - would return zero posts for this state; today
+ *    only `ryv_state_news` supports this, for the "Latest News & Updates"
+ *    section) - marker
  *    prefixes an admin can add to any element's Advanced ▸ CSS
  *    Classes control in the template. Elementor's own Display Conditions
  *    cannot be used for this at all: its comparator is typed `string` and
@@ -424,6 +428,20 @@ class RYV_States_Template {
 			}
 
 			return $row_index >= $row_count;
+		}
+
+		if ( 0 === strpos( $marker, 'query-' ) ) {
+			$query_id = substr( $marker, strlen( 'query-' ) );
+
+			// Static call, deliberately not `new RYV_State_Queries()`: that
+			// class's constructor registers every `elementor/query/*` hook,
+			// so instantiating it here on every render would re-register
+			// them a second time.
+			if ( 'ryv_state_news' === $query_id && class_exists( 'RYV_State_Queries' ) ) {
+				return ! RYV_State_Queries::has_news_posts( $post_id );
+			}
+
+			return true;
 		}
 
 		return true;

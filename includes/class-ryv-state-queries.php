@@ -12,6 +12,21 @@
  *                           soonest first, past ones dropped.
  * - `ryv_state_resources` - the state's picked Resources, in the order the
  *                           admin arranged them in the relationship field.
+ * - `ryv_state_news`      - standard blog `post`s whose `category` matches
+ *                           this state, newest first. Which category(ies)
+ *                           match is an admin's own `ryv_news_categories`
+ *                           pick on the state (RYV_States_ACF) when set,
+ *                           falling back to auto-matching a single category
+ *                           by slug against the state's `ryv_state_slug`
+ *                           (e.g. a "Kentucky" category shows on the
+ *                           Kentucky state page) for a state nobody has
+ *                           curated yet. Pair the widget's Query ID with
+ *                           `ryv-hide-empty--query-ryv_state_news` on the
+ *                           section's own container (see
+ *                           RYV_States_Template::is_marker_empty()) so the
+ *                           whole "Latest News & Updates" section disappears
+ *                           on a state with no matching posts instead of
+ *                           rendering an empty grid.
  *
  * Why query filters rather than widgets of this plugin's own: each card's
  * design is authored as an Elementor Loop Item template, so the layout stays
@@ -40,6 +55,11 @@ class RYV_State_Queries {
 	const EVENTS_POST_TYPE = 'tribe_events';
 
 	/**
+	 * Standard WordPress post type the `ryv_state_news` query lists.
+	 */
+	const NEWS_POST_TYPE = 'post';
+
+	/**
 	 * Query id => the ACF relationship field on `ryv_states` it reads.
 	 *
 	 * Adding another "this state's X" list means adding a row here and, if
@@ -58,7 +78,9 @@ class RYV_State_Queries {
 	 * Constructor.
 	 */
 	public function __construct() {
-		foreach ( array_keys( $this->get_queries() ) as $query_id ) {
+		$query_ids = array_merge( array_keys( $this->get_queries() ), array( 'ryv_state_news' ) );
+
+		foreach ( $query_ids as $query_id ) {
 			add_action(
 				'elementor/query/' . $query_id,
 				function ( $query ) use ( $query_id ) {
@@ -77,13 +99,18 @@ class RYV_State_Queries {
 			return;
 		}
 
+		if ( 'ryv_state_news' === $query_id ) {
+			$this->filter_news_query( $query );
+			return;
+		}
+
 		$queries = $this->get_queries();
 
 		if ( ! isset( $queries[ $query_id ] ) ) {
 			return;
 		}
 
-		$ids = $this->get_related_ids( $this->get_state_id(), $queries[ $query_id ] );
+		$ids = $this->get_related_ids( self::get_state_id(), $queries[ $query_id ] );
 
 		if ( 'ryv_state_events' === $query_id ) {
 			$ids = $this->prepare_event_ids( $ids );
@@ -215,9 +242,14 @@ class RYV_State_Queries {
 	 * back to the global post so the query still works if the widget is
 	 * placed somewhere else that has a state in context.
 	 *
+	 * Static so `RYV_States_Template::is_marker_empty()` can resolve the same
+	 * "which state" answer for the `query-ryv_state_news` hide-empty marker
+	 * without instantiating this class - doing that would re-run the
+	 * constructor and register every `elementor/query/*` hook a second time.
+	 *
 	 * @return int
 	 */
-	private function get_state_id(): int {
+	private static function get_state_id(): int {
 		$queried_id = (int) get_queried_object_id();
 
 		if ( $queried_id && RYV_States_CPT::POST_TYPE === get_post_type( $queried_id ) ) {
@@ -227,6 +259,186 @@ class RYV_State_Queries {
 		$post_id = (int) get_the_ID();
 
 		return ( $post_id && RYV_States_CPT::POST_TYPE === get_post_type( $post_id ) ) ? $post_id : 0;
+	}
+
+	/**
+	 * Constrain a Loop Grid's query to standard `post`s categorized for this
+	 * state, newest first - the `ryv_state_news` "Latest News & Updates"
+	 * query.
+	 *
+	 * @param WP_Query $query The widget's query, before it runs.
+	 */
+	private function filter_news_query( $query ) {
+		$query->set( 'post_status', 'publish' );
+		$query->set( 'ignore_sticky_posts', true );
+		$query->set( 'post_type', self::NEWS_POST_TYPE );
+
+		$term_ids = self::get_state_category_ids( self::get_state_id() );
+
+		if ( ! $term_ids ) {
+			// Same "no posts" convention as post__in above: a state with no
+			// matching category should list nothing, not fall through to
+			// the widget's own default (every post on the site).
+			$query->set( 'post__in', array( 0 ) );
+			return;
+		}
+
+		$query->set(
+			'tax_query', // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_tax_query -- a handful of term_ids, not a filterable archive.
+			array(
+				array(
+					'taxonomy' => 'category',
+					'field'    => 'term_id',
+					'terms'    => $term_ids,
+				),
+			)
+		);
+	}
+
+	/**
+	 * The `category` term(s) that feed this state's news section, in two
+	 * tiers:
+	 *
+	 * 1. **Admin-picked** - the `ryv_news_categories` ACF field
+	 *    (RYV_States_ACF::register_news_group()), when the admin has chosen
+	 *    one or more categories from the state's own edit screen. Preferred
+	 *    because a state's category doesn't always share its exact slug, and
+	 *    more than one category can legitimately feed one state.
+	 * 2. **Automatic fallback** - a single category matched by slug against
+	 *    the state's own `ryv_state_slug` ACF field (falling back to its post
+	 *    slug, then its title), for a state nobody has curated yet.
+	 *
+	 * Either way, ids are mapped to the language being viewed: WPML keeps a
+	 * separate category term per language (confirmed on this site - e.g. two
+	 * "KENTUCKY" terms sharing one slug), so an id picked - or auto-matched -
+	 * on one language edition needs translating to resolve the right term on
+	 * another, the same reasoning `map_ids_to_current_language()` applies to
+	 * picked event/resource ids above.
+	 *
+	 * @param int $state_id `ryv_states` post ID, or 0.
+	 * @return int[] Category term_ids, empty if none matches.
+	 */
+	private static function get_state_category_ids( int $state_id ): array {
+		if ( ! $state_id ) {
+			return array();
+		}
+
+		$picked = function_exists( 'get_field' ) ? get_field( 'ryv_news_categories', $state_id ) : null;
+
+		if ( is_array( $picked ) && $picked ) {
+			$ids = array();
+
+			foreach ( $picked as $item ) {
+				$id = is_object( $item ) ? (int) $item->term_id : (int) $item;
+				if ( $id ) {
+					$ids[] = $id;
+				}
+			}
+
+			if ( $ids ) {
+				return self::map_term_ids_to_current_language( array_values( array_unique( $ids ) ) );
+			}
+		}
+
+		$term_id = self::auto_match_category_id( $state_id );
+
+		return $term_id ? self::map_term_ids_to_current_language( array( $term_id ) ) : array();
+	}
+
+	/**
+	 * The single category term auto-matched to a state by slug, with no
+	 * language mapping and no `ryv_news_categories` override applied - the
+	 * raw "what would this state auto-match to" answer.
+	 *
+	 * Pulled out of `get_state_category_ids()` so `RYV_News_Categories_Sync`
+	 * (the "Sync News Categories" admin tool, RYV States → Generate States)
+	 * can offer an admin the exact same match this class would fall back to
+	 * at render time, rather than a second, possibly-diverging guess.
+	 *
+	 * @param int $state_id `ryv_states` post ID, or 0.
+	 * @return int Category term_id in the state post's own language/edition, or 0.
+	 */
+	public static function auto_match_category_id( int $state_id ): int {
+		if ( ! $state_id ) {
+			return 0;
+		}
+
+		$slug = function_exists( 'get_field' ) ? (string) get_field( 'ryv_state_slug', $state_id ) : '';
+
+		if ( '' === $slug ) {
+			$slug = (string) get_post_field( 'post_name', $state_id );
+		}
+
+		$slug = sanitize_title( $slug );
+
+		$term = $slug ? get_term_by( 'slug', $slug, 'category' ) : false;
+
+		if ( ! $term || is_wp_error( $term ) ) {
+			$term = get_term_by( 'name', get_the_title( $state_id ), 'category' );
+		}
+
+		return ( $term && ! is_wp_error( $term ) ) ? (int) $term->term_id : 0;
+	}
+
+	/**
+	 * Term-taxonomy counterpart of `map_ids_to_current_language()`: swaps
+	 * each category id for its translation in the language being viewed,
+	 * keeping the original where there isn't one (or WPML isn't active).
+	 *
+	 * @param int[] $term_ids Category term ids.
+	 * @return int[]
+	 */
+	private static function map_term_ids_to_current_language( array $term_ids ): array {
+		if ( ! $term_ids || ! has_filter( 'wpml_object_id' ) ) {
+			return $term_ids;
+		}
+
+		$mapped = array();
+
+		foreach ( $term_ids as $term_id ) {
+			$translated = apply_filters( 'wpml_object_id', $term_id, 'category', true );
+			$mapped[]   = $translated ? (int) $translated : (int) $term_id;
+		}
+
+		return array_values( array_unique( $mapped ) );
+	}
+
+	/**
+	 * Whether this state has any published posts in its matching category
+	 * (or categories) - the check behind the
+	 * `ryv-hide-empty--query-ryv_state_news` marker, so the "Latest News &
+	 * Updates" section disappears entirely rather than rendering an empty
+	 * grid.
+	 *
+	 * @param int $state_id `ryv_states` post ID.
+	 * @return bool
+	 */
+	public static function has_news_posts( int $state_id ): bool {
+		$term_ids = self::get_state_category_ids( $state_id );
+
+		if ( ! $term_ids ) {
+			return false;
+		}
+
+		$query = new WP_Query(
+			array(
+				'post_type'           => self::NEWS_POST_TYPE,
+				'post_status'         => 'publish',
+				'posts_per_page'      => 1,
+				'fields'              => 'ids',
+				'ignore_sticky_posts' => true,
+				'no_found_rows'       => false,
+				'tax_query'           => array( // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_tax_query -- a handful of term_ids, not a filterable archive.
+					array(
+						'taxonomy' => 'category',
+						'field'    => 'term_id',
+						'terms'    => $term_ids,
+					),
+				),
+			)
+		);
+
+		return $query->found_posts > 0;
 	}
 
 	/**
