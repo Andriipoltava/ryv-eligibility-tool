@@ -100,9 +100,10 @@ class RYV_Design_Tokens_Page {
 					<li>
 						<?php
 						printf(
-							/* translators: 1: heading font, 2: body font */
-							esc_html__( 'Fonts: %1$s (headings) + %2$s (body)', 'ryv-eligibility-tool' ),
+							/* translators: 1: H1/H2 font, 2: H3 font, 3: body/UI font */
+							esc_html__( 'Fonts: %1$s (H1/H2) + %2$s (H3) + %3$s (body/UI)', 'ryv-eligibility-tool' ),
 							'<strong>' . esc_html( RYV_Design_Tokens::font_heading() ) . '</strong>',
+							'<strong>' . esc_html( RYV_Design_Tokens::font_heading_h3() ) . '</strong>',
 							'<strong>' . esc_html( RYV_Design_Tokens::font_body() ) . '</strong>'
 						);
 						?>
@@ -129,7 +130,7 @@ class RYV_Design_Tokens_Page {
 					printf(
 						/* translators: 1: clc_font_heading filter name, 2: clc_font_body filter name */
 						wp_kses(
-							__( 'Sentinel and District Pro are licensed fonts, not available on Google Fonts. Until they\'re added (Elementor Pro &rarr; Custom Fonts, or an Adobe Typekit embed), free look-alikes can be swapped in via the %1$s / %2$s filters - e.g. <code>Bitter</code> and <code>Barlow</code>.', 'ryv-eligibility-tool' ),
+							__( 'Sentinel and District Pro are licensed fonts, self-hosted from this plugin\'s own <code>assets/fonts/</code> (the client\'s webfont files, not an Adobe Typekit embed) - no further setup needed. If those files are ever missing on an environment, a free look-alike can still be swapped in via the %1$s / %2$s filters - e.g. <code>Bitter</code> and <code>Barlow</code>. H3\'s Merriweather is a free Google Font, so it loads automatically - see the <code>clc_font_h3</code> filter if it ever needs overriding.', 'ryv-eligibility-tool' ),
 							array( 'code' => array() )
 						),
 						'<code>clc_font_heading</code>',

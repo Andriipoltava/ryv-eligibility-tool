@@ -8,7 +8,7 @@
  *
  * Source: Figma -> CLC Restore Your Vote -> "Style Guide" page.
  * Palette: 002A41 / A21D1B / EC2927 / 03509F / 2A6A8F / D4EFFC / FFFFFF
- * Fonts:   Sentinel (headings) + District Pro (body)
+ * Fonts:   Sentinel (H1/H2) + Merriweather (H3) + District Pro (body/UI)
  *
  * Usage:
  * 1. This class is loaded by RYV_Plugin like every other includes/ file, so
@@ -36,9 +36,11 @@ class RYV_Design_Tokens {
 	 * directly rather than through a hook.
 	 */
 	public function __construct() {
+		add_filter( 'elementor/fonts/additional_fonts', array( __CLASS__, 'register_elementor_fonts' ) );
+		add_action( 'wp_head', array( __CLASS__, 'output_font_faces' ), 4 );
+		add_action( 'elementor/editor/after_enqueue_styles', array( __CLASS__, 'output_font_faces' ), 4 );
 		add_action( 'wp_head', array( __CLASS__, 'output_css_custom_properties' ), 5 );
 		add_action( 'elementor/editor/after_enqueue_styles', array( __CLASS__, 'output_css_custom_properties' ), 5 );
-		add_action( 'wp_head', array( __CLASS__, 'output_font_preconnect' ), 1 );
 		// Site chrome rather than tokens, but it belongs on the same hook:
 		// the language switcher sits in the header, i.e. on every page,
 		// while assets/css/app.css only loads where an RYV widget or
@@ -115,10 +117,20 @@ class RYV_Design_Tokens {
 	 * ============================================================
 	 *
 	 * Sentinel (Hoefler) and District Pro (Adobe Fonts) are licensed fonts,
-	 * not available on Google Fonts. Until they're actually loaded on the
-	 * site (Elementor Pro -> Custom Fonts, or an Adobe Typekit embed), the
-	 * closest free look-alikes can be swapped in here temporarily: 'Bitter'
-	 * and 'Barlow'.
+	 * self-hosted from this plugin's own assets/fonts/ - see
+	 * output_font_faces() below - rather than an Adobe Fonts/Typekit embed,
+	 * since what the client supplied was the licensed webfont files
+	 * themselves (OTF, converted to WOFF2 here), not a Typekit kit ID.
+	 * `clc_font_heading`/`clc_font_body` stay filterable so a temporary
+	 * look-alike (e.g. Google's free 'Bitter'/'Barlow') can still be swapped
+	 * in via those filters if the real files ever go missing on another
+	 * environment.
+	 *
+	 * H3's Merriweather is unlike those two - a free Google Font, so it
+	 * needs no self-hosted files and no manual enqueue: Elementor's Kit
+	 * typography auto-loads any Google Font it recognizes as a
+	 * `typography_font_family` value, same mechanism as every other Kit
+	 * font.
 	 *
 	 * Change it in one place - the tokens, the Kit import, and the CSS
 	 * variables all pick it up.
@@ -136,6 +148,19 @@ class RYV_Design_Tokens {
 	 */
 	public static function font_body() {
 		return apply_filters( 'clc_font_body', 'District Pro' );
+	}
+
+	/**
+	 * H3 is the one heading level styled with a third, distinct family in
+	 * the Figma Style Guide (Merriweather Bold) rather than reusing the H1/H2
+	 * Sentinel face - confirmed both from the guide's own per-style font
+	 * report and the "H3" sample node's own font-family, not just its
+	 * (unreliable, Montserrat-rendered) Font-column label text.
+	 *
+	 * @return string
+	 */
+	public static function font_heading_h3() {
+		return apply_filters( 'clc_font_h3', 'Merriweather' );
 	}
 
 	/**
@@ -162,8 +187,9 @@ class RYV_Design_Tokens {
 	 * @return array{colors: array, typography: array, spacing: array}
 	 */
 	public static function get_tokens() {
-		$heading = self::font_heading();
-		$body    = self::font_body();
+		$heading    = self::font_heading();
+		$heading_h3 = self::font_heading_h3();
+		$body       = self::font_body();
 
 		return array(
 
@@ -260,7 +286,7 @@ class RYV_Design_Tokens {
 			// Style Guide rows:
 			//   H1  Sentinel      Black      70   auto    0
 			//   H2  Sentinel      Bold       36   auto    0
-			//   H3  Sentinel      Bold       28   auto    0
+			//   H3  Merriweather  Bold       28   auto    0
 			//   H4  District Pro  Demi       26   145%    0
 			//   SPAN-Breadcrumb   Regular    15   auto    0
 			//   SPAN-PREHEAD      ExtraBold  16   52      1.68px
@@ -297,7 +323,7 @@ class RYV_Design_Tokens {
 
 				'h3' => array(
 					'label'            => 'H3 - Subsection',
-					'font_family'      => $heading,
+					'font_family'      => $heading_h3,
 					'font_weight'      => '700',
 					'font_size'        => 28,
 					'font_size_tablet' => 24,
@@ -629,6 +655,106 @@ class RYV_Design_Tokens {
 
 	/**
 	 * ============================================================
+	 * 2b. SELF-HOSTED FONT FACES (Sentinel / District Pro)
+	 * ============================================================
+	 *
+	 * One row per licensed webfont file the client supplied
+	 * (assets/fonts/sentinel/, assets/fonts/district-pro/, both WOFF2 -
+	 * converted from the client's original OTF files, committed the same
+	 * way as assets/css/app.css - no build step at deploy time). Each row
+	 * is a single `font-weight` value, not a range: District Pro has no
+	 * true ExtraBold(800) face (the H6/prehead token asks for one - see
+	 * get_tokens()), but that's fine left unmapped - per the CSS font
+	 * matching spec, a `font-weight: 800` request with no exact/heavier
+	 * face declared for the family falls back to the next *lighter*
+	 * declared weight, i.e. Bold(700) here, automatically and without any
+	 * synthetic/faux-bold rendering.
+	 *
+	 * @return array<int,array{family:string,dir:string,file:string,weight:string,style:string}>
+	 */
+	private static function font_face_definitions() {
+		return array(
+			// -- Sentinel --------------------------------------------------
+			array( 'family' => 'Sentinel', 'dir' => 'sentinel', 'file' => 'Sentinel-Light', 'weight' => '300', 'style' => 'normal' ),
+			array( 'family' => 'Sentinel', 'dir' => 'sentinel', 'file' => 'Sentinel-LightItalic', 'weight' => '300', 'style' => 'italic' ),
+			array( 'family' => 'Sentinel', 'dir' => 'sentinel', 'file' => 'Sentinel-Book', 'weight' => '400', 'style' => 'normal' ),
+			array( 'family' => 'Sentinel', 'dir' => 'sentinel', 'file' => 'Sentinel-BookItalic', 'weight' => '400', 'style' => 'italic' ),
+			array( 'family' => 'Sentinel', 'dir' => 'sentinel', 'file' => 'Sentinel-Medium', 'weight' => '500', 'style' => 'normal' ),
+			array( 'family' => 'Sentinel', 'dir' => 'sentinel', 'file' => 'Sentinel-MediumItalic', 'weight' => '500', 'style' => 'italic' ),
+			array( 'family' => 'Sentinel', 'dir' => 'sentinel', 'file' => 'Sentinel-Semibold', 'weight' => '600', 'style' => 'normal' ),
+			array( 'family' => 'Sentinel', 'dir' => 'sentinel', 'file' => 'Sentinel-SemiboldItalic', 'weight' => '600', 'style' => 'italic' ),
+			array( 'family' => 'Sentinel', 'dir' => 'sentinel', 'file' => 'Sentinel-Bold', 'weight' => '700', 'style' => 'normal' ),
+			array( 'family' => 'Sentinel', 'dir' => 'sentinel', 'file' => 'Sentinel-BoldItalic', 'weight' => '700', 'style' => 'italic' ),
+			array( 'family' => 'Sentinel', 'dir' => 'sentinel', 'file' => 'Sentinel-Black', 'weight' => '900', 'style' => 'normal' ),
+			array( 'family' => 'Sentinel', 'dir' => 'sentinel', 'file' => 'Sentinel-BlackItalic', 'weight' => '900', 'style' => 'italic' ),
+
+			// -- District Pro ------------------------------------------------
+			array( 'family' => 'District Pro', 'dir' => 'district-pro', 'file' => 'DistrictPro_light', 'weight' => '300', 'style' => 'normal' ),
+			array( 'family' => 'District Pro', 'dir' => 'district-pro', 'file' => 'DistricPro_lightitalic', 'weight' => '300', 'style' => 'italic' ),
+			array( 'family' => 'District Pro', 'dir' => 'district-pro', 'file' => 'DistrictPro_book', 'weight' => '400', 'style' => 'normal' ),
+			array( 'family' => 'District Pro', 'dir' => 'district-pro', 'file' => 'DistricPro_bookitalic', 'weight' => '400', 'style' => 'italic' ),
+			array( 'family' => 'District Pro', 'dir' => 'district-pro', 'file' => 'DistrictPro_medium', 'weight' => '500', 'style' => 'normal' ),
+			array( 'family' => 'District Pro', 'dir' => 'district-pro', 'file' => 'DistrictPro_mediumitalic', 'weight' => '500', 'style' => 'italic' ),
+			array( 'family' => 'District Pro', 'dir' => 'district-pro', 'file' => 'DistrictPro_demi', 'weight' => '600', 'style' => 'normal' ),
+			array( 'family' => 'District Pro', 'dir' => 'district-pro', 'file' => 'DistrictPro_demiitalic', 'weight' => '600', 'style' => 'italic' ),
+			array( 'family' => 'District Pro', 'dir' => 'district-pro', 'file' => 'DistrictPro_bold', 'weight' => '700', 'style' => 'normal' ),
+			array( 'family' => 'District Pro', 'dir' => 'district-pro', 'file' => 'DistrictPro_bolditalic', 'weight' => '700', 'style' => 'italic' ),
+		);
+	}
+
+	/**
+	 * `font-display: swap` so a visitor sees the fallback stack immediately
+	 * rather than invisible text while these load, matching the
+	 * `var(--x, <default>)` fallback philosophy used everywhere else in this
+	 * plugin's CSS.
+	 *
+	 * `?ver=RYV_VERSION` on every file URL for the same reason every other
+	 * asset in this plugin is cache-busted this way - see the CLAUDE.md note
+	 * on RYV_VERSION; these files can change (a font update from the client)
+	 * without their filenames changing.
+	 */
+	public static function output_font_faces() {
+		$base = RYV_PLUGIN_URL . 'assets/fonts/';
+
+		echo '<style id="clc-font-faces">' . "\n";
+		foreach ( self::font_face_definitions() as $face ) {
+			$url = esc_url( $base . $face['dir'] . '/' . $face['file'] . '.woff2?ver=' . RYV_VERSION );
+			printf(
+				"@font-face{font-family:'%s';src:url('%s') format('woff2');font-weight:%s;font-style:%s;font-display:swap;}\n",
+				esc_attr( $face['family'] ),
+				$url,
+				esc_attr( $face['weight'] ),
+				esc_attr( $face['style'] )
+			);
+		}
+		echo '</style>' . "\n";
+	}
+
+	/**
+	 * Makes "Sentinel" / "District Pro" selectable in Elementor's own
+	 * Typography font-family dropdown (Content/Style tab autocomplete),
+	 * everywhere in the editor - not just wherever import_to_elementor()
+	 * already writes them as plain font_family strings into the Kit.
+	 * Without this an editor typing "Sentinel" into a widget's own
+	 * Typography control would find no matching suggestion and might
+	 * assume the font isn't actually available.
+	 *
+	 * `Fonts::LOCAL` (Elementor core's `includes/fonts.php`) is the group
+	 * for exactly this case: a font Elementor should list but never try to
+	 * enqueue itself (no Google Fonts request, no Adobe Fonts <script>),
+	 * because it's already self-hosted via `output_font_faces()` above.
+	 *
+	 * @param array<string,string> $fonts Font name => group slug.
+	 * @return array<string,string>
+	 */
+	public static function register_elementor_fonts( $fonts ) {
+		$fonts['Sentinel']     = \Elementor\Fonts::LOCAL;
+		$fonts['District Pro'] = \Elementor\Fonts::LOCAL;
+		return $fonts;
+	}
+
+	/**
+	 * ============================================================
 	 * 3. CSS CUSTOM PROPERTIES (always on)
 	 * ============================================================
 	 *
@@ -680,12 +806,13 @@ class RYV_Design_Tokens {
 	 * 4. FONT PRECONNECT (performance)
 	 * ============================================================
 	 *
-	 * Google - for the free fallbacks (Bitter / Barlow) that Elementor
-	 * loads on its own. Typekit - for District Pro, if Adobe Fonts is wired up.
+	 * Google, for H3's Merriweather - the one family here Elementor still
+	 * loads remotely on its own. Sentinel/District Pro are self-hosted from
+	 * this plugin's own assets/fonts/ (see output_font_faces()) - same
+	 * origin as the page itself, so no preconnect is needed for those.
 	 */
 	public static function output_font_preconnect() {
 		echo '<link rel="preconnect" href="https://fonts.googleapis.com">' . "\n";
 		echo '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>' . "\n";
-		echo '<link rel="preconnect" href="https://use.typekit.net" crossorigin>' . "\n";
 	}
 }
