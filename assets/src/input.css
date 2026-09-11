@@ -508,6 +508,39 @@
     border-color: var(--ryv-lang-switch-border-color-hover, var(--ryv-lang-switch-border-color, transparent)) !important;
   }
 
+  /*
+   * Wizard-mode "Back" button (engine.js's positionBackButton()/goBack()) -
+   * sits above the currently visible card, hidden entirely (removed from
+   * the DOM, not just display:none) when there's no previous card to go
+   * back to. Same doubled-selector + !important treatment as
+   * .ryv-lang-switch-btn above, for the same reason - a host theme's own
+   * `button` rules would otherwise win on load order alone.
+   */
+  .ryv-back-btn.ryv-back-btn {
+    display: inline-flex !important;
+    align-items: center !important;
+    cursor: pointer !important;
+    font-weight: 500 !important;
+    margin-bottom: var(--ryv-back-btn-margin-bottom, 0.75rem) !important;
+    text-decoration: underline !important;
+    transition-property: color, background-color, border-color !important;
+    transition-duration: 150ms !important;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1) !important;
+    color: var(--ryv-back-btn-text-color, var(--ryv-primary-color, #002a41)) !important;
+    background-color: var(--ryv-back-btn-bg, transparent) !important;
+    border-style: solid !important;
+    border-width: var(--ryv-back-btn-border-width, 0px) !important;
+    border-color: var(--ryv-back-btn-border-color, transparent) !important;
+    border-radius: var(--ryv-back-btn-border-radius, var(--ryv-radius, 0)) !important;
+    padding: var(--ryv-back-btn-padding, 0.25rem 0) !important;
+  }
+  .ryv-back-btn.ryv-back-btn:hover,
+  .ryv-back-btn.ryv-back-btn:focus-visible {
+    color: var(--ryv-back-btn-text-color-hover, var(--ryv-back-btn-text-color, var(--ryv-secondary-color, #c8102e))) !important;
+    background-color: var(--ryv-back-btn-bg-hover, var(--ryv-back-btn-bg, transparent)) !important;
+    border-color: var(--ryv-back-btn-border-color-hover, var(--ryv-back-btn-border-color, transparent)) !important;
+  }
+
   .ryv-input.ryv-input {
     @apply ryv-w-full ryv-mb-4;
     max-width: var(--ryv-input-max-width, none);

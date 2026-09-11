@@ -185,6 +185,7 @@ final class RYV_Plugin {
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-elementor.php';
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-shortcode.php';
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-resource-button-shortcode.php';
+		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-states-field-shortcode.php';
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-states-cpt.php';
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-state-queries.php';
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-events-repair.php';
@@ -246,6 +247,7 @@ final class RYV_Plugin {
 		new RYV_Elementor();
 		new RYV_Shortcode();
 		new RYV_Resource_Button_Shortcode();
+		new RYV_States_Field_Shortcode();
 		// Not ACF-gated: the Elementor query id has to be registered on
 		// every frontend request, and the class degrades to "no events
 		// picked" (an empty list, never the whole events archive) when ACF

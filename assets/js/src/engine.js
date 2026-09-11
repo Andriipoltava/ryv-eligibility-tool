@@ -1,8 +1,8 @@
 // See the matching comment in ../decision-engine.js - these query strings
 // are the only thing cache-busting these nested imports; bump them with
 // every RYV_VERSION change.
-import { fetchForm, logSubmission, submitLead } from './api-client.js?ver=0.8.48';
-import * as renderer from './renderer.js?ver=0.8.48';
+import { fetchForm, logSubmission, submitLead } from './api-client.js?ver=0.8.50';
+import * as renderer from './renderer.js?ver=0.8.50';
 
 const LOADING_CARD_ID = '__loading__';
 const ERROR_CARD_ID = '__error__';
@@ -68,6 +68,10 @@ export class RYVDecisionEngine {
     // stays correct however the editions arrive.
     this.languageCode = (this.languageEditions.find((e) => String(e.form_id) === String(this.formId)) || {}).code || '';
     this.langSwitchEl = null;
+    // Wizard-mode-only "Back" button (see mount()/positionBackButton()/
+    // goBack()) - stacked layout has no equivalent, see renderBackButton()'s
+    // own docblock.
+    this.backBtnEl = null;
     // One id per attempt at the questionnaire - restart() rolls a new one so
     // an abandoned-then-restarted trail stays on record as its own row
     // (see RYV_Submission_Log) instead of being overwritten in place.
@@ -142,6 +146,9 @@ export class RYVDecisionEngine {
     }
     this.list = renderer.createList();
     this.root.appendChild(this.list);
+    if (this.wizardMode) {
+      this.backBtnEl = renderer.renderBackButton(() => this.goBack(), this.labels);
+    }
     this.mountLanguageSwitch();
     this.loadForm();
   }
@@ -448,6 +455,66 @@ export class RYVDecisionEngine {
   }
 
   /**
+   * Places the wizard-mode Back button immediately above the currently
+   * visible card, and hides it entirely when there's nowhere to go back to
+   * (the very first real card on screen). No-op outside wizard mode -
+   * `backBtnEl` is never created there (see mount()).
+   */
+  positionBackButton() {
+    if (!this.backBtnEl) return;
+
+    if (this.previousRealIndex() < 0) {
+      this.backBtnEl.remove();
+      return;
+    }
+
+    let lastRealId = null;
+    this.renderedOrder.forEach((id) => {
+      if (this.cardElements.has(id)) lastRealId = id;
+    });
+    const lastCard = lastRealId ? this.cardElements.get(lastRealId) : null;
+    if (lastCard) lastCard.before(this.backBtnEl);
+    else this.backBtnEl.remove();
+  }
+
+  /**
+   * Index (in `renderedOrder`) of the real card immediately before the one
+   * currently on screen, or -1 when the visible card is the first (or there
+   * is none yet). Shared by positionBackButton() (whether to show the
+   * button) and goBack() (where it truncates back to).
+   */
+  previousRealIndex() {
+    let lastRealIndex = -1;
+    this.renderedOrder.forEach((id, i) => {
+      if (this.cardElements.has(id)) lastRealIndex = i;
+    });
+    if (lastRealIndex <= 0) return -1;
+
+    for (let i = lastRealIndex - 1; i >= 0; i -= 1) {
+      if (this.cardElements.has(this.renderedOrder[i])) return i;
+    }
+    return -1;
+  }
+
+  /**
+   * Wizard mode only: truncate back to the previous real card and re-show
+   * it, leaving its previous answer in place - same truncate-and-re-append
+   * shape as goToStep()'s wizard branch, deliberately not a forward
+   * renderFrom() walk (which would just recompute through the still-cached
+   * answers and land right back here).
+   */
+  goBack() {
+    const index = this.previousRealIndex();
+    if (index < 0) return;
+
+    const nodeId = this.renderedOrder[index];
+    this.truncateFrom(index);
+    const node = this.nodes[nodeId];
+    if (!node) return;
+    this.appendCard(nodeId, node.hidden ? null : this.buildCard(nodeId, node, false), true);
+  }
+
+  /**
    * Render `nodeId` and everything that follows it per the current answers,
    * appending after whatever is already on screen.
    */
@@ -675,6 +742,7 @@ export class RYVDecisionEngine {
     renderer.appendCard(this.list, element, animate);
     this.updateSteps();
     this.updateWizardVisibility();
+    this.positionBackButton();
     this.positionLanguageSwitch();
   }
 
@@ -693,6 +761,7 @@ export class RYVDecisionEngine {
     });
     this.updateSteps();
     this.updateWizardVisibility();
+    this.positionBackButton();
     this.positionLanguageSwitch();
   }
 }

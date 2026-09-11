@@ -28,6 +28,7 @@ export const DEFAULT_LABELS = {
   submit: 'Submit',
   submitting: 'Submitting…',
   continue: 'Continue',
+  back: '← Back',
   leadSubmitted: 'Thank you! Your submission has been received.',
   leadError: 'Something went wrong submitting your information. Please try again.',
   // {current}/{total} placeholders - see renderer.js's updateStepIndicator().
@@ -365,6 +366,28 @@ export function renderLanguageSwitch(others, onSwitch) {
   });
 
   return wrap;
+}
+
+/**
+ * Wizard-mode-only "Back" button (see engine.js's `goBack()`): a single
+ * long-lived element, same pattern as renderLanguageSwitch()/
+ * positionLanguageSwitch() - built once by mount() and re-homed by
+ * positionBackButton() rather than rebuilt per card, so its handler never
+ * needs re-wiring. Stacked layout has no equivalent: every card there is
+ * already visible and independently editable, so there's nothing for a
+ * "back" action to reveal.
+ *
+ * @param {() => void} onBack
+ * @param {object} labels
+ * @returns {HTMLElement}
+ */
+export function renderBackButton(onBack, labels = DEFAULT_LABELS) {
+  return el('button', {
+    className: 'ryv-back-btn',
+    text: labels.back,
+    attrs: { type: 'button' },
+    on: { click: () => onBack() },
+  });
 }
 
 export function renderLoadingCard(labels = DEFAULT_LABELS) {
