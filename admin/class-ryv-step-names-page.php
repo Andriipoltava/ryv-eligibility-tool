@@ -50,7 +50,7 @@ class RYV_Step_Names_Page {
 	 * Constructor.
 	 */
 	public function __construct() {
-		add_action( 'admin_menu', array( $this, 'register_menu' ) );
+		RYV_States_Tools_Page::add_tab( self::PAGE_SLUG, __( 'Step Names', 'ryv-eligibility-tool' ), array( $this, 'render_page' ) );
 		add_action( 'admin_init', array( $this, 'handle_submission' ) );
 	}
 
@@ -65,20 +65,6 @@ class RYV_Step_Names_Page {
 	 * reads/writes `ryv_forms` schemas, only its menu location differs.
 	 */
 	const PARENT_SLUG = 'edit.php?post_type=' . RYV_States_CPT::POST_TYPE;
-
-	/**
-	 * Register the submenu page under the ryv_states CPT menu.
-	 */
-	public function register_menu() {
-		add_submenu_page(
-			self::PARENT_SLUG,
-			__( 'Step Names', 'ryv-eligibility-tool' ),
-			__( 'Step Names', 'ryv-eligibility-tool' ),
-			self::CAPABILITY,
-			self::PAGE_SLUG,
-			array( $this, 'render_page' )
-		);
-	}
 
 	/**
 	 * Whether WPML's translation-linking API is present - same check as
@@ -206,7 +192,7 @@ class RYV_Step_Names_Page {
 					'ryv_form'   => $anchor_id,
 					'ryv_notice' => rawurlencode( wp_json_encode( $notice ) ),
 				),
-				admin_url( self::PARENT_SLUG . '&page=' . self::PAGE_SLUG )
+				admin_url( self::PARENT_SLUG . '&page=' . RYV_States_Tools_Page::PAGE_SLUG . '&tab=' . self::PAGE_SLUG )
 			)
 		);
 		exit;

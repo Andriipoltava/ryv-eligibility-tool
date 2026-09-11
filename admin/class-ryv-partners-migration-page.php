@@ -32,23 +32,8 @@ class RYV_Partners_Migration_Page {
 	 * Constructor.
 	 */
 	public function __construct() {
-		add_action( 'admin_menu', array( $this, 'register_page' ) );
+		RYV_States_Tools_Page::add_tab( self::PAGE_SLUG, __( 'Migrate Partners', 'ryv-eligibility-tool' ), array( $this, 'render_page' ) );
 		add_action( 'admin_post_ryv_migrate_partners', array( $this, 'handle_submission' ) );
-	}
-
-	/**
-	 * Register the submenu page under RYV States, next to the other
-	 * one-off/repair tools (Generate States).
-	 */
-	public function register_page() {
-		add_submenu_page(
-			'edit.php?post_type=' . ( class_exists( 'RYV_States_CPT' ) ? RYV_States_CPT::POST_TYPE : 'ryv_states' ),
-			__( 'Migrate Partners', 'ryv-eligibility-tool' ),
-			__( 'Migrate Partners', 'ryv-eligibility-tool' ),
-			self::CAPABILITY,
-			self::PAGE_SLUG,
-			array( $this, 'render_page' )
-		);
 	}
 
 	/**
@@ -81,7 +66,7 @@ class RYV_Partners_Migration_Page {
 			MINUTE_IN_SECONDS * 5
 		);
 
-		wp_safe_redirect( admin_url( 'edit.php?post_type=ryv_states&page=' . self::PAGE_SLUG ) );
+		wp_safe_redirect( admin_url( 'edit.php?post_type=ryv_states&page=' . RYV_States_Tools_Page::PAGE_SLUG . '&tab=' . self::PAGE_SLUG ) );
 		exit;
 	}
 

@@ -35,7 +35,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 	<h2><?php esc_html_e( 'Choose a Form', 'ryv-eligibility-tool' ); ?></h2>
 	<form method="get">
 		<input type="hidden" name="post_type" value="<?php echo esc_attr( RYV_States_CPT::POST_TYPE ); ?>" />
-		<input type="hidden" name="page" value="<?php echo esc_attr( RYV_Step_Names_Page::PAGE_SLUG ); ?>" />
+		<input type="hidden" name="page" value="<?php echo esc_attr( RYV_States_Tools_Page::PAGE_SLUG ); ?>" />
+		<input type="hidden" name="tab" value="<?php echo esc_attr( RYV_Step_Names_Page::PAGE_SLUG ); ?>" />
 		<select name="ryv_form">
 			<option value=""><?php esc_html_e( '— Select —', 'ryv-eligibility-tool' ); ?></option>
 			<?php foreach ( $forms as $form ) : ?>

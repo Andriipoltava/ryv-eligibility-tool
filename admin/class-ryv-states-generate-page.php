@@ -80,26 +80,12 @@ class RYV_States_Generate_Page {
 	 * Constructor.
 	 */
 	public function __construct() {
-		add_action( 'admin_menu', array( $this, 'register_menu' ) );
+		RYV_States_Tools_Page::add_tab( self::PAGE_SLUG, __( 'Generate States', 'ryv-eligibility-tool' ), array( $this, 'render_page' ) );
 		add_action( 'admin_init', array( $this, 'handle_submission' ) );
 		add_action( 'admin_init', array( $this, 'handle_sync_submission' ) );
 		add_action( 'admin_init', array( $this, 'handle_autopopulate_submission' ) );
 		add_action( 'admin_init', array( $this, 'handle_events_repair_submission' ) );
 		add_action( 'admin_init', array( $this, 'handle_template_repair_submission' ) );
-	}
-
-	/**
-	 * Register the submenu page under the ryv_states CPT menu.
-	 */
-	public function register_menu() {
-		add_submenu_page(
-			'edit.php?post_type=' . RYV_States_CPT::POST_TYPE,
-			__( 'Generate States', 'ryv-eligibility-tool' ),
-			__( 'Generate States', 'ryv-eligibility-tool' ),
-			self::CAPABILITY,
-			self::PAGE_SLUG,
-			array( $this, 'render_page' )
-		);
 	}
 
 	/**
@@ -142,7 +128,7 @@ class RYV_States_Generate_Page {
 			);
 		}
 
-		wp_safe_redirect( admin_url( 'edit.php?post_type=' . RYV_States_CPT::POST_TYPE . '&page=' . self::PAGE_SLUG ) );
+		wp_safe_redirect( admin_url( 'edit.php?post_type=' . RYV_States_CPT::POST_TYPE . '&page=' . RYV_States_Tools_Page::PAGE_SLUG . '&tab=' . self::PAGE_SLUG ) );
 		exit;
 	}
 
@@ -189,7 +175,7 @@ class RYV_States_Generate_Page {
 			);
 		}
 
-		wp_safe_redirect( admin_url( 'edit.php?post_type=' . RYV_States_CPT::POST_TYPE . '&page=' . self::PAGE_SLUG ) );
+		wp_safe_redirect( admin_url( 'edit.php?post_type=' . RYV_States_CPT::POST_TYPE . '&page=' . RYV_States_Tools_Page::PAGE_SLUG . '&tab=' . self::PAGE_SLUG ) );
 		exit;
 	}
 
@@ -239,7 +225,7 @@ class RYV_States_Generate_Page {
 			);
 		}
 
-		wp_safe_redirect( admin_url( 'edit.php?post_type=' . RYV_States_CPT::POST_TYPE . '&page=' . self::PAGE_SLUG ) );
+		wp_safe_redirect( admin_url( 'edit.php?post_type=' . RYV_States_CPT::POST_TYPE . '&page=' . RYV_States_Tools_Page::PAGE_SLUG . '&tab=' . self::PAGE_SLUG ) );
 		exit;
 	}
 
@@ -357,7 +343,7 @@ class RYV_States_Generate_Page {
 			MINUTE_IN_SECONDS * 5
 		);
 
-		wp_safe_redirect( admin_url( 'edit.php?post_type=' . RYV_States_CPT::POST_TYPE . '&page=' . self::PAGE_SLUG ) );
+		wp_safe_redirect( admin_url( 'edit.php?post_type=' . RYV_States_CPT::POST_TYPE . '&page=' . RYV_States_Tools_Page::PAGE_SLUG . '&tab=' . self::PAGE_SLUG ) );
 		exit;
 	}
 
@@ -415,7 +401,7 @@ class RYV_States_Generate_Page {
 			MINUTE_IN_SECONDS * 5
 		);
 
-		wp_safe_redirect( admin_url( 'edit.php?post_type=' . RYV_States_CPT::POST_TYPE . '&page=' . self::PAGE_SLUG ) );
+		wp_safe_redirect( admin_url( 'edit.php?post_type=' . RYV_States_CPT::POST_TYPE . '&page=' . RYV_States_Tools_Page::PAGE_SLUG . '&tab=' . self::PAGE_SLUG ) );
 		exit;
 	}
 

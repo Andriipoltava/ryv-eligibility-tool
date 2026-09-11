@@ -201,6 +201,12 @@ final class RYV_Plugin {
 		// once every state has been migrated and QA'd post-launch.
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-partners-migration.php';
 
+		// Temporary state-slug/form-option repair - see
+		// class-ryv-state-slug-repair.php's own docblock. Delete this
+		// require (and the file, and its admin-page wrapper below) once the
+		// live site has been repaired and QA'd.
+		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-state-slug-repair.php';
+
 		// ACF + sync only when ACF is available.
 		if ( class_exists( 'ACF' ) ) {
 			require_once RYV_PLUGIN_DIR . 'includes/class-ryv-states-acf.php';
@@ -227,8 +233,10 @@ final class RYV_Plugin {
 			require_once RYV_PLUGIN_DIR . 'admin/class-ryv-shortcode-hint.php';
 			require_once RYV_PLUGIN_DIR . 'admin/class-ryv-help-page.php';
 			require_once RYV_PLUGIN_DIR . 'admin/class-ryv-translations-page.php';
+			require_once RYV_PLUGIN_DIR . 'admin/class-ryv-states-tools-page.php';
 			require_once RYV_PLUGIN_DIR . 'admin/class-ryv-step-names-page.php';
 			require_once RYV_PLUGIN_DIR . 'admin/class-ryv-design-tokens-page.php';
+			require_once RYV_PLUGIN_DIR . 'admin/class-ryv-state-slug-repair-page.php';
 
 			if ( class_exists( 'ACF' ) ) {
 				require_once RYV_PLUGIN_DIR . 'admin/class-ryv-states-generate-page.php';
@@ -294,8 +302,10 @@ final class RYV_Plugin {
 			new RYV_Shortcode_Hint();
 			$this->help_page         = new RYV_Help_Page();
 			$this->translations_page = new RYV_Translations_Page();
+			new RYV_States_Tools_Page();
 			$this->step_names_page   = new RYV_Step_Names_Page();
 			$this->design_tokens_page = new RYV_Design_Tokens_Page();
+			new RYV_State_Slug_Repair_Page();
 
 			if ( class_exists( 'ACF' ) ) {
 				new RYV_States_Generate_Page();
