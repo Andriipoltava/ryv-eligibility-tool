@@ -607,6 +607,16 @@ class RYV_Widget extends \Elementor\Widget_Base {
 			)
 		);
 
+		$this->add_control(
+			'label_back',
+			array(
+				'label'       => __( '"Back" Button', 'ryv-eligibility-tool' ),
+				'type'        => \Elementor\Controls_Manager::TEXT,
+				'default'     => __( '← Back', 'ryv-eligibility-tool' ),
+				'description' => __( 'Only shown in the one-question-at-a-time (wizard) Question Layout.', 'ryv-eligibility-tool' ),
+			)
+		);
+
 		$this->register_button_icon_controls( 'icon_continue', __( 'Continue Button', 'ryv-eligibility-tool' ), true );
 		$this->register_button_icon_controls( 'icon_start_over', __( '"Start Over" Button', 'ryv-eligibility-tool' ) );
 		$this->register_button_icon_controls( 'icon_retry', __( 'Retry Button (on error)', 'ryv-eligibility-tool' ) );
@@ -2847,6 +2857,7 @@ class RYV_Widget extends \Elementor\Widget_Base {
 			'label_loading'            => 'loading',
 			'label_retry'              => 'retry',
 			'label_select_placeholder' => 'selectPlaceholder',
+			'label_back'               => 'back',
 		);
 
 		$typed = array();

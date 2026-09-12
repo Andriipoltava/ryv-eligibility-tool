@@ -290,11 +290,13 @@ if ( ! defined( 'ABSPATH' ) ) {
 				<?php endif; ?>
 				<?php
 				printf(
-					/* translators: 1: number of display conditions, 2: number of classes, 3: number of query IDs */
-					esc_html__( 'Display conditions removed: %1$d. Hide-when-empty classes set: %2$d. Loop Grid query IDs set: %3$d.', 'ryv-eligibility-tool' ),
+					/* translators: 1: number of display conditions, 2: number of classes, 3: number of query IDs, 4: number of dynamic tags, 5: number of static settings */
+					esc_html__( 'Display conditions removed: %1$d. Hide-when-empty classes set: %2$d. Loop Grid query IDs set: %3$d. Dynamic tags rebound: %4$d. Widget settings written: %5$d.', 'ryv-eligibility-tool' ),
 					(int) $template_result['conditions_removed'],
 					(int) $template_result['markers_set'],
-					(int) $template_result['query_ids_set']
+					(int) $template_result['query_ids_set'],
+					(int) $template_result['dynamic_tags_set'],
+					(int) $template_result['static_settings_set']
 				);
 				?>
 			</p>
@@ -310,6 +312,14 @@ if ( ! defined( 'ABSPATH' ) ) {
 							<?php endforeach; ?>
 							<?php foreach ( $template['query_ids_set'] as $element_id => $query_id ) : ?>
 								<br /><small><code><?php echo esc_html( $element_id ); ?></code> → <?php esc_html_e( 'Query ID', 'ryv-eligibility-tool' ); ?> <code><?php echo esc_html( $query_id ); ?></code></small>
+							<?php endforeach; ?>
+							<?php foreach ( $template['dynamic_tags_set'] as $element_id => $shortcode ) : ?>
+								<br /><small><code><?php echo esc_html( $element_id ); ?></code> → <?php esc_html_e( 'Dynamic tag', 'ryv-eligibility-tool' ); ?> <code><?php echo esc_html( $shortcode ); ?></code></small>
+							<?php endforeach; ?>
+							<?php foreach ( $template['static_settings_set'] as $element_id => $settings ) : ?>
+								<?php foreach ( $settings as $setting_key => $value ) : ?>
+									<br /><small><code><?php echo esc_html( $element_id ); ?></code> → <code><?php echo esc_html( $setting_key ); ?></code> = <code><?php echo esc_html( $value ); ?></code></small>
+								<?php endforeach; ?>
 							<?php endforeach; ?>
 						</li>
 					<?php endforeach; ?>

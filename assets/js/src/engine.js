@@ -1,8 +1,8 @@
 // See the matching comment in ../decision-engine.js - these query strings
 // are the only thing cache-busting these nested imports; bump them with
 // every RYV_VERSION change.
-import { fetchForm, logSubmission, submitLead } from './api-client.js?ver=0.8.50';
-import * as renderer from './renderer.js?ver=0.8.50';
+import { fetchForm, logSubmission, submitLead } from './api-client.js?ver=0.8.57';
+import * as renderer from './renderer.js?ver=0.8.57';
 
 const LOADING_CARD_ID = '__loading__';
 const ERROR_CARD_ID = '__error__';
@@ -248,6 +248,16 @@ export class RYVDecisionEngine {
     this.answers = new Map();
     this.sessionId = this.generateSessionId();
 
+    // Unlike the language switch button and every card (rebuilt below by
+    // loadForm()), the wizard "Back" button is a single long-lived element
+    // (see mount()) that outlives a language switch - relabel it in place
+    // rather than rebuilding, or it would keep showing whatever language it
+    // was first mounted in (reported: switching to Spanish left it reading
+    // "← Back").
+    if (this.backBtnEl) {
+      this.backBtnEl.textContent = this.labels.back;
+    }
+
     // Rebuilt rather than relabeled: the button set is "every edition except
     // the current one", which just changed.
     if (this.langSwitchEl) {
@@ -268,6 +278,11 @@ export class RYVDecisionEngine {
       // graph - a stale override (e.g. the state page's linked form was
       // repointed after this widget instance was configured) should fall
       // back to the form's normal entry_node rather than render nothing.
+      // The form's *real* entry node (the state picker), independent of
+      // entryNodeOverride - buildAllSteps() needs it to synthesize the
+      // "state selected" step below, since it's never itself walked once an
+      // override skips straight past it.
+      this.trueEntryNode = data.entry_node;
       this.entryNode = (this.entryNodeOverride && this.nodes[this.entryNodeOverride])
         ? this.entryNodeOverride
         : data.entry_node;
@@ -330,6 +345,25 @@ export class RYVDecisionEngine {
   buildAllSteps() {
     const steps = [];
     const seenNames = new Set();
+
+    // On a state page, entryNodeOverride skips straight past the form's own
+    // state-picker node (this.trueEntryNode) to that state's first question -
+    // so the BFS below, which walks forward from wherever rendering actually
+    // starts, never visits it and its named step ("Select Your State" or
+    // whatever an admin typed on the Step Names page) never appears at all.
+    // The state is already known on this kind of placement, so that step is
+    // synthesized here as always-satisfied: `firstNodeId: null` keeps it
+    // unclickable (there's nowhere on this page to jump back to), and
+    // updateStepSidebar() marks anything before the visitor's real active
+    // step done automatically, with no special-casing needed there.
+    if (this.entryNodeOverride && this.entryNode !== this.trueEntryNode) {
+      const trueEntry = this.nodes[this.trueEntryNode];
+      if (trueEntry && trueEntry.step_name && !trueEntry.hidden) {
+        seenNames.add(trueEntry.step_name);
+        steps.push({ name: trueEntry.step_name, firstNodeId: null });
+      }
+    }
+
     const visited = new Set();
     const queue = [this.entryNode];
 

@@ -85,6 +85,7 @@
 				<field editor_type="LINE">label_loading</field>
 				<field editor_type="LINE">label_retry</field>
 				<field editor_type="LINE">label_select_placeholder</field>
+				<field editor_type="LINE">label_back</field>
 				<!--
 					Not a string to translate but an id to *convert*: when
 					WPML creates or updates a translation of a page holding

@@ -76,6 +76,7 @@ class RYV_Form_Translations {
 			'submit'             => 'Enviar',
 			'submitting'         => 'Enviando…',
 			'continue'           => 'Continuar',
+			'back'               => '← Atrás',
 			'leadSubmitted'      => '¡Gracias! Hemos recibido su información.',
 			'leadError'          => 'Algo salió mal al enviar su información. Por favor, inténtelo de nuevo.',
 			'step'               => 'Paso {current}',

@@ -487,6 +487,31 @@ class RYV_States_ACF {
 					),
 				),
 
+				// General description/quote for the whole Featured Partners
+				// list, not tied to any one partner - renders once, below
+				// every partner card, via
+				// RYV_Featured_Partners_Renderer::render_general_note().
+				// Both optional and independent of each partner's own
+				// description/quote above: a state can use only this shared
+				// pair, only per-partner ones, or both at once.
+				array(
+					'key'          => 'field_ryv_featured_partners_description',
+					'label'        => 'General Description',
+					'name'         => 'featured_partners_description',
+					'type'         => 'wysiwyg',
+					'tabs'         => 'all',
+					'media_upload' => 0,
+					'instructions' => 'Optional. Shown once below all Featured Partners cards, not attached to any single partner.',
+				),
+				array(
+					'key'          => 'field_ryv_featured_partners_quote',
+					'label'        => 'General Quote',
+					'name'         => 'featured_partners_quote',
+					'type'         => 'textarea',
+					'rows'         => 3,
+					'instructions' => 'Optional. Shown once below all Featured Partners cards, not attached to any single partner.',
+				),
+
 				// --- Featured Partner (legacy) ---
 				// Hidden from the edit screen entirely via
 				// assets/css/admin/states-admin.css - this whole tab is

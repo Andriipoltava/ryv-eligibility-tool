@@ -9,6 +9,13 @@
  * optional and simply omits its own markup when empty, so a partner with
  * only a name and a logo renders a shorter card, not a broken one.
  *
+ * A second, independent pair of fields -
+ * `featured_partners_description`/`featured_partners_quote` - holds a
+ * description/quote for the list as a whole rather than any one partner
+ * (render_general_note()): rendered once, after every card, so a state can
+ * say something about its coalition of partners collectively without
+ * pinning that copy to whichever partner happens to be listed first.
+ *
  * Two front ends call this, both producing byte-identical output:
  * - `[ryv_featured_partners]` (RYV_States_Partners_Shortcode) - drop it
  *   anywhere do_shortcode() runs (a Shortcode widget, post content, ...).
@@ -49,54 +56,104 @@ class RYV_Featured_Partners_Renderer {
 		$rows = get_field( 'featured_partners', $post_id );
 
 		if ( is_array( $rows ) && count( $rows ) > 0 ) {
-			return self::render_cards( $rows );
+			$cards = self::build_cards_markup( $rows );
+		} else {
+			// Legacy fallback (see class docblock): one card built from the
+			// old single-partner fields (which is exactly what they were -
+			// one partner's logo/name/location/description/quote/link, just
+			// not in a repeater), so a state RYV_Partners_Migration hasn't
+			// reached yet keeps rendering its existing content unchanged.
+			$legacy_name = trim( (string) get_field( 'ryv_partner_name', $post_id ) );
+			$cards       = '' !== $legacy_name
+				? self::build_cards_markup(
+					array(
+						array(
+							'logo'        => null,
+							'name'        => $legacy_name,
+							'url'         => (string) get_field( 'ryv_partner_link_url', $post_id ),
+							'location'    => (string) get_field( 'ryv_partner_location', $post_id ),
+							'description' => (string) get_field( 'ryv_partner_description', $post_id ),
+							'quote'       => (string) get_field( 'ryv_partner_quote', $post_id ),
+						),
+					)
+				)
+				: '';
 		}
 
-		// Legacy fallback (see class docblock): one card built from the old
-		// single-partner fields (which is exactly what they were - one
-		// partner's logo/name/location/description/quote/link, just not in
-		// a repeater), so a state RYV_Partners_Migration hasn't reached yet
-		// keeps rendering its existing content unchanged.
-		$legacy_name = trim( (string) get_field( 'ryv_partner_name', $post_id ) );
-		if ( '' === $legacy_name ) {
+		$note = self::render_general_note( $post_id );
+
+		if ( '' === $cards && '' === $note ) {
 			return '';
 		}
 
-		return self::render_cards(
-			array(
-				array(
-					'logo'        => null,
-					'name'        => $legacy_name,
-					'url'         => (string) get_field( 'ryv_partner_link_url', $post_id ),
-					'location'    => (string) get_field( 'ryv_partner_location', $post_id ),
-					'description' => (string) get_field( 'ryv_partner_description', $post_id ),
-					'quote'       => (string) get_field( 'ryv_partner_quote', $post_id ),
-				),
-			)
-		);
+		return '<div class="ryv-partner-cards">' . $cards . $note . '</div>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- $cards is pre-escaped per card in render_card(), $note in render_general_note().
 	}
 
 	/**
 	 * @param array $rows Repeater rows (or the single-row legacy fallback),
 	 *                     each `{ logo: int|null, name, url, location,
 	 *                     description, quote: string }`.
-	 * @return string
+	 * @return string Concatenated `<article class="ryv-partner-card">` tags,
+	 *                 '' if every row was nameless. Not itself wrapped in
+	 *                 `.ryv-partner-cards` - render_html() does that once,
+	 *                 alongside render_general_note()'s output.
 	 */
-	private static function render_cards( array $rows ): string {
+	private static function build_cards_markup( array $rows ): string {
 		$cards = '';
 
 		foreach ( $rows as $row ) {
-			$card = self::render_card( $row );
-			if ( '' !== $card ) {
-				$cards .= $card;
-			}
+			$cards .= self::render_card( $row );
 		}
 
-		if ( '' === $cards ) {
+		return $cards;
+	}
+
+	/**
+	 * The description/quote pair that applies to the whole Featured
+	 * Partners list rather than any one partner
+	 * (`featured_partners_description`/`featured_partners_quote` on
+	 * RYV_States_ACF::register_partner_highlight_group()) - e.g. a note
+	 * about the coalition as a whole that shouldn't read as belonging to
+	 * whichever partner card happens to be listed first.
+	 *
+	 * Deliberately reuses the same `.ryv-partner-card-description`/
+	 * `.ryv-partner-card-quote` markup/classes a single card's own fields
+	 * render with, wrapped in `.ryv-partner-section-note` instead of
+	 * `.ryv-partner-card`: the widget's existing Style-tab Description/Quote
+	 * controls (color via a `--ryv-partner-*` custom property on
+	 * `.ryv-partner-cards`, typography via those exact class selectors)
+	 * apply to it automatically, with no separate controls to add or keep
+	 * in sync - while the different wrapper class means it never picks up
+	 * `.ryv-partner-card + .ryv-partner-card`'s divider border, which is
+	 * only meant to separate one partner's card from the next.
+	 *
+	 * @param int $post_id A `ryv_states` post.
+	 * @return string '' if both fields are empty.
+	 */
+	private static function render_general_note( int $post_id ): string {
+		$description = trim( (string) get_field( 'featured_partners_description', $post_id ) );
+		$quote       = trim( (string) get_field( 'featured_partners_quote', $post_id ) );
+
+		if ( '' === $description && '' === $quote ) {
 			return '';
 		}
 
-		return '<div class="ryv-partner-cards">' . $cards . '</div>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- $cards is pre-escaped per card in render_card().
+		// Trusted HTML - same admin-only boundary as every other rich-text
+		// ACF field in this plugin (node.content, ryv_partner_description, a
+		// partner card's own `description` sub-field above).
+		$description_html = '' !== $description
+			? sprintf( '<div class="ryv-partner-card-description">%s</div>', wp_kses_post( $description ) )
+			: '';
+
+		$quote_html = '' !== $quote
+			? sprintf( '<blockquote class="ryv-partner-card-quote"><p>%s</p></blockquote>', self::format_quote( $quote ) )
+			: '';
+
+		return sprintf(
+			'<div class="ryv-partner-section-note">%s%s</div>',
+			$description_html, // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- wp_kses_post() above.
+			$quote_html // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- format_quote() above (wp_kses()+nl2br()).
+		);
 	}
 
 	/**
@@ -156,7 +213,7 @@ class RYV_Featured_Partners_Renderer {
 			: '';
 
 		$quote_html = '' !== $quote
-			? sprintf( '<blockquote class="ryv-partner-card-quote"><p>%s</p></blockquote>', esc_html( $quote ) )
+			? sprintf( '<blockquote class="ryv-partner-card-quote"><p>%s</p></blockquote>', self::format_quote( $quote ) )
 			: '';
 
 		$link_html = '';
@@ -184,9 +241,31 @@ class RYV_Featured_Partners_Renderer {
 			esc_html( $name ),
 			$location_html, // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- built from esc_html() above.
 			$description_html, // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- wp_kses_post() above.
-			$quote_html, // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- built from esc_html() above.
+			$quote_html, // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- format_quote() above (wp_kses()+nl2br()).
 			$link_html // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- built from esc_url()/esc_html() above.
 		);
+	}
+
+	/**
+	 * A `quote` field is a plain `textarea`, not a WYSIWYG - so unlike
+	 * `description` above it gets `esc_html()`, not `wp_kses_post()` -  but a
+	 * quote with an attribution line (e.g. "...quote text."<br>- Jane Doe,
+	 * Chair") needs *some* way to break the line, and a textarea has no rich
+	 * formatting to do it with. Real quotes on this site are typed with a
+	 * literal `<br>` for exactly that reason, which `esc_html()` alone turns
+	 * into visible `&lt;br&gt;` text instead of a line break.
+	 *
+	 * `wp_kses()` allowing only `<br>` covers that literal-tag case (and
+	 * strips anything else typed by accident, same trust boundary as
+	 * `esc_html()` - it's still admin-only input); `nl2br()` on top covers a
+	 * quote typed across multiple lines in the textarea itself, since a
+	 * plain `\n` would otherwise collapse in the rendered `<p>`.
+	 *
+	 * @param string $quote Raw ACF field value.
+	 * @return string Safe to echo inside a `<blockquote><p>`.
+	 */
+	private static function format_quote( string $quote ): string {
+		return nl2br( wp_kses( $quote, array( 'br' => array() ) ) );
 	}
 
 	/**

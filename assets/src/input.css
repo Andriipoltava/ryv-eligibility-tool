@@ -1413,6 +1413,14 @@
     padding-top: var(--ryv-partner-card-gap, 2rem);
     border-top: 1px solid var(--ryv-partner-card-divider-color, #E5E7EB);
   }
+  /* The general (not-partner-specific) description/quote note, when it
+   * follows at least one card - `:not(:first-child)` so a state with no
+   * partner cards at all (the note as the section's only content) doesn't
+   * get an orphaned top divider. */
+  .ryv-partner-section-note:not(:first-child) {
+    padding-top: var(--ryv-partner-card-gap, 2rem);
+    border-top: 1px solid var(--ryv-partner-card-divider-color, #E5E7EB);
+  }
   .ryv-partner-card-header {
     display: flex;
     align-items: flex-start;
