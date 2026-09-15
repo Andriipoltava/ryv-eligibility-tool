@@ -1,8 +1,8 @@
 // See the matching comment in ../decision-engine.js - these query strings
 // are the only thing cache-busting these nested imports; bump them with
 // every RYV_VERSION change.
-import { fetchForm, logSubmission, submitLead } from './api-client.js?ver=0.8.66';
-import * as renderer from './renderer.js?ver=0.8.66';
+import { fetchForm, logSubmission, submitLead } from './api-client.js?ver=0.8.67';
+import * as renderer from './renderer.js?ver=0.8.67';
 
 const LOADING_CARD_ID = '__loading__';
 const ERROR_CARD_ID = '__error__';
@@ -525,6 +525,13 @@ export class RYVDecisionEngine {
     this.truncateFrom(index);
     this.leadingMarkupByNode.set(nodeId, leadingMarkup);
     if (previousAnswer !== undefined) this.answers.set(nodeId, previousAnswer);
+    // Same reasoning as goBack(): jumping back to the state-picker step
+    // itself (clicked from the sidebar) re-opens the state as a live
+    // question again, so the checklist shouldn't stay narrowed to whichever
+    // state's shape was last answered until they pick again.
+    if (nodeId === this.trueEntryNode) {
+      this.allSteps = this.buildAllSteps();
+    }
     const node = this.nodes[nodeId];
     if (!node) return;
     this.appendCard(nodeId, node.hidden ? null : this.buildCard(nodeId, node, false, leadingMarkup), true);
@@ -658,6 +665,16 @@ export class RYVDecisionEngine {
     // otherwise silently lose the merged content and pre-filled answer.
     this.leadingMarkupByNode.set(nodeId, leadingMarkup);
     if (previousAnswer !== undefined) this.answers.set(nodeId, previousAnswer);
+    // Landing back on the state picker itself re-opens "which state" as a
+    // live question again - even though its previous answer is still
+    // pre-filled above, the visitor hasn't re-confirmed it, so the sidebar
+    // shouldn't keep showing the shape of whichever state that answer
+    // happened to be. Back to the full graph-wide checklist (same reasoning
+    // as restart()) until they pick again, which re-narrows it via
+    // onAnswerChange() same as any other selection.
+    if (nodeId === this.trueEntryNode) {
+      this.allSteps = this.buildAllSteps();
+    }
     const node = this.nodes[nodeId];
     if (!node) return;
     this.appendCard(nodeId, node.hidden ? null : this.buildCard(nodeId, node, false, leadingMarkup), true);
