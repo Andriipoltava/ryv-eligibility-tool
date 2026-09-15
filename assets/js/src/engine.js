@@ -1,8 +1,8 @@
 // See the matching comment in ../decision-engine.js - these query strings
 // are the only thing cache-busting these nested imports; bump them with
 // every RYV_VERSION change.
-import { fetchForm, logSubmission, submitLead } from './api-client.js?ver=0.8.65';
-import * as renderer from './renderer.js?ver=0.8.65';
+import { fetchForm, logSubmission, submitLead } from './api-client.js?ver=0.8.66';
+import * as renderer from './renderer.js?ver=0.8.66';
 
 const LOADING_CARD_ID = '__loading__';
 const ERROR_CARD_ID = '__error__';
@@ -330,6 +330,11 @@ export class RYVDecisionEngine {
     // the same session row and RYV_Submission_Log::record() would overwrite
     // the trail that was just abandoned instead of leaving it on record.
     this.sessionId = this.generateSessionId();
+    // Back to the full graph-wide checklist - clearing `answers` above also
+    // forgets which state (if any) `this.allSteps` was last narrowed to, so
+    // leaving it as-is would show a stale, wrong-shaped sidebar for however
+    // long it takes the visitor to pick a state again.
+    this.allSteps = this.buildAllSteps();
     this.truncateFrom(0);
     this.renderFrom(this.entryNode, true);
   }
@@ -352,8 +357,8 @@ export class RYVDecisionEngine {
   }
 
   /**
-   * Every named step in the whole graph, in the order a visitor reaches
-   * them - so the sidebar can show the full "1, 2, 3" checklist up front
+   * Every named step reachable from the entry node, in the order a visitor
+   * reaches them - so the sidebar can show the full checklist up front
    * (upcoming steps greyed) instead of revealing each entry only once the
    * visitor gets there.
    *
@@ -365,10 +370,27 @@ export class RYVDecisionEngine {
    * different per-state nodes all share the one "Tell us about your
    * conviction" label and must collapse to a single entry.
    *
-   * Cached per load (see loadForm()) rather than recomputed on every
-   * render - a real form is 450+ nodes and this runs on every card change.
+   * `branchValue`, once a state's been picked, narrows the walk to that
+   * state's own branch instead of the whole graph: at the state-picker node
+   * itself (and only there - `id === this.trueEntryNode`), only the option
+   * matching `branchValue` is followed, rather than every state's. Without
+   * this a state whose branch has no separate conviction question at all
+   * (the entry option routes straight to a "you can vote" verdict, e.g.
+   * DC/Maine/Puerto Rico/Vermont) would still show every other state's
+   * "Tell us about your conviction" entry - discovered via whichever state
+   * the graph-wide BFS reaches first - as a permanently-upcoming, never-
+   * checked-off step in *their* sidebar too, which reads as a skipped step
+   * rather than a 2-step questionnaire. Called with no argument (initial
+   * load, before any state is chosen) this still walks the whole graph, so
+   * the generic 3-item preview shows before a visitor's own shape is known;
+   * onAnswerChange() recomputes it with the chosen value once the state
+   * question is answered or changed.
+   *
+   * Cached on `this.allSteps` (see loadForm()/onAnswerChange()) rather than
+   * recomputed on every render - a real form is 450+ nodes and this would
+   * otherwise run on every card change.
    */
-  buildAllSteps() {
+  buildAllSteps(branchValue) {
     const steps = [];
     const seenNames = new Set();
 
@@ -392,6 +414,7 @@ export class RYVDecisionEngine {
 
     const visited = new Set();
     const queue = [this.entryNode];
+    const wantedValue = Array.isArray(branchValue) ? branchValue[0] : branchValue;
 
     while (queue.length) {
       const id = queue.shift();
@@ -408,9 +431,15 @@ export class RYVDecisionEngine {
         steps.push({ name: node.step_name, firstNodeId: null });
       }
 
-      (node.options || []).forEach((option) => {
-        if (option && option.next_node) queue.push(option.next_node);
-      });
+      const options = node.options || [];
+      if (wantedValue !== undefined && id === this.trueEntryNode) {
+        const chosen = options.find((option) => option && option.value === wantedValue);
+        if (chosen && chosen.next_node) queue.push(chosen.next_node);
+      } else {
+        options.forEach((option) => {
+          if (option && option.next_node) queue.push(option.next_node);
+        });
+      }
       if (node.next_node) queue.push(node.next_node);
     }
 
@@ -823,6 +852,14 @@ export class RYVDecisionEngine {
 
     const isEmpty = Array.isArray(value) ? value.length === 0 : !value;
     if (!isEmpty) this.answers.set(nodeId, value);
+
+    // Re-narrow the sidebar checklist to the chosen state's own branch (see
+    // buildAllSteps()'s own docblock) whenever the state question itself is
+    // what just changed - including clearing it, which falls back to the
+    // full graph-wide list since no branch is known again.
+    if (nodeId === this.trueEntryNode) {
+      this.allSteps = this.buildAllSteps(isEmpty ? undefined : value);
+    }
 
     const node = this.nodes[nodeId];
     const next = this.computeNext(nodeId, node);

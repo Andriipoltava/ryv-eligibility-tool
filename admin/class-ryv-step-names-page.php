@@ -236,18 +236,28 @@ class RYV_Step_Names_Page {
 	}
 
 	/**
-	 * Follow a chain of `hidden` nodes (Markup/Unsupported nodes only - see
-	 * CLAUDE.md's gate-collision section) forward to the first node that
-	 * actually gets a card, since a hidden node never appears in the wizard
-	 * sidebar (engine.js's updateStepSidebar() skips it - "no card") and so
-	 * can never usefully carry a `step_name` itself; the visible step
-	 * really begins wherever the visitor's eyes land.
+	 * Follow a chain of nodes forward, past any that can never anchor a
+	 * sidebar step on their own, to the first one that actually can. Two
+	 * cases fold through: a `hidden` node (Markup/Unsupported only - see
+	 * CLAUDE.md's gate-collision section) never gets a card at all
+	 * (engine.js's updateStepSidebar() skips it - "no card"); a *visible*
+	 * markup node with its own `next_node` doesn't get one either in the
+	 * wizard question layout - its content instead rides along onto
+	 * whichever real card follows it (renderFrom()'s `leadingMarkup`
+	 * accumulator, engine.js), so it's never in `cardElements` either. A
+	 * `step_name` assigned to either kind is invisible to
+	 * updateStepSidebar()'s own path walk, which is exactly the bug this
+	 * fixes: several states' entry option routed to a state-specific intro
+	 * blurb before their real conviction question, and Step 2 landed on
+	 * that unreachable blurb instead - the sidebar then never left "Step 1"
+	 * for that state's whole branch. A markup node with no `next_node` is a
+	 * true terminal, not a fold-through case - see is_terminal().
 	 *
 	 * @param array  $nodes Full node map.
 	 * @param string $id    Node id to resolve.
 	 * @param int    $depth Recursion guard against a cyclic graph.
-	 * @return string|null First non-hidden node id reachable, or null if
-	 *   the id doesn't exist or the hidden chain dead-ends.
+	 * @return string|null First node id that can anchor a step, or null if
+	 *   the id doesn't exist or the fold-through chain dead-ends.
 	 */
 	private function resolve_visible( array $nodes, string $id, int $depth = 0 ): ?string {
 		if ( $depth > 200 || ! isset( $nodes[ $id ] ) ) {
@@ -256,7 +266,10 @@ class RYV_Step_Names_Page {
 
 		$node = $nodes[ $id ];
 
-		if ( empty( $node['hidden'] ) ) {
+		$folds_through = ! empty( $node['hidden'] )
+			|| ( 'markup' === ( $node['type'] ?? '' ) && ! empty( $node['next_node'] ) );
+
+		if ( ! $folds_through ) {
 			return $id;
 		}
 
@@ -272,14 +285,24 @@ class RYV_Step_Names_Page {
 	/**
 	 * Reset every node's `step_name` in the target form, then set exactly
 	 * three: the entry node (step 1), every node the entry node's options
-	 * route to - resolved past any hidden nodes in between - (step 2), and
-	 * every true-terminal node not already claimed by step 1/2 (step 3).
-	 * Everything else (the many un-named nodes in between, e.g. follow-up
-	 * questions within one state's own branch) is left with an empty
-	 * `step_name` on purpose: engine.js's updateStepSidebar() only starts a
-	 * new sidebar entry when a node's `step_name` differs from the
-	 * currently-active one, so an unset step_name just keeps the visitor
-	 * folded into whichever named step they're already in.
+	 * route to - resolved past any fold-through nodes in between, see
+	 * resolve_visible() - (step 2), and every true-terminal node not
+	 * already claimed by step 1/2 (step 3). Everything else (the many
+	 * un-named nodes in between, e.g. follow-up questions within one
+	 * state's own branch) is left with an empty `step_name` on purpose:
+	 * engine.js's updateStepSidebar() only starts a new sidebar entry when
+	 * a node's `step_name` differs from the currently-active one, so an
+	 * unset step_name just keeps the visitor folded into whichever named
+	 * step they're already in.
+	 *
+	 * A resolved step-2 candidate that's itself a true terminal (some
+	 * states, e.g. ones where a felony conviction never affects
+	 * eligibility, route straight from the entry option to a "you can
+	 * vote" verdict with no conviction question in between at all) is
+	 * treated as step 3 instead - it's the end of the questionnaire, not a
+	 * step on the way there, and leaving it as step 2 meant the sidebar
+	 * never advanced to (or checked off) "step 3" for that state even
+	 * though the visitor had already reached their result.
 	 *
 	 * @param int    $post_id Form post ID.
 	 * @param string $step1   Step 1 label (applied to the entry node).
@@ -324,19 +347,25 @@ class RYV_Step_Names_Page {
 		}
 		unset( $node );
 
-		$second_ids = array();
+		$second_ids   = array();
+		$terminal_ids = array();
 		foreach ( $this->direct_targets( $nodes[ $entry_id ] ) as $target_id ) {
 			$visible_id = $this->resolve_visible( $nodes, $target_id );
-			if ( $visible_id && $entry_id !== $visible_id ) {
+			if ( ! $visible_id || $entry_id === $visible_id ) {
+				continue;
+			}
+			if ( $this->is_terminal( $nodes[ $visible_id ] ) ) {
+				$terminal_ids[ $visible_id ] = true;
+			} else {
 				$second_ids[ $visible_id ] = true;
 			}
 		}
 
-		$terminal_ids = array();
 		foreach ( $nodes as $id => $node ) {
 			if ( empty( $node['hidden'] )
 				&& $entry_id !== $id
 				&& ! isset( $second_ids[ $id ] )
+				&& ! isset( $terminal_ids[ $id ] )
 				&& $this->is_terminal( $node )
 			) {
 				$terminal_ids[ $id ] = true;
