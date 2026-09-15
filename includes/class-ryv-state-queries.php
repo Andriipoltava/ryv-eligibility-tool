@@ -60,6 +60,41 @@ class RYV_State_Queries {
 	const NEWS_POST_TYPE = 'post';
 
 	/**
+	 * The state page resolved from an in-flight Elementor Pro loop-filter/
+	 * search REST refresh request's `Referer` header (clicking a Taxonomy
+	 * Filter tab, or typing into a Search widget, on a Loop Grid that also
+	 * carries one of this class's Query IDs), if this request is one of
+	 * those. 0 otherwise.
+	 *
+	 * Why this exists: those refresh requests hit
+	 * `/wp-json/elementor-pro/v1/refresh-loop` (or `refresh-search`), which
+	 * rebuilds just the one widget from its stored Elementor data
+	 * (`Pro_Utils::create_widget_instance_from_db()`) and calls
+	 * `render_content()` directly - it never runs the site's normal template
+	 * bootstrap (`wp()`/`setup_postdata()`), so there is no "page being
+	 * viewed" for `get_queried_object_id()`/`get_the_ID()` to report; both
+	 * return 0. Confirmed live: clicking any tab on a state's "Guides,
+	 * Forms, and Toolkits" filter reliably emptied the list regardless of
+	 * which tab, because `get_state_id()` fell through to 0 every time.
+	 *
+	 * The request does carry its own `post_id` param, but that's the
+	 * *Theme Builder template's* post id (e.g. the shared "State Post!"
+	 * document, 745) - it's how Elementor locates the widget's stored
+	 * definition, not which state page the visitor is actually on, and every
+	 * state shares that one template id. Confirmed live via the request
+	 * body: `{"post_id":"745", ...}` regardless of which state's page issued
+	 * it. The `Referer` header - the browser's own record of the actual page
+	 * URL the fetch was made from - is what's left to resolve "which state"
+	 * from; `capture_rest_referer_state_id()` below is the only place that
+	 * header is available, since by the time our query filter runs there is
+	 * no `$request` object in scope, only whatever globals Elementor chose
+	 * to set.
+	 *
+	 * @var int
+	 */
+	private static $rest_referer_state_id = 0;
+
+	/**
 	 * Query id => the ACF relationship field on `ryv_states` it reads.
 	 *
 	 * Adding another "this state's X" list means adding a row here and, if
@@ -88,6 +123,64 @@ class RYV_State_Queries {
 				}
 			);
 		}
+
+		add_filter( 'rest_request_before_callbacks', array( __CLASS__, 'capture_rest_referer_state_id' ), 10, 3 );
+	}
+
+	/**
+	 * Resolve the `ryv_states` post from an in-flight REST request's
+	 * `Referer` header, so `get_state_id()` has something to fall back to
+	 * once that request's own `render_content()` call reaches this class's
+	 * query filters - see `$rest_referer_state_id`'s docblock for why
+	 * nothing else is available at that point.
+	 *
+	 * Hooked globally (every REST request, not just Elementor's) since the
+	 * only alternative is matching route strings by hand here and Elementor
+	 * Pro doesn't expose a namespaced way to hook just its own routes - an
+	 * unrelated request's referer simply not matching any `ryv_states` slug
+	 * keeps this a no-op everywhere else.
+	 *
+	 * @param mixed            $response Unmodified; this only observes the request.
+	 * @param array            $handler  Unused.
+	 * @param \WP_REST_Request $request  The REST request about to be dispatched.
+	 * @return mixed $response, unmodified.
+	 */
+	public static function capture_rest_referer_state_id( $response, $handler, $request ) {
+		$referer = wp_get_referer();
+
+		if ( ! $referer ) {
+			return $response;
+		}
+
+		// Not `url_to_postid()`: confirmed dead-ending at 0 for a real
+		// `ryv_states` permalink here (`/states/kentucky/`) even outside any
+		// REST context - it matches against registered rewrite rules, which
+		// this CPT's URL structure doesn't hit cleanly. The state pages
+		// don't nest or share slugs across post types, so matching the
+		// referer's last path segment directly against `post_name` is both
+		// simpler and actually works.
+		$path = (string) wp_parse_url( $referer, PHP_URL_PATH );
+		$slug = basename( untrailingslashit( $path ) );
+
+		if ( ! $slug ) {
+			return $response;
+		}
+
+		$ids = get_posts(
+			array(
+				'name'        => $slug,
+				'post_type'   => RYV_States_CPT::POST_TYPE,
+				'post_status' => 'publish',
+				'fields'      => 'ids',
+				'numberposts' => 1,
+			)
+		);
+
+		if ( $ids ) {
+			self::$rest_referer_state_id = (int) $ids[0];
+		}
+
+		return $response;
 	}
 
 	/**
@@ -240,7 +333,11 @@ class RYV_State_Queries {
 	 * a Loop Grid, whose own rendering swaps the global post per item, and on
 	 * a single-state template the queried object is the state itself. Falls
 	 * back to the global post so the query still works if the widget is
-	 * placed somewhere else that has a state in context.
+	 * placed somewhere else that has a state in context. Finally falls back
+	 * to `$rest_referer_state_id`, for an Elementor Pro loop-filter/search
+	 * widget-refresh REST request - see that property's docblock - where
+	 * both of the above resolve to 0 since there's no real page being
+	 * rendered for them to read.
 	 *
 	 * Static so `RYV_States_Template::is_marker_empty()` can resolve the same
 	 * "which state" answer for the `query-ryv_state_news` hide-empty marker
@@ -258,7 +355,11 @@ class RYV_State_Queries {
 
 		$post_id = (int) get_the_ID();
 
-		return ( $post_id && RYV_States_CPT::POST_TYPE === get_post_type( $post_id ) ) ? $post_id : 0;
+		if ( $post_id && RYV_States_CPT::POST_TYPE === get_post_type( $post_id ) ) {
+			return $post_id;
+		}
+
+		return self::$rest_referer_state_id;
 	}
 
 	/**
