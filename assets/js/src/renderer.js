@@ -37,6 +37,8 @@ export const DEFAULT_LABELS = {
   // (no total) is used for every render.
   step: 'Step {current}',
   stepWithTotal: 'Step {current} of {total}',
+  // {state} placeholder - see engine.js's updateStateBadge().
+  selectedState: 'Selected State: {state}',
 };
 
 /**
@@ -213,6 +215,31 @@ function descriptionEl(description) {
 }
 
 /**
+ * Wizard layout only (see engine.js's renderFrom()): a visible markup node
+ * that leads straight into a question no longer gets its own Continue-gated
+ * card - its title/content render right at the top of the question's own
+ * card instead, so the visitor sees both without an extra click. Each entry
+ * renders exactly like renderMarkupCard()'s own title+content (same trusted-
+ * HTML boundary), in document order, before the card's own title.
+ *
+ * @param {HTMLElement} wrap The card being built - content is appended, so
+ *   call this before adding the node's own title/content.
+ * @param {object[]} leadingMarkup Markup nodes to render, in order. Empty/
+ *   omitted is a no-op (stacked layout, or nothing preceded this node).
+ */
+function prependLeadingContent(wrap, leadingMarkup) {
+  (leadingMarkup || []).forEach((node) => {
+    if (node.title) wrap.appendChild(titleEl(node.title, node.help));
+    if (node.description) wrap.appendChild(descriptionEl(node.description));
+
+    const contentClass = node.wrapper_class ? `ryv-content ${node.wrapper_class}` : 'ryv-content';
+    const content = el('div', { className: contentClass });
+    content.innerHTML = node.content || '';
+    wrap.appendChild(content);
+  });
+}
+
+/**
  * Append `card` to `container`. New cards fade/slide in; cards being
  * rebuilt in place (an edited answer) skip the animation so the page
  * doesn't jump while you're still looking at what you just clicked.
@@ -243,6 +270,40 @@ export function appendCard(container, card, animate = true) {
  */
 export function renderStepIndicator(labels = DEFAULT_LABELS) {
   return el('div', { className: 'ryv-step-indicator', attrs: { role: 'status' } });
+}
+
+/**
+ * A small "Selected State: X" badge shown above the question list once the
+ * visitor has answered the form's state-picker node (engine.js's
+ * `trueEntryNode` - see updateStateBadge()). Built empty/hidden, same
+ * lazy-reveal pattern as renderStepIndicator() - it's a no-op, unstyled
+ * element until a state is actually picked, so an untouched placement never
+ * reserves visible space for it.
+ *
+ * @returns {HTMLElement}
+ */
+export function renderStateBadge() {
+  const badge = el('div', { className: 'ryv-state-badge', attrs: { role: 'status' } });
+  badge.hidden = true;
+  return badge;
+}
+
+/**
+ * @param {HTMLElement} badgeEl From renderStateBadge().
+ * @param {string|null} stateLabel The selected state option's label, or null/empty to hide the badge.
+ * @param {object} labels
+ */
+export function updateStateBadge(badgeEl, stateLabel, labels = DEFAULT_LABELS) {
+  if (!badgeEl) return;
+
+  if (!stateLabel) {
+    badgeEl.hidden = true;
+    badgeEl.textContent = '';
+    return;
+  }
+
+  badgeEl.textContent = (labels.selectedState || DEFAULT_LABELS.selectedState).replace('{state}', stateLabel);
+  badgeEl.hidden = false;
 }
 
 /**
@@ -646,11 +707,16 @@ function renderSingleChoiceOptions(
  *   (see appendReferenceContent()). Optional so callers that never merge reference content can omit it.
  */
 /**
- * @param {boolean} deferCommit Wizard (one-question-at-a-time) layout mode:
- *   a click/change only updates the visible selection - `onChange` isn't
- *   called until the visitor clicks the appended "Continue" button. Stacked
- *   (default) layout keeps today's behavior: `onChange` fires immediately,
- *   no Continue button is rendered at all.
+ * @param {boolean} deferCommit Whether this specific card should wait for a
+ *   "Continue" click instead of committing on the first click/change.
+ *   `engine.js`'s `buildCard()` decides this per node - never just
+ *   `wizardMode` - since a checkbox (multi-select) answer isn't "done" after
+ *   one click regardless of the setting below, while a single-choice node
+ *   (radio/dropdown/buttons, including the state picker) only defers when
+ *   the widget's "Require Continue Button for Single-Choice Questions"
+ *   wizard-mode setting is on (`engine.js`'s `requireChoiceContinue`) -
+ *   see buildCard(). Stacked (default) layout never sets this true at all.
+ * @param {object[]} [leadingMarkup] See prependLeadingContent().
  */
 export function renderQuestionCard(
   node,
@@ -661,8 +727,10 @@ export function renderQuestionCard(
   allNodes = null,
   deferCommit = false,
   icons = DEFAULT_ICONS,
+  leadingMarkup = [],
 ) {
   const wrap = cardWrap(node);
+  prependLeadingContent(wrap, leadingMarkup);
   wrap.appendChild(titleEl(node.title, node.help));
   if (node.description) wrap.appendChild(descriptionEl(node.description));
 
@@ -800,6 +868,7 @@ function appendReferenceContent(wrap, node, allNodes) {
  *   button that calls the same `commit()` as blur/Enter - harmless to leave
  *   blur/Enter active too, since committing the same value twice is a no-op
  *   (see `lastCommitted` below).
+ * @param {object[]} [leadingMarkup] See prependLeadingContent().
  */
 export function renderInputCard(
   node,
@@ -808,8 +877,10 @@ export function renderInputCard(
   labels = DEFAULT_LABELS,
   deferCommit = false,
   icons = DEFAULT_ICONS,
+  leadingMarkup = [],
 ) {
   const wrap = cardWrap(node);
+  prependLeadingContent(wrap, leadingMarkup);
   wrap.appendChild(titleEl(node.title, node.help));
   if (node.description) wrap.appendChild(descriptionEl(node.description));
 
@@ -920,6 +991,7 @@ function buildFieldControl(field) {
  *   after a successful submission; engine.js wires this to advance to
  *   `node.next_node`. Never called if `node.next_node` is empty.
  * @param {object} labels
+ * @param {object[]} [leadingMarkup] See prependLeadingContent().
  */
 export function renderLeadCaptureCard(
   node,
@@ -928,8 +1000,10 @@ export function renderLeadCaptureCard(
   onContinue,
   labels = DEFAULT_LABELS,
   icons = DEFAULT_ICONS,
+  leadingMarkup = [],
 ) {
   const wrap = cardWrap(node);
+  prependLeadingContent(wrap, leadingMarkup);
   if (node.title) wrap.appendChild(titleEl(node.title, node.help));
   if (node.description) wrap.appendChild(descriptionEl(node.description));
 
@@ -1024,16 +1098,20 @@ export function renderLeadCaptureCard(
  * the title above it too.
  *
  * @param {boolean} deferCommit Wizard (one-question-at-a-time) layout mode:
- *   a non-terminal markup card (one with a `next_node`) stops here and
- *   renders its own "Continue" button instead of engine.js's renderFrom()
- *   walking straight through it - otherwise the card would be built, hidden
- *   by updateWizardVisibility(), and replaced by its next_node's card all
- *   within the same synchronous pass, so the visitor would never actually
- *   see it painted. Stacked (default) layout keeps today's behavior: no
- *   button, the whole chain renders and stays visible at once.
+ *   a non-terminal markup card (one with a `next_node`) renders its own
+ *   "Continue" button rather than auto-advancing. In practice engine.js's
+ *   renderFrom() now merges a visible non-terminal markup node's content
+ *   onto whichever real card follows instead of giving it a card of its own
+ *   at all (see prependLeadingContent()), so this only still fires via
+ *   goBack()/goToStep() revisiting a node directly. Stacked (default)
+ *   layout keeps today's behavior: no button, the whole chain renders and
+ *   stays visible at once.
  * @param {() => void} [onContinue] Called when the Continue button is
  *   clicked. Only used when `deferCommit` is true and the card isn't
  *   terminal.
+ * @param {object[]} [leadingMarkup] See prependLeadingContent() - other
+ *   markup nodes that led into *this* one (rare: only when this markup
+ *   node is itself terminal or hidden-then-revisited).
  */
 export function renderMarkupCard(
   node,
@@ -1043,8 +1121,10 @@ export function renderMarkupCard(
   deferCommit = false,
   onContinue = null,
   icons = DEFAULT_ICONS,
+  leadingMarkup = [],
 ) {
   const wrap = el('div');
+  prependLeadingContent(wrap, leadingMarkup);
   if (node.title) {
     wrap.appendChild(titleEl(node.title, node.help));
   }
@@ -1086,8 +1166,9 @@ export function renderMarkupCard(
   return wrap;
 }
 
-export function renderUnsupportedCard(node, isTerminal, onRestart, labels = DEFAULT_LABELS, icons = DEFAULT_ICONS) {
+export function renderUnsupportedCard(node, isTerminal, onRestart, labels = DEFAULT_LABELS, icons = DEFAULT_ICONS, leadingMarkup = []) {
   const wrap = el('div', { className: 'ryv-error-box' });
+  prependLeadingContent(wrap, leadingMarkup);
   wrap.appendChild(
     el('p', {
       text: `This step ("${node.title || node.source_type}") needs configuration before it can be shown.`,

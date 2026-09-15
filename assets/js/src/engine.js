@@ -1,8 +1,8 @@
 // See the matching comment in ../decision-engine.js - these query strings
 // are the only thing cache-busting these nested imports; bump them with
 // every RYV_VERSION change.
-import { fetchForm, logSubmission, submitLead } from './api-client.js?ver=0.8.57';
-import * as renderer from './renderer.js?ver=0.8.57';
+import { fetchForm, logSubmission, submitLead } from './api-client.js?ver=0.8.62';
+import * as renderer from './renderer.js?ver=0.8.62';
 
 const LOADING_CARD_ID = '__loading__';
 const ERROR_CARD_ID = '__error__';
@@ -57,6 +57,16 @@ export class RYVDecisionEngine {
     // stacked mode (the DAG-walking logic never changes) - only their
     // visibility is toggled, in appendCard()/truncateFrom() below.
     this.wizardMode = root.dataset.questionLayout === 'wizard';
+    // Wizard-mode-only widget setting ("Require Continue Button for
+    // Single-Choice Questions", class-ryv-widget.php's
+    // `require_choice_continue` control): off by default, meaning a
+    // radio/dropdown/buttons pick (including the state picker) advances the
+    // instant it's clicked, same as it always has in stacked layout. Turning
+    // it on restores the pre-existing wizard behavior of waiting for an
+    // explicit Continue click on every question type, same as checkbox
+    // already requires (checkbox always defers in wizard mode regardless of
+    // this setting - see buildCard()). Stacked layout ignores this entirely.
+    this.requireChoiceContinue = root.dataset.requireChoiceContinue === '1';
     // Every language edition of this form the visitor may switch the tool
     // to, built server-side (class-ryv-widget.php's get_language_editions()).
     // Empty for a form with no linked translation, a single-language site,
@@ -82,6 +92,12 @@ export class RYVDecisionEngine {
     this.answers = new Map(); // node id -> string[] (radio/checkbox values) | string (text/textarea)
     this.renderedOrder = []; // ids (real node ids, or the sentinel ids above) in on-screen order
     this.cardElements = new Map(); // id -> DOM element
+    // Real (cardElements-having) node id -> the wizard-mode leading markup
+    // nodes merged onto its card when first built (see renderFrom()) - kept
+    // so a rebuild of that same card (onAnswerChange()) or a revisit
+    // (goBack()/goToStep()) can re-show the same merged content instead of
+    // silently dropping it.
+    this.leadingMarkupByNode = new Map();
   }
 
   /**
@@ -127,6 +143,15 @@ export class RYVDecisionEngine {
 
   mount() {
     this.root.classList.add('ryv-app-wrapper');
+
+    // Small "Selected State: X" badge - see updateStateBadge(). Mounted
+    // first, above the step indicator/sidebar and the question list, and
+    // stays empty/hidden until the visitor actually answers the form's
+    // state-picker node (this.trueEntryNode, set once loadForm() fetches the
+    // graph).
+    this.stateBadgeEl = renderer.renderStateBadge();
+    this.root.appendChild(this.stateBadgeEl);
+
     if (this.stepMode === 'counter') {
       this.stepEl = renderer.renderStepIndicator(this.labels);
       this.root.appendChild(this.stepEl);
@@ -144,6 +169,7 @@ export class RYVDecisionEngine {
         slot.appendChild(this.stepSidebarEl);
       }
     }
+
     this.list = renderer.createList();
     this.root.appendChild(this.list);
     if (this.wizardMode) {
@@ -457,16 +483,43 @@ export class RYVDecisionEngine {
       return;
     }
 
+    // Same ordering note as goBack(): read before truncateFrom() deletes it,
+    // then restore it after - nothing else re-populates this map for a card
+    // rebuilt here, so a later revisit/answer-change on this same node would
+    // otherwise silently lose the merged content once.
+    const leadingMarkup = this.leadingMarkupByNode.get(nodeId) || [];
     this.truncateFrom(index);
+    this.leadingMarkupByNode.set(nodeId, leadingMarkup);
     const node = this.nodes[nodeId];
     if (!node) return;
-    this.appendCard(nodeId, node.hidden ? null : this.buildCard(nodeId, node, false), true);
+    this.appendCard(nodeId, node.hidden ? null : this.buildCard(nodeId, node, false, leadingMarkup), true);
   }
 
   /** Dispatches to whichever step display is active (or neither). */
   updateSteps() {
     if (this.stepMode === 'counter') this.updateStepIndicator();
     else if (this.stepMode === 'sidebar') this.updateStepSidebar();
+  }
+
+  /**
+   * Shows/hides the "Selected State: X" badge based on the visitor's answer
+   * to the form's actual state-picker node (`this.trueEntryNode` - the flat
+   * DAG's `select_state`-shaped entry node, see CLAUDE.md; not
+   * `this.entryNode`, which on a state-page placement skips the picker
+   * entirely via `entryNodeOverride` and so is never answered at all - the
+   * badge correctly stays hidden there, since there's no picker to reflect).
+   * Called everywhere `updateSteps()` is, so it stays in sync with every
+   * card mutation (new answer, truncation on edit, restart, language switch).
+   */
+  updateStateBadge() {
+    if (!this.stateBadgeEl) return;
+
+    const stateNode = this.nodes[this.trueEntryNode];
+    const answer = stateNode ? this.answers.get(this.trueEntryNode) : null;
+    const value = Array.isArray(answer) ? answer[0] : null;
+    const option = value ? (stateNode.options || []).find((o) => o.value === value) : null;
+
+    renderer.updateStateBadge(this.stateBadgeEl, option ? option.label : null, this.labels);
   }
 
   /**
@@ -542,10 +595,18 @@ export class RYVDecisionEngine {
     if (index < 0) return;
 
     const nodeId = this.renderedOrder[index];
+    // Read before truncateFrom(), which deletes this same id's entry (it's
+    // part of the range being removed, `index` inclusive) - reading after
+    // would always see it already gone.
+    const leadingMarkup = this.leadingMarkupByNode.get(nodeId) || [];
     this.truncateFrom(index);
+    // Restore it: nothing else re-populates this map for a card rebuilt
+    // here, so a later revisit/answer-change on this same node would
+    // otherwise silently lose the merged content.
+    this.leadingMarkupByNode.set(nodeId, leadingMarkup);
     const node = this.nodes[nodeId];
     if (!node) return;
-    this.appendCard(nodeId, node.hidden ? null : this.buildCard(nodeId, node, false), true);
+    this.appendCard(nodeId, node.hidden ? null : this.buildCard(nodeId, node, false, leadingMarkup), true);
   }
 
   /**
@@ -559,6 +620,14 @@ export class RYVDecisionEngine {
     // blocked, in NodeEditor.js) - without this guard, a cyclic graph would
     // spin this loop forever and hang the visitor's tab.
     const visited = new Set();
+    // Wizard layout: a visible markup node with somewhere to go no longer
+    // gets its own card gated behind a Continue click (see the branch
+    // below) - its content instead rides along onto whichever real card
+    // follows, rendered together in one card via buildCard()'s
+    // `leadingMarkup` param / renderer.js's prependLeadingContent().
+    // Consecutive markup nodes accumulate here and are flushed together, in
+    // document order, onto the next real card.
+    let leadingMarkup = [];
 
     while (current) {
       if (visited.has(current)) {
@@ -574,19 +643,28 @@ export class RYVDecisionEngine {
         return;
       }
 
+      // `node.hidden` markup already skips its own card unconditionally
+      // (via the ternary below) and keeps routing through transparently -
+      // this only intercepts markup that WOULD otherwise have gotten its
+      // own Continue-gated card.
+      if (this.wizardMode && node.type === 'markup' && node.next_node && !node.hidden) {
+        leadingMarkup.push(node);
+        this.appendCard(current, null, animate);
+        current = node.next_node;
+        continue;
+      }
+
       const next = this.computeNext(current, node);
-      // Terminal-ness is about whether the *graph* dead-ends here
-      // (`node.next_node` unset), not about whether `next` itself is
-      // available yet - in wizard mode a markup node with a `next_node` set
-      // still gets `next === null` from computeNext() (deferred until its
-      // own Continue click, see below), and that must not be mistaken for
-      // "Start Over" terminal.
       const isTerminal = !node.next_node && (node.type === 'markup' || node.type === 'unsupported');
       // `node.hidden` (see RYV_YAML_Parser's "visible_and_invisible" case)
       // still routes through normally - it's just never given a card, so a
-      // hidden markup node's own next_node keeps the chain moving
-      // transparently instead of dead-ending the flow.
-      this.appendCard(current, node.hidden ? null : this.buildCard(current, node, isTerminal), animate);
+      // hidden node's own next_node keeps the chain moving transparently
+      // instead of dead-ending the flow.
+      if (!node.hidden) {
+        this.leadingMarkupByNode.set(current, leadingMarkup);
+      }
+      this.appendCard(current, node.hidden ? null : this.buildCard(current, node, isTerminal, leadingMarkup), animate);
+      leadingMarkup = [];
 
       if (!next) return;
       current = next;
@@ -599,19 +677,12 @@ export class RYVDecisionEngine {
    * or is still awaiting user input.
    */
   computeNext(nodeId, node) {
-    // Wizard layout: a markup node with somewhere to go still stops here and
-    // waits for its own Continue click (onMarkupContinue()), same as every
-    // other node type in this mode - otherwise renderFrom()'s synchronous
-    // walk would build this card, wizard-hide it, and move straight to
-    // next_node's card in one pass, and the visitor would never see it
-    // painted at all. `unsupported` nodes have no Continue affordance
-    // (renderUnsupportedCard never renders one), so they still auto-advance.
+    // Wizard layout no longer defers a visible markup node with somewhere
+    // to go - renderFrom() intercepts that case before ever calling this
+    // (see its `leadingMarkup` branch), so a markup node reaching here is
+    // always either hidden or terminal, both of which auto-advance/dead-end
+    // the same way in every layout.
     if (node.type === 'markup') {
-      // `node.hidden` nodes never get a card at all (see renderFrom()), so
-      // there's no Continue button to click - deferring here would dead-end
-      // the visitor with no way to move on. Only defer a node that's
-      // actually going to be shown.
-      if (this.wizardMode && node.next_node && !node.hidden) return null;
       return node.next_node || null;
     }
     if (node.type === 'unsupported') {
@@ -640,7 +711,14 @@ export class RYVDecisionEngine {
     return chosen ? chosen.next_node || null : null;
   }
 
-  buildCard(nodeId, node, isTerminal) {
+  /**
+   * @param {object[]} leadingMarkup Visible markup nodes (wizard mode only -
+   *   see renderFrom()) that led into this one without their own
+   *   Continue-gated card; their content is prepended onto this card
+   *   instead, via renderer.js's prependLeadingContent(). Empty for stacked
+   *   layout, or when nothing preceded this node.
+   */
+  buildCard(nodeId, node, isTerminal, leadingMarkup = []) {
     switch (node.type) {
       case 'radio':
       case 'checkbox':
@@ -651,8 +729,13 @@ export class RYVDecisionEngine {
           nodeId,
           this.labels,
           this.nodes,
-          this.wizardMode,
-          this.icons
+          // Checkbox (multi-select) always defers in wizard mode - a single
+          // click never fully answers it. A single-choice node only defers
+          // when the widget's "Require Continue Button for Single-Choice
+          // Questions" setting is on; by default it auto-advances instead.
+          this.wizardMode && (node.type === 'checkbox' || this.requireChoiceContinue),
+          this.icons,
+          leadingMarkup
         );
       case 'text':
       case 'textarea':
@@ -662,7 +745,8 @@ export class RYVDecisionEngine {
           (value) => this.onAnswerChange(nodeId, value),
           this.labels,
           this.wizardMode,
-          this.icons
+          this.icons,
+          leadingMarkup
         );
       case 'lead_capture':
         return renderer.renderLeadCaptureCard(
@@ -671,7 +755,8 @@ export class RYVDecisionEngine {
           (values) => this.onLeadSubmit(nodeId, values),
           () => this.onLeadContinue(nodeId),
           this.labels,
-          this.icons
+          this.icons,
+          leadingMarkup
         );
       case 'markup':
         return renderer.renderMarkupCard(
@@ -681,7 +766,8 @@ export class RYVDecisionEngine {
           this.labels,
           this.wizardMode && !isTerminal,
           () => this.onMarkupContinue(nodeId),
-          this.icons
+          this.icons,
+          leadingMarkup
         );
       default:
         return renderer.renderUnsupportedCard(
@@ -689,7 +775,8 @@ export class RYVDecisionEngine {
           isTerminal && this.showStartOver,
           () => this.restart(),
           this.labels,
-          this.icons
+          this.icons,
+          leadingMarkup
         );
     }
   }
@@ -702,12 +789,20 @@ export class RYVDecisionEngine {
       this.answers.set(nodeId, value);
     }
 
+    // Same ordering note as goBack()/goToStep(): read before truncateFrom()
+    // deletes this same id's entry (it's part of the range being removed).
+    const leadingMarkup = this.leadingMarkupByNode.get(nodeId) || [];
     this.truncateFrom(this.indexOf(nodeId));
+    // Restore it: truncateFrom() just deleted it, and unlike renderFrom()'s
+    // own walk, nothing else re-populates this map for a card rebuilt here -
+    // without this, a later goBack()/goToStep() back to this same node (or
+    // another answer change on it) would silently lose the merged content.
+    this.leadingMarkupByNode.set(nodeId, leadingMarkup);
 
     const node = this.nodes[nodeId];
     const next = this.computeNext(nodeId, node);
     const isTerminal = !next && (node.type === 'markup' || node.type === 'unsupported');
-    this.appendCard(nodeId, node.hidden ? null : this.buildCard(nodeId, node, isTerminal), false);
+    this.appendCard(nodeId, node.hidden ? null : this.buildCard(nodeId, node, isTerminal, leadingMarkup), false);
 
     if (next) this.renderFrom(next, true);
     this.logProgress();
@@ -770,11 +865,13 @@ export class RYVDecisionEngine {
     // cardElements/the DOM, since there's nothing to remove later either.
     if (!element) {
       this.updateSteps();
+      this.updateStateBadge();
       return;
     }
     this.cardElements.set(id, element);
     renderer.appendCard(this.list, element, animate);
     this.updateSteps();
+    this.updateStateBadge();
     this.updateWizardVisibility();
     this.positionBackButton();
     this.positionLanguageSwitch();
@@ -792,8 +889,10 @@ export class RYVDecisionEngine {
       const element = this.cardElements.get(id);
       if (element && element.parentNode) element.parentNode.removeChild(element);
       this.cardElements.delete(id);
+      this.leadingMarkupByNode.delete(id);
     });
     this.updateSteps();
+    this.updateStateBadge();
     this.updateWizardVisibility();
     this.positionBackButton();
     this.positionLanguageSwitch();

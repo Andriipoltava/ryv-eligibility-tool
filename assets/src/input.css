@@ -85,6 +85,34 @@
   }
 
   /*
+   * "Selected State: X" badge above the question list - engine.js's
+   * updateStateBadge() only ever shows it once the visitor has answered the
+   * form's own state-picker node, using its `[hidden]` attribute (not an
+   * :empty rule like .ryv-step-indicator above) since renderer.js's
+   * renderStateBadge() starts it out hidden rather than empty.
+   *
+   * Deliberately NOT `@apply ryv-text-sm` (a rem-based Tailwind utility):
+   * confirmed live that this site's theme sets the root `<html>` font-size
+   * to 10px (a common rem-scaling reset), so `0.875rem` computed to a
+   * barely-visible 8.75px instead of the intended ~14px - every other
+   * small/inline text in this stylesheet (.ryv-lang-switch-btn,
+   * .ryv-back-btn) avoids this by never setting a rem/Tailwind font-size at
+   * all and just inheriting the ambient size instead. `0.85em` here does
+   * the same thing explicitly: relative to *inherited* font-size, not the
+   * page's root, so it renders correctly regardless of what a host theme
+   * sets `<html>`'s font-size to.
+   */
+  .ryv-state-badge {
+    @apply ryv-font-semibold;
+    font-size: 0.85em;
+    color: var(--ryv-state-badge-color, var(--ryv-primary-color, #002a41));
+    background-color: var(--ryv-state-badge-bg, transparent);
+    border-radius: var(--ryv-state-badge-border-radius, var(--ryv-radius, 0));
+    padding: var(--ryv-state-badge-padding, 0);
+    margin-bottom: var(--ryv-state-badge-margin-bottom, 0.75rem);
+  }
+
+  /*
    * The Elementor widget's "Named step sidebar" step_mode (see
    * class-ryv-widget.php's register_step_indicator_controls()) - a
    * two-column grid holding the header title/description + step checklist

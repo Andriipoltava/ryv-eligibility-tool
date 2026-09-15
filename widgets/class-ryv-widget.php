@@ -507,7 +507,23 @@ class RYV_Widget extends \Elementor\Widget_Base {
 					'stacked' => __( 'Stacked (all questions, growing list)', 'ryv-eligibility-tool' ),
 					'wizard'  => __( 'One question at a time', 'ryv-eligibility-tool' ),
 				),
-				'description' => __( 'Stacked keeps every answered question visible and advances instantly on click (today\'s behavior). "One question at a time" shows only the current question and always requires an explicit Continue click to advance, for every question type.', 'ryv-eligibility-tool' ),
+				'description' => __( 'Stacked keeps every answered question visible and advances instantly on click (today\'s behavior). "One question at a time" shows only the current question - a single-choice question (radio/dropdown/buttons, including the state picker) still advances instantly on click by default; see "Require Continue Button for Single-Choice Questions" below to change that. A checkbox (multi-select) question always waits for an explicit Continue click either way, since one click never fully answers it.', 'ryv-eligibility-tool' ),
+			)
+		);
+
+		$this->add_control(
+			'require_choice_continue',
+			array(
+				'label'        => __( 'Require Continue Button for Single-Choice Questions', 'ryv-eligibility-tool' ),
+				'type'         => \Elementor\Controls_Manager::SWITCHER,
+				'label_on'     => __( 'Yes', 'ryv-eligibility-tool' ),
+				'label_off'    => __( 'No', 'ryv-eligibility-tool' ),
+				'return_value' => 'yes',
+				'default'      => '',
+				'condition'    => array(
+					'question_layout' => 'wizard',
+				),
+				'description'  => __( 'Only applies to "One question at a time" layout. Off (default): picking a radio/dropdown/buttons option - including the state picker - advances immediately, same as Stacked layout always has. On: restores the earlier wizard behavior of waiting for an explicit Continue click on every question type, including single-choice ones.', 'ryv-eligibility-tool' ),
 			)
 		);
 
@@ -2576,6 +2592,7 @@ class RYV_Widget extends \Elementor\Widget_Base {
 		$step_mode       = in_array( $step_mode, array( 'counter', 'sidebar' ), true ) ? $step_mode : 'none';
 		$total_steps     = absint( $this->get_settings_for_display( 'total_steps' ) );
 		$question_layout = 'wizard' === $this->get_settings_for_display( 'question_layout' ) ? 'wizard' : 'stacked';
+		$require_choice_continue = 'yes' === $this->get_settings_for_display( 'require_choice_continue' );
 
 		// The "Named step sidebar" mode needs a two-column layout (header +
 		// step checklist on the left, the questions on the right) - the
@@ -2593,7 +2610,7 @@ class RYV_Widget extends \Elementor\Widget_Base {
 		}
 
 		printf(
-			'<div class="ryv-app-wrapper" data-form-id="%d" data-show-start-over="%d" data-labels="%s" data-icons="%s" data-entry-node="%s" data-step-mode="%s" data-total-steps="%d" data-question-layout="%s" data-language-editions="%s"></div>',
+			'<div class="ryv-app-wrapper" data-form-id="%d" data-show-start-over="%d" data-labels="%s" data-icons="%s" data-entry-node="%s" data-step-mode="%s" data-total-steps="%d" data-question-layout="%s" data-require-choice-continue="%d" data-language-editions="%s"></div>',
 			absint( $form_id ),
 			$show_start_over ? 1 : 0,
 			esc_attr( wp_json_encode( $this->get_label_overrides( absint( $form_id ) ) ) ),
@@ -2602,6 +2619,7 @@ class RYV_Widget extends \Elementor\Widget_Base {
 			esc_attr( $step_mode ),
 			$total_steps,
 			esc_attr( $question_layout ),
+			$require_choice_continue ? 1 : 0,
 			esc_attr( wp_json_encode( $this->get_language_editions( absint( $form_id ), $state_slug ) ) )
 		);
 
