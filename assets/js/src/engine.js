@@ -1,8 +1,8 @@
 // See the matching comment in ../decision-engine.js - these query strings
 // are the only thing cache-busting these nested imports; bump them with
 // every RYV_VERSION change.
-import { fetchForm, logSubmission, submitLead } from './api-client.js?ver=0.8.63';
-import * as renderer from './renderer.js?ver=0.8.63';
+import { fetchForm, logSubmission, submitLead } from './api-client.js?ver=0.8.65';
+import * as renderer from './renderer.js?ver=0.8.65';
 
 const LOADING_CARD_ID = '__loading__';
 const ERROR_CARD_ID = '__error__';
@@ -488,8 +488,14 @@ export class RYVDecisionEngine {
     // rebuilt here, so a later revisit/answer-change on this same node would
     // otherwise silently lose the merged content once.
     const leadingMarkup = this.leadingMarkupByNode.get(nodeId) || [];
+    // truncateFrom() now also clears the cached answer for every card it
+    // removes, nodeId's own included (see its own docblock) - read it first
+    // and restore it after, so jumping back to a step still pre-fills what
+    // the visitor answered there, same as before.
+    const previousAnswer = this.answers.get(nodeId);
     this.truncateFrom(index);
     this.leadingMarkupByNode.set(nodeId, leadingMarkup);
+    if (previousAnswer !== undefined) this.answers.set(nodeId, previousAnswer);
     const node = this.nodes[nodeId];
     if (!node) return;
     this.appendCard(nodeId, node.hidden ? null : this.buildCard(nodeId, node, false, leadingMarkup), true);
@@ -510,9 +516,26 @@ export class RYVDecisionEngine {
    * badge correctly stays hidden there, since there's no picker to reflect).
    * Called everywhere `updateSteps()` is, so it stays in sync with every
    * card mutation (new answer, truncation on edit, restart, language switch).
+   *
+   * Suppressed while the state-picker card itself is the one currently on
+   * screen (last real card in `renderedOrder`) - showing "Selected State: X"
+   * right alongside the "What state do you live in?" picker is redundant at
+   * best and, worse, can visibly lag one step behind (e.g. after navigating
+   * back to the picker and switching states) since the badge would otherwise
+   * be reflecting whatever was last answered rather than what the visitor is
+   * looking at right now. It reappears as soon as they move past the picker.
    */
   updateStateBadge() {
     if (!this.stateBadgeEl) return;
+
+    let lastRealId = null;
+    this.renderedOrder.forEach((id) => {
+      if (this.cardElements.has(id)) lastRealId = id;
+    });
+    if (lastRealId === this.trueEntryNode) {
+      renderer.updateStateBadge(this.stateBadgeEl, null, this.labels);
+      return;
+    }
 
     const stateNode = this.nodes[this.trueEntryNode];
     const answer = stateNode ? this.answers.get(this.trueEntryNode) : null;
@@ -595,15 +618,17 @@ export class RYVDecisionEngine {
     if (index < 0) return;
 
     const nodeId = this.renderedOrder[index];
-    // Read before truncateFrom(), which deletes this same id's entry (it's
+    // Read before truncateFrom(), which deletes this same id's entries (it's
     // part of the range being removed, `index` inclusive) - reading after
-    // would always see it already gone.
+    // would always see them already gone.
     const leadingMarkup = this.leadingMarkupByNode.get(nodeId) || [];
+    const previousAnswer = this.answers.get(nodeId);
     this.truncateFrom(index);
-    // Restore it: nothing else re-populates this map for a card rebuilt
+    // Restore both: nothing else re-populates these for a card rebuilt
     // here, so a later revisit/answer-change on this same node would
-    // otherwise silently lose the merged content.
+    // otherwise silently lose the merged content and pre-filled answer.
     this.leadingMarkupByNode.set(nodeId, leadingMarkup);
+    if (previousAnswer !== undefined) this.answers.set(nodeId, previousAnswer);
     const node = this.nodes[nodeId];
     if (!node) return;
     this.appendCard(nodeId, node.hidden ? null : this.buildCard(nodeId, node, false, leadingMarkup), true);
@@ -782,22 +807,22 @@ export class RYVDecisionEngine {
   }
 
   onAnswerChange(nodeId, value) {
-    const isEmpty = Array.isArray(value) ? value.length === 0 : !value;
-    if (isEmpty) {
-      this.answers.delete(nodeId);
-    } else {
-      this.answers.set(nodeId, value);
-    }
+    const index = this.indexOf(nodeId);
 
     // Same ordering note as goBack()/goToStep(): read before truncateFrom()
     // deletes this same id's entry (it's part of the range being removed).
     const leadingMarkup = this.leadingMarkupByNode.get(nodeId) || [];
-    this.truncateFrom(this.indexOf(nodeId));
-    // Restore it: truncateFrom() just deleted it, and unlike renderFrom()'s
-    // own walk, nothing else re-populates this map for a card rebuilt here -
-    // without this, a later goBack()/goToStep() back to this same node (or
-    // another answer change on it) would silently lose the merged content.
+    // truncateFrom() now also forgets the cached answer for every card it
+    // removes - nodeId's old answer included, since index is inclusive -
+    // which is exactly what's wanted here (every downstream answer from a
+    // path the visitor is leaving becomes stale) but means nodeId's own new
+    // answer has to be applied *after*, not before, or truncateFrom() would
+    // immediately erase it.
+    this.truncateFrom(index);
     this.leadingMarkupByNode.set(nodeId, leadingMarkup);
+
+    const isEmpty = Array.isArray(value) ? value.length === 0 : !value;
+    if (!isEmpty) this.answers.set(nodeId, value);
 
     const node = this.nodes[nodeId];
     const next = this.computeNext(nodeId, node);
@@ -881,7 +906,23 @@ export class RYVDecisionEngine {
     return this.renderedOrder.indexOf(id);
   }
 
-  /** Remove every rendered card from `index` (inclusive) to the end. */
+  /**
+   * Remove every rendered card from `index` (inclusive) to the end, and
+   * forget their cached answers - so `this.answers` only ever holds answers
+   * for a node still on screen (or about to be, via `nodeId`/renderFrom()'s
+   * own walk), never a stale one left over from a path the visitor has since
+   * abandoned. Without this, re-truncating past a node twice (e.g. clicking
+   * "Back" repeatedly to the state picker, then picking a *different* state,
+   * then picking the original one again) would silently replay whatever
+   * answers were cached from the first visit instead of asking the visitor
+   * again, since neither pass alone was in a position to notice the other's
+   * now-orphaned cache entries.
+   *
+   * A caller that wants to keep pre-filling one specific node's answer after
+   * truncating past it (goBack()/goToStep(), re-showing exactly the node
+   * they truncated to) has to explicitly restore it afterward - same pattern
+   * already used here for `leadingMarkupByNode`.
+   */
   truncateFrom(index) {
     if (index < 0) return;
     const removed = this.renderedOrder.splice(index);
@@ -890,6 +931,7 @@ export class RYVDecisionEngine {
       if (element && element.parentNode) element.parentNode.removeChild(element);
       this.cardElements.delete(id);
       this.leadingMarkupByNode.delete(id);
+      this.answers.delete(id);
     });
     this.updateSteps();
     this.updateStateBadge();

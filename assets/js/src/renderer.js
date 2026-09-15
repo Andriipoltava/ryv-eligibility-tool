@@ -670,7 +670,16 @@ function renderSingleChoiceOptions(
         attrs: { type: 'radio', name: radioGroupName, value: option.value },
       });
       input.checked = option.value === selectedValue;
-      input.addEventListener('change', () => onSelect(option.value));
+      input.addEventListener('change', () => {
+        // Drop focus before the answer handler mutates the DOM (appends the
+        // next card) - otherwise mobile browsers' "scroll the focused
+        // control into view" kicks in against the *new*, taller document
+        // and jumps the page past the next question instead of settling
+        // near this one, especially with a long disclaimer/content block
+        // above the options pushing this input further down the page.
+        input.blur();
+        onSelect(option.value);
+      });
 
       const label = el('label', { className: 'ryv-radio-option' }, [input, el('span', { text: option.label })]);
       wrap.appendChild(label);
@@ -689,7 +698,8 @@ function renderSingleChoiceOptions(
       className: 'ryv-option-btn',
       text: option.label,
       attrs: { type: 'button', 'aria-pressed': isSelected ? 'true' : 'false' },
-      on: { click: () => onSelect(option.value) },
+      // See the radio-input case above for why blur() runs before onSelect.
+      on: { click: () => { btn.blur(); onSelect(option.value); } },
     });
     list.appendChild(btn);
   });
@@ -805,6 +815,13 @@ export function renderQuestionCard(
     buttons.set(option.value, btn);
 
     btn.addEventListener('click', () => {
+      // See renderSingleChoiceOptions()'s radio-input case for why: without
+      // this, mobile browsers scroll the still-focused button into view
+      // against the document *after* commit() appends the next card, which
+      // jumps the page past that card instead of settling near this one -
+      // worse the longer any content/disclaimer above the options pushed
+      // this button down the page to begin with.
+      btn.blur();
       if (isMulti) {
         const pressed = btn.getAttribute('aria-pressed') === 'true';
         btn.setAttribute('aria-pressed', pressed ? 'false' : 'true');
