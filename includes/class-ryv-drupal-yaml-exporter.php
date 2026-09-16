@@ -83,11 +83,20 @@ class RYV_Drupal_YAML_Exporter {
 	 * build_base_element().
 	 */
 	const HEURISTIC_FALLBACK_TYPE = array(
-		'radio'    => 'webform_buttons',
-		'checkbox' => 'checkboxes',
-		'text'     => 'textfield',
-		'textarea' => 'textarea',
-		'markup'   => 'processed_text',
+		'radio'         => 'webform_buttons',
+		'checkbox'      => 'checkboxes',
+		'text'          => 'textfield',
+		'textarea'      => 'textarea',
+		'markup'        => 'processed_text',
+		// No real Drupal element models a lead_capture node at all (see
+		// RYV_YAML_Parser::TYPE_MAP's matching entry) - this sentinel #type,
+		// plus the '#ryv_form_fields'/'#ryv_email_settings'/
+		// '#ryv_success_message' keys build_base_element() adds below, is
+		// what lets a form this plugin exports round-trip its lead-capture
+		// nodes back through this plugin's own importer, instead of the
+		// prior behavior of silently degrading to a bare processed_text
+		// node with every lead-capture field dropped.
+		'lead_capture'  => 'ryv_lead_capture',
 	);
 
 	/**
@@ -97,6 +106,15 @@ class RYV_Drupal_YAML_Exporter {
 	 * branch on `! empty( $nodes[$id]['options'] )`.
 	 */
 	const CHOICE_TYPES = array( 'radio', 'checkbox' );
+
+	/**
+	 * Drupal `#type`s that render a `radio` node as a native dropdown vs. a
+	 * button/radio list - used by build_base_element() to detect when a
+	 * node's current `display_style` (changed in the builder after import)
+	 * has drifted from the ORIGINAL `source_type` recorded at import time,
+	 * which would otherwise re-emit the stale Drupal type on export.
+	 */
+	const DROPDOWN_DRUPAL_TYPES = array( 'select' );
 
 	/**
 	 * Build the Drupal-shaped YAML export for one form's schema.
@@ -264,6 +282,27 @@ class RYV_Drupal_YAML_Exporter {
 
 		if ( ! empty( $source_type ) && 'unsupported' !== $source_type ) {
 			$drupal_type = $source_type;
+
+			// A builder edit can flip display_style AFTER import without
+			// ever touching source_type (nothing re-syncs it), so the
+			// original Drupal #type on record can silently go stale - e.g.
+			// a `select` (dropdown) source_type re-emitted verbatim after an
+			// admin switched the node to "buttons" in the builder, or vice
+			// versa. Re-derive the type family from the CURRENT
+			// display_style whenever the two disagree, same heuristic the
+			// no-source_type branch below already uses.
+			if ( 'radio' === $ryv_type ) {
+				$is_dropdown_now    = 'dropdown' === ( $node['display_style'] ?? '' );
+				$was_dropdown_type  = in_array( $drupal_type, self::DROPDOWN_DRUPAL_TYPES, true );
+
+				if ( $is_dropdown_now && ! $was_dropdown_type ) {
+					$drupal_type = 'select';
+					$warnings[]  = "Node '{$id}': recorded source_type ('{$source_type}') is a button/radio list, but display_style is now 'dropdown' - exported as 'select' instead to match the node's current setting.";
+				} elseif ( ! $is_dropdown_now && $was_dropdown_type ) {
+					$drupal_type = self::HEURISTIC_FALLBACK_TYPE['radio'];
+					$warnings[]  = "Node '{$id}': recorded source_type ('{$source_type}') is a dropdown, but display_style is now 'buttons' - exported as '{$drupal_type}' instead to match the node's current setting.";
+				}
+			}
 		} else {
 			$drupal_type = self::HEURISTIC_FALLBACK_TYPE[ $ryv_type ] ?? 'webform_markup';
 
@@ -271,13 +310,32 @@ class RYV_Drupal_YAML_Exporter {
 				$drupal_type = 'select';
 			}
 
-			$warnings[] = "Node '{$id}': no recorded source_type - guessed Drupal #type '{$drupal_type}'. This node was likely created directly in the builder rather than imported; review before relying on this file for a real Drupal import.";
+			if ( 'lead_capture' !== $ryv_type ) {
+				$warnings[] = "Node '{$id}': no recorded source_type - guessed Drupal #type '{$drupal_type}'. This node was likely created directly in the builder rather than imported; review before relying on this file for a real Drupal import.";
+			}
 		}
 
 		$def = array( '#type' => $drupal_type );
 
 		if ( ! empty( $node['title'] ) ) {
 			$def['#title'] = $node['title'];
+		}
+
+		if ( ! empty( $node['description'] ) ) {
+			$def['#description'] = $node['description'];
+		}
+
+		if ( ! empty( $node['step_name'] ) ) {
+			$def['#ryv_step_name'] = $node['step_name'];
+		}
+
+		if ( 'lead_capture' === $ryv_type ) {
+			$def['#ryv_form_fields']    = $node['form_fields'] ?? array();
+			$def['#ryv_email_settings'] = $node['email_settings'] ?? array();
+
+			if ( ! empty( $node['success_message'] ) ) {
+				$def['#ryv_success_message'] = $node['success_message'];
+			}
 		}
 
 		if ( ! empty( $node['options'] ) && in_array( $ryv_type, self::CHOICE_TYPES, true ) ) {
@@ -445,7 +503,13 @@ class RYV_Drupal_YAML_Exporter {
 			if ( ! empty( $defs_by_id[ $id ]['#states']['visible'] ) ) {
 				$defs_by_id[ $id ]['#states']['invisible'] = array();
 			} else {
-				$warnings[] = "Node '{$id}': marked hidden but has no reconstructable #states.visible condition to pair an invisible rule with - exported WITHOUT the hidden flag; it will render normally (not hidden) if this file is re-imported.";
+				// No real Drupal #states pairing to hang the flag off of -
+				// fall back to the same '#ryv_hidden' side channel
+				// RYV_YAML_Parser reads (see its build_node()), so the flag
+				// still survives a round-trip through this plugin's own
+				// importer even though a real Drupal site has no use for it.
+				$defs_by_id[ $id ]['#ryv_hidden'] = true;
+				$warnings[] = "Node '{$id}': marked hidden but has no reconstructable #states.visible condition to pair an invisible rule with - the hidden flag was preserved via a non-standard '#ryv_hidden' key (round-trips through this plugin's own importer, but a real Drupal site would ignore it and render this node normally).";
 			}
 		}
 	}

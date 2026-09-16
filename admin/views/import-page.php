@@ -114,6 +114,29 @@ if ( ! defined( 'ABSPATH' ) ) {
 				</div>
 			<?php endif; ?>
 
+			<?php if ( null !== ( $result['states'] ?? null ) ) : ?>
+				<div class="notice notice-info" style="margin-top: 0;">
+					<p>
+						<strong><?php esc_html_e( 'States linked:', 'ryv-eligibility-tool' ); ?></strong>
+						<?php
+						printf(
+							/* translators: 1: created count, 2: skipped (already existing) count */
+							esc_html__( '%1$d ryv_states post(s) created, %2$d already existed and were skipped.', 'ryv-eligibility-tool' ),
+							count( $result['states']['created'] ),
+							count( $result['states']['skipped'] )
+						);
+						?>
+					</p>
+					<?php if ( ! empty( $result['states']['errors'] ) ) : ?>
+						<ul style="list-style: disc; margin-left: 1.5em;">
+							<?php foreach ( $result['states']['errors'] as $error ) : ?>
+								<li><?php echo esc_html( $error ); ?></li>
+							<?php endforeach; ?>
+						</ul>
+					<?php endif; ?>
+				</div>
+			<?php endif; ?>
+
 			<?php if ( ! empty( $result['review'] ) ) : ?>
 				<div class="notice notice-warning" style="margin-top: 0;">
 					<p>
@@ -200,6 +223,27 @@ if ( ! defined( 'ABSPATH' ) ) {
 					<p class="description"><?php esc_html_e( 'Only required when the selected target form already has content - ignored when creating a new form.', 'ryv-eligibility-tool' ); ?></p>
 				</td>
 			</tr>
+			<?php if ( class_exists( 'RYV_States_Generator' ) ) : ?>
+				<tr>
+					<th scope="row"><?php esc_html_e( 'Link States', 'ryv-eligibility-tool' ); ?></th>
+					<td>
+						<label>
+							<input type="checkbox" name="ryv_generate_states" value="1" />
+							<?php esc_html_e( 'Also create/link a ryv_states post for every state in this form\'s picker node.', 'ryv-eligibility-tool' ); ?>
+						</label>
+						<p class="description">
+							<?php esc_html_e( 'Same as running "RYV States → Generate States" afterward - skips any state that already has a post, so it\'s safe to leave checked on a re-import.', 'ryv-eligibility-tool' ); ?>
+						</p>
+						<p>
+							<label for="ryv_generate_states_status"><?php esc_html_e( 'New state posts status:', 'ryv-eligibility-tool' ); ?></label>
+							<select name="ryv_generate_states_status" id="ryv_generate_states_status">
+								<option value="draft"><?php esc_html_e( 'Draft', 'ryv-eligibility-tool' ); ?></option>
+								<option value="publish"><?php esc_html_e( 'Publish', 'ryv-eligibility-tool' ); ?></option>
+							</select>
+						</p>
+					</td>
+				</tr>
+			<?php endif; ?>
 		</table>
 
 		<?php submit_button( __( 'Import', 'ryv-eligibility-tool' ), 'primary', 'ryv_import_submit' ); ?>

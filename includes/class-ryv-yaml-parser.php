@@ -69,6 +69,13 @@ class RYV_YAML_Parser {
 		'webform_markup' => 'markup',
 		'markup'         => 'markup',
 		'processed_text' => 'markup',
+
+		// Not a real Drupal element - RYV_Drupal_YAML_Exporter's own sentinel
+		// #type for a lead_capture node (which has no Drupal equivalent),
+		// recognized here so a form exported by this plugin and re-imported
+		// by this plugin round-trips its lead-capture nodes instead of
+		// silently degrading them - see build_node()'s '#ryv_*' handling.
+		'ryv_lead_capture' => 'lead_capture',
 	);
 
 	/**
@@ -663,6 +670,45 @@ class RYV_YAML_Parser {
 		// trusted-HTML boundary as title/content - only ever admin-authored.
 		if ( ! empty( $def['#help'] ) ) {
 			$node['help'] = (string) $def['#help'];
+		}
+
+		// Drupal's own #description - distinct from #help above (a tooltip)
+		// and from a markup node's #markup/#text body below. RYV's real
+		// exports never use it, but the builder's own "Description" field
+		// (NodeEditor.js) needs somewhere to round-trip through the exporter.
+		if ( ! empty( $def['#description'] ) && is_scalar( $def['#description'] ) ) {
+			$node['description'] = (string) $def['#description'];
+		}
+
+		// '#ryv_*' keys are never real Drupal properties - RYV_Drupal_YAML_Exporter
+		// writes them as a side channel for builder-only concepts Drupal has
+		// no model for at all (the wizard step-sidebar name, a node hidden
+		// with no reconstructable #states pairing) so a form this plugin
+		// exported and later re-imports through this same parser doesn't
+		// lose them, even though a real Drupal site would just ignore them.
+		if ( ! empty( $def['#ryv_step_name'] ) && is_scalar( $def['#ryv_step_name'] ) ) {
+			$node['step_name'] = (string) $def['#ryv_step_name'];
+		}
+
+		if ( ! empty( $def['#ryv_hidden'] ) ) {
+			$node['hidden'] = true;
+		}
+
+		// lead_capture has no Drupal element model at all - every field it
+		// carries (see NodeEditor.js's FormFieldsEditor.js) is written and
+		// read back exclusively through these '#ryv_*' keys.
+		if ( 'lead_capture' === $type ) {
+			if ( isset( $def['#ryv_form_fields'] ) && is_array( $def['#ryv_form_fields'] ) ) {
+				$node['form_fields'] = $def['#ryv_form_fields'];
+			}
+
+			if ( isset( $def['#ryv_email_settings'] ) && is_array( $def['#ryv_email_settings'] ) ) {
+				$node['email_settings'] = $def['#ryv_email_settings'];
+			}
+
+			if ( ! empty( $def['#ryv_success_message'] ) && is_scalar( $def['#ryv_success_message'] ) ) {
+				$node['success_message'] = (string) $def['#ryv_success_message'];
+			}
 		}
 
 		// Display-only elements (markup/processed_text) carry their body in

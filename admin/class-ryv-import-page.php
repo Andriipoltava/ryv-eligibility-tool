@@ -123,6 +123,18 @@ class RYV_Import_Page {
 
 			$health = RYV_Graph_Validator::analyze( $schema );
 
+			// Optional: create/link a `ryv_states` post for every state
+			// option in this form's picker node (same logic as the manual
+			// "RYV Forms → Generate States" tool - RYV_States_Generator is
+			// only loaded when ACF is active, and skips any state slug that
+			// already has a post, so this is safe to leave checked on a
+			// re-import into an already-generated form.
+			$states = null;
+			if ( ! empty( $_POST['ryv_generate_states'] ) && class_exists( 'RYV_States_Generator' ) ) {
+				$states_status = ( 'publish' === ( $_POST['ryv_generate_states_status'] ?? '' ) ) ? 'publish' : 'draft';
+				$states        = RYV_States_Generator::generate( $post_id, $states_status );
+			}
+
 			$this->store_result(
 				array(
 					'success'     => true,
@@ -134,6 +146,7 @@ class RYV_Import_Page {
 					'skipped'     => $result['skipped'],
 					'review'      => $review,
 					'health'      => $health,
+					'states'      => $states,
 				)
 			);
 		} catch ( \Throwable $e ) {
