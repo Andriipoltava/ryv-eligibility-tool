@@ -186,7 +186,8 @@ class RYV_States_Sync {
 			wp_send_json_error( 'Invalid state post.' );
 		}
 
-		$form_id = (int) get_field( 'ryv_form_connection', $post_id );
+		$form_id    = (int) get_field( 'ryv_form_connection', $post_id );
+		$state_slug = get_field( 'ryv_state_slug', $post_id );
 
 		if ( ! $form_id ) {
 			wp_send_json_error( 'This state has no connected form yet.' );
@@ -202,7 +203,8 @@ class RYV_States_Sync {
 		$schema = RYV_CPT::get_schema( $form_id );
 		$nodes  = &$schema['nodes'];
 
-		$resolved_id = self::resolve_row_node_id( $nodes, $schema, $typed_id, $original_id );
+		$default_group = $state_slug ? 'state_' . sanitize_title( $state_slug ) : '';
+		$resolved_id    = self::resolve_row_node_id( $nodes, $schema, $typed_id, $original_id, $default_group );
 
 		if ( null === $resolved_id ) {
 			wp_send_json_error( 'Couldn\'t save "' . $typed_id . '" - it may already be used by another question, or the question this row was loaded from no longer exists. Pick a different id and try again.' );
@@ -239,12 +241,22 @@ class RYV_States_Sync {
 	 * @param string $typed_id    The Node ID field's current value.
 	 * @param string $original_id The id this row was loaded with (empty for
 	 *                            a row that was never saved before).
+	 * @param string $default_group Group to stamp on a brand-new node only
+	 *                            (e.g. "state_vermont") - matches this
+	 *                            state's own existing nodes' naming
+	 *                            convention, since the States screen has no
+	 *                            Group field of its own to set one from.
+	 *                            Without this, a node created here had no
+	 *                            group at all and fell into the Forms
+	 *                            builder's catch-all "General" bucket
+	 *                            instead of sitting with the rest of its
+	 *                            state - confirmed live.
 	 * @return string|null The resolved node id to write fields onto, or null
 	 *                      if this row should be skipped entirely (empty id,
 	 *                      or a create/rename that would collide with an
 	 *                      unrelated existing node).
 	 */
-	private static function resolve_row_node_id( array &$nodes, array &$schema, string $typed_id, string $original_id ): ?string {
+	private static function resolve_row_node_id( array &$nodes, array &$schema, string $typed_id, string $original_id, string $default_group = '' ): ?string {
 		if ( '' === $typed_id ) {
 			return null;
 		}
@@ -259,6 +271,9 @@ class RYV_States_Sync {
 				return null;
 			}
 			$nodes[ $typed_id ] = array();
+			if ( '' !== $default_group ) {
+				$nodes[ $typed_id ]['group'] = $default_group;
+			}
 			return $typed_id;
 		}
 
@@ -581,11 +596,13 @@ class RYV_States_Sync {
 			unset( $nodes[ $removed_id ] );
 		}
 
+		$default_group = 'state_' . sanitize_title( $state_slug );
+
 		foreach ( $rows as $row ) {
 			$typed_id    = trim( $row['node_id'] ?? '' );
 			$original_id = trim( $row['node_original_id'] ?? '' );
 
-			$node_id = self::resolve_row_node_id( $nodes, $schema, $typed_id, $original_id );
+			$node_id = self::resolve_row_node_id( $nodes, $schema, $typed_id, $original_id, $default_group );
 
 			if ( null === $node_id ) {
 				continue;
@@ -594,6 +611,19 @@ class RYV_States_Sync {
 			// Update scalar fields.
 			$nodes[ $node_id ]['type']  = $row['node_type'] ?? $nodes[ $node_id ]['type'];
 			$nodes[ $node_id ]['title'] = $row['node_title'] ?? '';
+
+			// Choice-only fields (options, display_style) and non-choice-only
+			// fields (next_node) are gated on the row's own current type, not
+			// just written unconditionally - ACF's conditional_logic only
+			// hides the *inapplicable* field group in the UI, it doesn't stop
+			// a value already sitting in that hidden group from being
+			// submitted and written. Without this gate, switching a node's
+			// Type back and forth (or a stray edit while the wrong type was
+			// selected) can leave e.g. a markup node with a leftover
+			// `options` entry whose `next_node` silently routes back to the
+			// node itself - confirmed live: exactly this turned
+			// `vermont_you_can_vote` into a one-node infinite loop.
+			$is_choice_type = in_array( $nodes[ $node_id ]['type'], array( 'radio', 'checkbox' ), true );
 
 			// Only set content/help/display_style if the value is non-empty
 			// or the key already exists — avoids polluting nodes with empty keys.
@@ -612,9 +642,13 @@ class RYV_States_Sync {
 				$nodes[ $node_id ]['step_name'] = $step_name;
 			}
 
-			$display_style = $row['node_display_style'] ?? '';
-			if ( '' !== $display_style || isset( $nodes[ $node_id ]['display_style'] ) ) {
-				$nodes[ $node_id ]['display_style'] = $display_style;
+			if ( 'radio' === $nodes[ $node_id ]['type'] ) {
+				$display_style = $row['node_display_style'] ?? '';
+				if ( '' !== $display_style || isset( $nodes[ $node_id ]['display_style'] ) ) {
+					$nodes[ $node_id ]['display_style'] = $display_style;
+				}
+			} elseif ( isset( $nodes[ $node_id ]['display_style'] ) ) {
+				unset( $nodes[ $node_id ]['display_style'] );
 			}
 
 			// Hidden: only set if truthy, otherwise remove the key entirely
@@ -625,8 +659,14 @@ class RYV_States_Sync {
 				unset( $nodes[ $node_id ]['hidden'] );
 			}
 
-			// Non-choice nodes: update next_node.
-			if ( isset( $row['node_next_node'] ) ) {
+			// Non-choice nodes: update next_node. Choice nodes route via their
+			// own options instead, so a leftover node-level next_node from
+			// before a type change is cleared rather than left dangling.
+			if ( $is_choice_type ) {
+				if ( isset( $nodes[ $node_id ]['next_node'] ) ) {
+					unset( $nodes[ $node_id ]['next_node'] );
+				}
+			} elseif ( isset( $row['node_next_node'] ) ) {
 				$next = trim( $row['node_next_node'] );
 				if ( '' !== $next ) {
 					$nodes[ $node_id ]['next_node'] = $next;
@@ -649,8 +689,8 @@ class RYV_States_Sync {
 				}
 			}
 
-			// Options sub-repeater.
-			if ( isset( $row['node_options'] ) && is_array( $row['node_options'] ) ) {
+			// Options sub-repeater - only choice types route via options.
+			if ( $is_choice_type && isset( $row['node_options'] ) && is_array( $row['node_options'] ) ) {
 				$new_options = array();
 				foreach ( $row['node_options'] as $opt_row ) {
 					$opt = array(
@@ -666,6 +706,8 @@ class RYV_States_Sync {
 					$new_options[] = $opt;
 				}
 				$nodes[ $node_id ]['options'] = $new_options;
+			} elseif ( ! $is_choice_type && isset( $nodes[ $node_id ]['options'] ) ) {
+				unset( $nodes[ $node_id ]['options'] );
 			}
 		}
 
