@@ -29,13 +29,55 @@ if ( ! defined( 'ABSPATH' ) ) {
 class RYV_States_Sync {
 
 	/**
+	 * Node ids the "Nodes" repeater held for a given state post *before*
+	 * this save, keyed by post_id - snapshotted at priority 5, before ACF's
+	 * own priority-10 handler overwrites the stored postmeta with the
+	 * submitted values. sync_nodes_to_schema() (priority 20) diffs against
+	 * this to find rows the admin deleted, so it can delete the
+	 * corresponding node from the schema too. See its own docblock for why
+	 * this can't be recomputed from graph reachability instead.
+	 *
+	 * @var array<int, array<string, true>>
+	 */
+	private $rows_before_save = array();
+
+	/**
 	 * Constructor.
 	 */
 	public function __construct() {
 		add_action( 'wp_ajax_ryv_load_state_nodes', array( $this, 'ajax_load_nodes' ) );
 		add_action( 'wp_ajax_ryv_save_node_id', array( $this, 'ajax_save_node_id' ) );
+		add_action( 'acf/save_post', array( $this, 'snapshot_rows_before_save' ), 5 );
 		add_action( 'acf/save_post', array( $this, 'sync_nodes_to_schema' ), 20 );
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_scripts' ) );
+	}
+
+	/**
+	 * Record which node ids the repeater held right before this save, while
+	 * `get_field()` still reads the last-saved postmeta (ACF's own save
+	 * runs on this same `acf/save_post` action, at the default priority 10 -
+	 * this fires first). Cheap no-op for any post this save isn't about.
+	 *
+	 * @param int $post_id The post ID being saved.
+	 */
+	public function snapshot_rows_before_save( $post_id ) {
+		if ( get_post_type( $post_id ) !== RYV_States_CPT::POST_TYPE ) {
+			return;
+		}
+
+		$rows = get_field( 'ryv_form_nodes', $post_id );
+		$ids  = array();
+
+		if ( is_array( $rows ) ) {
+			foreach ( $rows as $row ) {
+				$id = trim( $row['node_id'] ?? '' );
+				if ( '' !== $id ) {
+					$ids[ $id ] = true;
+				}
+			}
+		}
+
+		$this->rows_before_save[ $post_id ] = $ids;
 	}
 
 	/**
@@ -243,6 +285,51 @@ class RYV_States_Sync {
 		// form builder's own renameNode().
 		self::rename_node_id( $nodes, $schema, $original_id, $typed_id );
 		return $typed_id;
+	}
+
+	/**
+	 * Whether $target_id is still reachable or linked from anywhere in the
+	 * graph other than the nodes about to be removed alongside it - used to
+	 * decide whether a node dropped from a state's repeater is safe to
+	 * actually delete from the schema (see sync_nodes_to_schema()).
+	 *
+	 * @param array    $nodes             Nodes map (not yet mutated by this save's deletions).
+	 * @param array    $schema            Full schema, for entry_node.
+	 * @param string   $target_id         The node id being considered for deletion.
+	 * @param string[] $ids_being_removed Every id in this same deletion batch -
+	 *                                    a reference from one about-to-be-deleted
+	 *                                    node to another doesn't count as keeping
+	 *                                    $target_id alive.
+	 * @return bool
+	 */
+	private static function is_node_referenced( array $nodes, array $schema, string $target_id, array $ids_being_removed ): bool {
+		if ( ( $schema['entry_node'] ?? null ) === $target_id ) {
+			return true;
+		}
+
+		foreach ( $nodes as $id => $node ) {
+			if ( $id === $target_id || in_array( $id, $ids_being_removed, true ) ) {
+				continue;
+			}
+
+			if ( ( $node['next_node'] ?? null ) === $target_id ) {
+				return true;
+			}
+
+			if ( ! empty( $node['options'] ) && is_array( $node['options'] ) ) {
+				foreach ( $node['options'] as $option ) {
+					if ( ( $option['next_node'] ?? null ) === $target_id ) {
+						return true;
+					}
+				}
+			}
+
+			if ( ! empty( $node['reference_node_ids'] ) && is_array( $node['reference_node_ids'] ) && in_array( $target_id, $node['reference_node_ids'], true ) ) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	/**
@@ -456,6 +543,43 @@ class RYV_States_Sync {
 
 		$schema = RYV_CPT::get_schema( $form_id );
 		$nodes  = &$schema['nodes'];
+
+		// A row the admin deleted from this state's repeater (rather than one
+		// that was simply never loaded here) needs its node actually removed
+		// from the schema, not just left out of this save's $rows - otherwise
+		// it lingers as dead weight in the form forever, which reads as "I
+		// deleted this and it didn't go away." "Belonged to this state" here
+		// means "was a row in this repeater right before this save" -
+		// snapshot_rows_before_save()'s capture, not graph reachability: a
+		// node just created via "Add Node"/"Save Node ID" and never wired to
+		// anything is unreachable from the moment it exists, so a
+		// reachability-based definition would never even see it as
+		// belonging here, and deleting its row would silently leave it
+		// behind as an orphan instead of actually deleting it.
+		$known_before = array_keys( $this->rows_before_save[ $post_id ] ?? array() );
+
+		$kept_ids = array();
+		foreach ( $rows as $row ) {
+			$orig = trim( $row['node_original_id'] ?? '' );
+			if ( '' !== $orig ) {
+				$kept_ids[ $orig ] = true;
+			}
+		}
+
+		$removed_ids = array_diff( $known_before, array_keys( $kept_ids ) );
+
+		foreach ( $removed_ids as $removed_id ) {
+			// Only delete if nothing else in the graph still points at it -
+			// a node reachable from this state but *also* linked from
+			// somewhere else (another question's reference_node_ids, say)
+			// would otherwise be deleted out from under that other link,
+			// leaving it dangling. Leave those as orphans rather than risk
+			// breaking a live route; RYV_Graph_Validator will flag them.
+			if ( self::is_node_referenced( $nodes, $schema, $removed_id, $removed_ids ) ) {
+				continue;
+			}
+			unset( $nodes[ $removed_id ] );
+		}
 
 		foreach ( $rows as $row ) {
 			$typed_id    = trim( $row['node_id'] ?? '' );
