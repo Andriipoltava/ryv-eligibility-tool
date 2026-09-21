@@ -50,6 +50,48 @@ class RYV_States_Sync {
 		add_action( 'acf/save_post', array( $this, 'snapshot_rows_before_save' ), 5 );
 		add_action( 'acf/save_post', array( $this, 'sync_nodes_to_schema' ), 20 );
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_scripts' ) );
+		add_filter( 'acf/load_value/name=ryv_form_nodes', array( $this, 'filter_stale_node_rows' ), 20, 3 );
+	}
+
+	/**
+	 * Drop any repeater row whose node id no longer exists in the connected
+	 * form's schema - e.g. because it was deleted from RYV Forms directly,
+	 * not from this state's own repeater. Without this, a state's edit
+	 * screen keeps showing a "ghost" row for a question that's already gone,
+	 * confusingly forever (states-admin.js only re-syncs on a Form/State
+	 * field *change*, not on every normal page load - see its own docblock -
+	 * so a stale row otherwise never gets cleared on its own). This only
+	 * filters what's *read*; the stored postmeta itself is untouched until
+	 * the next real save, so nothing destructive happens just by opening
+	 * the screen.
+	 *
+	 * @param mixed $value   The repeater's rows as loaded from postmeta.
+	 * @param int   $post_id The state post being loaded.
+	 * @param array $field   The ACF field array (unused).
+	 * @return mixed
+	 */
+	public function filter_stale_node_rows( $value, $post_id, $field ) {
+		if ( ! is_array( $value ) || empty( $value ) ) {
+			return $value;
+		}
+
+		if ( get_post_type( $post_id ) !== RYV_States_CPT::POST_TYPE ) {
+			return $value;
+		}
+
+		$form_id = (int) get_field( 'ryv_form_connection', $post_id );
+
+		if ( ! $form_id ) {
+			return $value;
+		}
+
+		$schema = RYV_CPT::get_schema( $form_id );
+		$nodes  = $schema['nodes'] ?? array();
+
+		return array_values( array_filter( $value, function ( $row ) use ( $nodes ) {
+			$id = trim( $row['node_id'] ?? '' );
+			return '' !== $id && isset( $nodes[ $id ] );
+		} ) );
 	}
 
 	/**
@@ -583,14 +625,34 @@ class RYV_States_Sync {
 
 		$removed_ids = array_diff( $known_before, array_keys( $kept_ids ) );
 
+		// Every node this state's own picker option can currently reach -
+		// the state picker's own option next_node, and every node's own
+		// next_node/options/reference_node_ids chain from there - is this
+		// state's *internal* wiring, not an external keep-alive. A deleted
+		// node is almost always referenced by exactly one of these (the
+		// picker itself, if it was the state's first question, or the
+		// sibling question that led to it), so without excluding them the
+		// "still referenced, leave it" check below would refuse to delete
+		// almost anything - confirmed live: deleting a node wired in as
+		// the state's own first question never actually removed it,
+		// because the state picker's own Vermont option pointing at it
+		// counted as "still referenced." Only a reference from *outside*
+		// this set (another state's question sharing this node via
+		// reference_node_ids, the documented cross-state case) should
+		// still block deletion.
+		$internal_ids = self::collect_state_node_ids( $nodes, $schema['entry_node'] ?? null, $state_slug );
+		if ( ! empty( $schema['entry_node'] ) ) {
+			$internal_ids[] = $schema['entry_node'];
+		}
+		$exclude_from_reference_check = array_unique( array_merge( $removed_ids, $internal_ids ) );
+
 		foreach ( $removed_ids as $removed_id ) {
-			// Only delete if nothing else in the graph still points at it -
-			// a node reachable from this state but *also* linked from
-			// somewhere else (another question's reference_node_ids, say)
-			// would otherwise be deleted out from under that other link,
-			// leaving it dangling. Leave those as orphans rather than risk
-			// breaking a live route; RYV_Graph_Validator will flag them.
-			if ( self::is_node_referenced( $nodes, $schema, $removed_id, $removed_ids ) ) {
+			// Only delete if nothing *outside this state's own wiring*
+			// still points at it - see $exclude_from_reference_check above.
+			// Leave a genuinely cross-referenced node as an orphan rather
+			// than risk breaking a route owned elsewhere;
+			// RYV_Graph_Validator will flag it either way.
+			if ( self::is_node_referenced( $nodes, $schema, $removed_id, $exclude_from_reference_check ) ) {
 				continue;
 			}
 			unset( $nodes[ $removed_id ] );
