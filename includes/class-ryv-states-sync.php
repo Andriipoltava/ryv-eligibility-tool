@@ -249,6 +249,11 @@ class RYV_States_Sync {
 
 		return array(
 			'node_id'              => $node_id,
+			// Snapshot of the id this row was loaded with, so
+			// sync_nodes_to_schema() can tell a deliberate rename (original_id
+			// present but different from node_id) apart from a brand-new row
+			// added via "Add Node" (original_id never set).
+			'node_original_id'     => $node_id,
 			'node_type'            => $node['type'] ?? 'markup',
 			'node_title'           => $node['title'] ?? '',
 			'node_step_name'       => $node['step_name'] ?? '',
@@ -324,10 +329,43 @@ class RYV_States_Sync {
 		$nodes  = &$schema['nodes'];
 
 		foreach ( $rows as $row ) {
-			$node_id = $row['node_id'] ?? '';
+			$typed_id     = trim( $row['node_id'] ?? '' );
+			$original_id  = trim( $row['node_original_id'] ?? '' );
 
-			if ( empty( $node_id ) || ! isset( $nodes[ $node_id ] ) ) {
+			if ( '' === $typed_id ) {
 				continue;
+			}
+
+			if ( '' === $original_id ) {
+				// A row added via "Add Node" this session - never had an id
+				// before, so this is a brand-new question. Only create it if
+				// the typed id isn't already some other node's id (silently
+				// dropping instead of clobbering an unrelated node - the
+				// admin can just pick a different id and save again).
+				if ( isset( $nodes[ $typed_id ] ) ) {
+					continue;
+				}
+				$nodes[ $typed_id ] = array();
+				$node_id            = $typed_id;
+			} elseif ( ! isset( $nodes[ $original_id ] ) ) {
+				// The node this row was loaded from no longer exists (e.g.
+				// deleted elsewhere in the meantime) - nothing to attach to.
+				continue;
+			} elseif ( $original_id === $typed_id ) {
+				// Ordinary edit of an existing node's own fields.
+				$node_id = $original_id;
+			} elseif ( isset( $nodes[ $typed_id ] ) ) {
+				// Attempted rename onto an id already used by another node -
+				// unsafe to guess which one wins, so keep editing the
+				// original node under its original id instead of clobbering
+				// the other one.
+				$node_id = $original_id;
+			} else {
+				// Safe rename: move the node to its new id and rewrite every
+				// reference to the old one across the whole graph, the same
+				// as the form builder's own renameNode().
+				self::rename_node_id( $nodes, $schema, $original_id, $typed_id );
+				$node_id = $typed_id;
 			}
 
 			// Update scalar fields.
@@ -409,5 +447,52 @@ class RYV_States_Sync {
 		}
 
 		RYV_CPT::save_schema( $form_id, $schema );
+	}
+
+	/**
+	 * Move a node from $old_id to $new_id within $nodes and rewrite every
+	 * reference to $old_id elsewhere in the graph - entry_node, every node's
+	 * next_node, every option's next_node, and every reference_node_ids entry
+	 * - so a rename made from this screen never leaves a dangling link. Same
+	 * behavior as the admin builder SPA's own renameNode() (App.js).
+	 *
+	 * @param array $nodes  Nodes map, modified in place (already a reference
+	 *                      into $schema['nodes'] at the call site).
+	 * @param array $schema Full schema, modified in place for entry_node.
+	 * @param string $old_id Existing node id.
+	 * @param string $new_id New node id to rename to.
+	 */
+	private static function rename_node_id( array &$nodes, array &$schema, string $old_id, string $new_id ) {
+		$nodes[ $new_id ] = $nodes[ $old_id ];
+		unset( $nodes[ $old_id ] );
+
+		if ( ( $schema['entry_node'] ?? null ) === $old_id ) {
+			$schema['entry_node'] = $new_id;
+		}
+
+		foreach ( $nodes as &$node ) {
+			if ( ( $node['next_node'] ?? null ) === $old_id ) {
+				$node['next_node'] = $new_id;
+			}
+
+			if ( ! empty( $node['options'] ) && is_array( $node['options'] ) ) {
+				foreach ( $node['options'] as &$option ) {
+					if ( ( $option['next_node'] ?? null ) === $old_id ) {
+						$option['next_node'] = $new_id;
+					}
+				}
+				unset( $option );
+			}
+
+			if ( ! empty( $node['reference_node_ids'] ) && is_array( $node['reference_node_ids'] ) ) {
+				foreach ( $node['reference_node_ids'] as &$ref_id ) {
+					if ( $ref_id === $old_id ) {
+						$ref_id = $new_id;
+					}
+				}
+				unset( $ref_id );
+			}
+		}
+		unset( $node );
 	}
 }

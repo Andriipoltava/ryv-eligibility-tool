@@ -67,6 +67,8 @@ class RYV_States_ACF {
 		add_action( 'acf/init', array( $this, 'register_options_pages' ) );
 		add_filter( 'acf/load_field/name=ryv_state_slug', array( $this, 'populate_state_slug_choices' ) );
 		add_filter( 'acf/load_field/name=ryv_map_category', array( $this, 'populate_map_category_choices' ) );
+		add_filter( 'acf/load_field/key=field_ryv_node_next_node', array( $this, 'populate_next_node_choices' ) );
+		add_filter( 'acf/load_field/key=field_ryv_option_next_node', array( $this, 'populate_next_node_choices' ) );
 		add_action( 'after_setup_theme', array( $this, 'register_image_sizes' ) );
 	}
 
@@ -813,12 +815,25 @@ class RYV_States_ACF {
 					'min'          => 0,
 					'sub_fields'   => array(
 						array(
-							'key'      => 'field_ryv_node_id',
-							'label'    => 'Node ID',
-							'name'     => 'node_id',
-							'type'     => 'text',
-							'wrapper'  => array( 'width' => '30' ),
-							'readonly' => 1,
+							'key'          => 'field_ryv_node_id',
+							'label'        => 'Node ID',
+							'name'         => 'node_id',
+							'type'         => 'text',
+							'wrapper'      => array( 'width' => '30' ),
+							// Editable so "Add Node" can create a brand-new question
+							// directly from this screen - see
+							// RYV_States_Sync::sync_nodes_to_schema(), which keys off
+							// this value and field_ryv_node_original_id below to tell
+							// a genuinely new node apart from a rename of an existing
+							// one (and rewrites every reference on a safe rename, the
+							// same as the form builder's renameNode()).
+							'instructions' => 'Unique ID for this question. Letters, numbers, and underscores only. Leave the default (from RYV Forms) alone unless you mean to rename this exact question everywhere it\'s referenced.',
+						),
+						array(
+							'key'        => 'field_ryv_node_original_id',
+							'label'      => 'Original Node ID',
+							'name'       => 'node_original_id',
+							'type'       => 'hidden',
 						),
 						array(
 							'key'           => 'field_ryv_node_type',
@@ -933,10 +948,18 @@ class RYV_States_ACF {
 							),
 						),
 						array(
-							'key'     => 'field_ryv_node_next_node',
-							'label'   => 'Next Node',
-							'name'    => 'node_next_node',
-							'type'    => 'text',
+							'key'          => 'field_ryv_node_next_node',
+							'label'        => 'Next Node',
+							'name'         => 'node_next_node',
+							'type'         => 'select',
+							'ui'           => 1,
+							'allow_null'   => 1,
+							'choices'      => array(),
+							// Populated dynamically by populate_next_node_choices() from
+							// the connected form's own node list - same validated,
+							// typo-proof dropdown the RYV Forms builder uses, instead
+							// of a free-text field a visitor could route to a
+							// nonexistent id with no warning.
 							'instructions' => 'Node ID to advance to (for non-choice nodes).',
 							// Choice nodes route via their own options' next_node,
 							// not this one.
@@ -1025,7 +1048,10 @@ class RYV_States_ACF {
 									'key'          => 'field_ryv_option_next_node',
 									'label'        => 'Next Node',
 									'name'         => 'option_next_node',
-									'type'         => 'text',
+									'type'         => 'select',
+									'ui'           => 1,
+									'allow_null'   => 1,
+									'choices'      => array(),
 									'wrapper'      => array( 'width' => '40' ),
 									'instructions' => 'Node ID to route to when this option is selected.',
 								),
@@ -1299,6 +1325,56 @@ class RYV_States_ACF {
 
 		foreach ( RYV_US_States::MAP as $slug => $label ) {
 			$field['choices'][ $slug ] = $label;
+		}
+
+		return $field;
+	}
+
+	/**
+	 * Dynamically populate a "Next Node" select (both the node-level field and
+	 * the one inside the options sub-repeater) with every node id actually in
+	 * the connected form's schema - the same validated dropdown the RYV Forms
+	 * builder gives, so a question can only ever be routed to a node that
+	 * really exists. Runs on the normal post-edit page load and on ACF's own
+	 * AJAX row-add request (adding an Option or a new Node), so a freshly
+	 * added row gets real choices immediately rather than an empty list.
+	 *
+	 * @param array $field ACF field definition.
+	 * @return array
+	 */
+	public function populate_next_node_choices( array $field ): array {
+		$post_id = 0;
+
+		if ( ! empty( $_POST['post_id'] ) ) {
+			$post_id = absint( $_POST['post_id'] );
+		} elseif ( ! empty( $_GET['post'] ) ) {
+			$post_id = absint( $_GET['post'] );
+		} elseif ( function_exists( 'get_the_ID' ) && get_the_ID() ) {
+			$post_id = get_the_ID();
+		}
+
+		$field['choices'] = array( '' => '— End —' );
+
+		if ( ! $post_id ) {
+			return $field;
+		}
+
+		$form_id = (int) get_field( 'ryv_form_connection', $post_id );
+
+		if ( ! $form_id ) {
+			return $field;
+		}
+
+		$schema = RYV_CPT::get_schema( $form_id );
+
+		foreach ( ( $schema['nodes'] ?? array() ) as $node_id => $node ) {
+			$label = $node_id;
+
+			if ( ! empty( $node['title'] ) ) {
+				$label .= ' — ' . wp_strip_all_tags( $node['title'] );
+			}
+
+			$field['choices'][ $node_id ] = $label;
 		}
 
 		return $field;
