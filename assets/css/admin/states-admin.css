@@ -214,3 +214,36 @@
 .acf-field[data-key="field_ryv_partner_link_text"] {
 	display: none !important;
 }
+
+/*
+ * node_original_id is a bookkeeping field only (RYV_States_Sync uses it to
+ * tell a brand-new "Add Node" row apart from a rename of an existing node -
+ * see class-ryv-states-sync.php) - an admin never needs to see or touch it,
+ * but ACF's `hidden` field type still renders its label/wrapper row, not
+ * just the <input type="hidden">. Hide the whole row.
+ */
+.acf-field[data-key="field_ryv_node_original_id"] {
+	display: none !important;
+}
+
+/*
+ * "Save Node ID" button under the Node ID field (states-admin.js) - lets an
+ * admin commit just the id (create or rename) over AJAX so it's pickable in
+ * every Next Node dropdown on the page immediately, without saving/reloading
+ * the whole post first.
+ */
+.ryv-sa-save-id-row {
+	margin-top: 8px;
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.ryv-sa-save-id-msg {
+	font-size: 12px;
+	color: #646970;
+}
+
+.ryv-sa-save-id-msg.ryv-sa-save-id-error {
+	color: #b32d2e;
+}

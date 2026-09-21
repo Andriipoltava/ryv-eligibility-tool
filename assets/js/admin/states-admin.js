@@ -435,6 +435,8 @@
 			$row.data('ryv-enhanced', true);
 			$row.addClass('ryv-sa-row');
 
+			addSaveNodeIdButton($row, $idField);
+
 			var $summary = $('<button type="button" class="ryv-sa-row-summary"></button>');
 			var $idPill   = $('<code class="ryv-sa-row-id"></code>');
 			var $typeBadge = $('<span class="ryv-builder-node-type"></span>');
@@ -486,6 +488,123 @@
 			$summary.on('click', function () {
 				$row.toggleClass('ryv-sa-collapsed');
 			});
+		});
+	}
+
+	/**
+	 * Add a "Save Node ID" button under a top-level node row's Node ID
+	 * field. Clicking it saves *just this node's id* into the connected
+	 * form's schema over AJAX (creating it if it's a brand-new row, or
+	 * safely renaming it if the id changed - see
+	 * RYV_States_Sync::ajax_save_node_id()) and refreshes every Next Node
+	 * dropdown on the page from the response, so the id becomes pickable
+	 * immediately instead of only after the whole post is saved and the
+	 * page reloaded.
+	 *
+	 * @param {jQuery} $row     The top-level node row.
+	 * @param {jQuery} $idField The row's `[data-name="node_id"]` field wrapper.
+	 */
+	function addSaveNodeIdButton($row, $idField) {
+		var $input = $idField.find('input').first();
+		if (!$input.length || $idField.find('.ryv-sa-save-id-btn').length) {
+			return;
+		}
+
+		var $btn = $('<button type="button" class="button ryv-sa-save-id-btn">Save Node ID</button>');
+		var $msg = $('<span class="ryv-sa-save-id-msg" aria-live="polite"></span>');
+		$idField.append($('<div class="ryv-sa-save-id-row"></div>').append($btn, $msg));
+
+		$btn.on('click', function () {
+			var typedId = ($input.val() || '').trim();
+			var $origField = $row.children('.acf-fields').children('[data-name="node_original_id"]').first();
+			var $origInput = $origField.find('input').first();
+			var originalId = $origInput.length ? ($origInput.val() || '') : '';
+			var postId = $('#post_ID').val();
+
+			$msg.removeClass('ryv-sa-save-id-error');
+
+			if (!typedId) {
+				$msg.addClass('ryv-sa-save-id-error').text('Enter a Node ID first.');
+				return;
+			}
+			if (!postId) {
+				$msg.addClass('ryv-sa-save-id-error').text('Save this state as a draft first.');
+				return;
+			}
+
+			$btn.prop('disabled', true);
+			$msg.text('Saving…');
+
+			$.ajax({
+				url: ryvStatesAdmin.ajaxUrl,
+				method: 'POST',
+				data: {
+					action: 'ryv_save_node_id',
+					nonce: ryvStatesAdmin.saveNodeNonce,
+					post_id: postId,
+					node_id: typedId,
+					node_original_id: originalId,
+				},
+				success: function (response) {
+					$btn.prop('disabled', false);
+
+					if (!response.success) {
+						$msg.addClass('ryv-sa-save-id-error').text(response.data || 'Could not save that id.');
+						return;
+					}
+
+					if ($origInput.length) {
+						$origInput.val(response.data.node_id).trigger('change');
+					}
+
+					refreshNextNodeChoices(response.data.choices);
+					$msg.text('Saved - ready to pick as a Next Node.');
+				},
+				error: function () {
+					$btn.prop('disabled', false);
+					$msg.addClass('ryv-sa-save-id-error').text('Request failed - check your connection and try again.');
+				}
+			});
+		});
+	}
+
+	/**
+	 * Rebuild every "Next Node" select on the page (both the node-level
+	 * field and the one inside every node's Options sub-repeater, including
+	 * the hidden `.acf-clone` row templates so a row added *after* this
+	 * point also gets the fresh list) from a fresh `{id: label}` map,
+	 * preserving whatever each select currently has chosen.
+	 *
+	 * @param {object} choices `{id: label}` map, as returned by
+	 *                         RYV_States_Sync::ajax_save_node_id().
+	 */
+	function refreshNextNodeChoices(choices) {
+		if (!choices) {
+			return;
+		}
+
+		$('.acf-field[data-key="field_ryv_node_next_node"] select, .acf-field[data-key="field_ryv_option_next_node"] select').each(function () {
+			var $select    = $(this);
+			var currentVal = $select.val();
+			var hasCurrent = false;
+
+			$select.empty();
+
+			Object.keys(choices).forEach(function (id) {
+				if (id === currentVal) {
+					hasCurrent = true;
+				}
+				$select.append($('<option></option>').attr('value', id).text(choices[id]));
+			});
+
+			// A selection that isn't in the fresh list (stale after some
+			// other change) is kept rather than silently dropped - losing
+			// an admin's saved choice would be worse than one extra option.
+			if (currentVal && !hasCurrent) {
+				$select.prepend($('<option></option>').attr('value', currentVal).text(currentVal));
+			}
+
+			$select.val(currentVal || '').trigger('change');
 		});
 	}
 

@@ -33,6 +33,7 @@ class RYV_States_Sync {
 	 */
 	public function __construct() {
 		add_action( 'wp_ajax_ryv_load_state_nodes', array( $this, 'ajax_load_nodes' ) );
+		add_action( 'wp_ajax_ryv_save_node_id', array( $this, 'ajax_save_node_id' ) );
 		add_action( 'acf/save_post', array( $this, 'sync_nodes_to_schema' ), 20 );
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_scripts' ) );
 	}
@@ -70,8 +71,9 @@ class RYV_States_Sync {
 		);
 
 		wp_localize_script( 'ryv-states-admin', 'ryvStatesAdmin', array(
-			'ajaxUrl' => admin_url( 'admin-ajax.php' ),
-			'nonce'   => wp_create_nonce( 'ryv_load_state_nodes' ),
+			'ajaxUrl'       => admin_url( 'admin-ajax.php' ),
+			'nonce'         => wp_create_nonce( 'ryv_load_state_nodes' ),
+			'saveNodeNonce' => wp_create_nonce( 'ryv_save_node_id' ),
 		) );
 	}
 
@@ -114,6 +116,133 @@ class RYV_States_Sync {
 		}
 
 		wp_send_json_success( $result );
+	}
+
+	/**
+	 * AJAX: create (or safely rename) a single node's id in the connected
+	 * form's schema immediately, without waiting for the whole state post to
+	 * be saved - so a question added via "Add Node" becomes pickable in every
+	 * Next Node dropdown on the page right away (states-admin.js's "Save
+	 * Node ID" button), instead of only after a full page reload.
+	 *
+	 * Expects POST params: post_id (the ryv_states post), node_id,
+	 * node_original_id (may be empty for a brand-new row).
+	 * Returns the resolved node id plus the form's full up-to-date
+	 * `{id: label}` choice map, so the client can rebuild every Next Node
+	 * select on the page from one source of truth.
+	 */
+	public function ajax_save_node_id() {
+		check_ajax_referer( 'ryv_save_node_id', 'nonce' );
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( 'Insufficient permissions.', 403 );
+		}
+
+		$post_id = absint( $_POST['post_id'] ?? 0 );
+
+		if ( ! $post_id || get_post_type( $post_id ) !== RYV_States_CPT::POST_TYPE ) {
+			wp_send_json_error( 'Invalid state post.' );
+		}
+
+		$form_id = (int) get_field( 'ryv_form_connection', $post_id );
+
+		if ( ! $form_id ) {
+			wp_send_json_error( 'This state has no connected form yet.' );
+		}
+
+		$typed_id    = trim( sanitize_text_field( $_POST['node_id'] ?? '' ) );
+		$original_id = trim( sanitize_text_field( $_POST['node_original_id'] ?? '' ) );
+
+		if ( '' === $typed_id ) {
+			wp_send_json_error( 'Node ID can\'t be empty.' );
+		}
+
+		$schema = RYV_CPT::get_schema( $form_id );
+		$nodes  = &$schema['nodes'];
+
+		$resolved_id = self::resolve_row_node_id( $nodes, $schema, $typed_id, $original_id );
+
+		if ( null === $resolved_id ) {
+			wp_send_json_error( 'Couldn\'t save "' . $typed_id . '" - it may already be used by another question, or the question this row was loaded from no longer exists. Pick a different id and try again.' );
+		}
+
+		RYV_CPT::save_schema( $form_id, $schema );
+
+		$choices = array( '' => '— End —' );
+		foreach ( $nodes as $node_id => $node ) {
+			$label = $node_id;
+			if ( ! empty( $node['title'] ) ) {
+				$label .= ' — ' . wp_strip_all_tags( $node['title'] );
+			}
+			$choices[ $node_id ] = $label;
+		}
+
+		wp_send_json_success( array(
+			'node_id' => $resolved_id,
+			'choices' => $choices,
+		) );
+	}
+
+	/**
+	 * Resolve a repeater row's typed Node ID + its original id into the
+	 * actual key it should be saved under in $nodes, creating a brand-new
+	 * node or performing a safe rename (rewriting every reference) as
+	 * needed. Shared by sync_nodes_to_schema() (whole-post save) and
+	 * ajax_save_node_id() (single-node AJAX save), so both take the exact
+	 * same create/rename/collision decisions.
+	 *
+	 * @param array  $nodes       Nodes map, modified in place.
+	 * @param array  $schema      Full schema, modified in place (entry_node
+	 *                            on a rename).
+	 * @param string $typed_id    The Node ID field's current value.
+	 * @param string $original_id The id this row was loaded with (empty for
+	 *                            a row that was never saved before).
+	 * @return string|null The resolved node id to write fields onto, or null
+	 *                      if this row should be skipped entirely (empty id,
+	 *                      or a create/rename that would collide with an
+	 *                      unrelated existing node).
+	 */
+	private static function resolve_row_node_id( array &$nodes, array &$schema, string $typed_id, string $original_id ): ?string {
+		if ( '' === $typed_id ) {
+			return null;
+		}
+
+		if ( '' === $original_id ) {
+			// A row added via "Add Node" this session - never had an id
+			// before, so this is a brand-new question. Only create it if
+			// the typed id isn't already some other node's id (skip instead
+			// of clobbering an unrelated node - the admin can just pick a
+			// different id and save again).
+			if ( isset( $nodes[ $typed_id ] ) ) {
+				return null;
+			}
+			$nodes[ $typed_id ] = array();
+			return $typed_id;
+		}
+
+		if ( ! isset( $nodes[ $original_id ] ) ) {
+			// The node this row was loaded from no longer exists (e.g.
+			// deleted elsewhere in the meantime) - nothing to attach to.
+			return null;
+		}
+
+		if ( $original_id === $typed_id ) {
+			// Ordinary edit of an existing node's own fields.
+			return $original_id;
+		}
+
+		if ( isset( $nodes[ $typed_id ] ) ) {
+			// Attempted rename onto an id already used by another node -
+			// unsafe to guess which one wins, so keep editing the original
+			// node under its original id instead of clobbering the other one.
+			return null;
+		}
+
+		// Safe rename: move the node to its new id and rewrite every
+		// reference to the old one across the whole graph, the same as the
+		// form builder's own renameNode().
+		self::rename_node_id( $nodes, $schema, $original_id, $typed_id );
+		return $typed_id;
 	}
 
 	/**
@@ -329,43 +458,13 @@ class RYV_States_Sync {
 		$nodes  = &$schema['nodes'];
 
 		foreach ( $rows as $row ) {
-			$typed_id     = trim( $row['node_id'] ?? '' );
-			$original_id  = trim( $row['node_original_id'] ?? '' );
+			$typed_id    = trim( $row['node_id'] ?? '' );
+			$original_id = trim( $row['node_original_id'] ?? '' );
 
-			if ( '' === $typed_id ) {
-				continue;
-			}
+			$node_id = self::resolve_row_node_id( $nodes, $schema, $typed_id, $original_id );
 
-			if ( '' === $original_id ) {
-				// A row added via "Add Node" this session - never had an id
-				// before, so this is a brand-new question. Only create it if
-				// the typed id isn't already some other node's id (silently
-				// dropping instead of clobbering an unrelated node - the
-				// admin can just pick a different id and save again).
-				if ( isset( $nodes[ $typed_id ] ) ) {
-					continue;
-				}
-				$nodes[ $typed_id ] = array();
-				$node_id            = $typed_id;
-			} elseif ( ! isset( $nodes[ $original_id ] ) ) {
-				// The node this row was loaded from no longer exists (e.g.
-				// deleted elsewhere in the meantime) - nothing to attach to.
+			if ( null === $node_id ) {
 				continue;
-			} elseif ( $original_id === $typed_id ) {
-				// Ordinary edit of an existing node's own fields.
-				$node_id = $original_id;
-			} elseif ( isset( $nodes[ $typed_id ] ) ) {
-				// Attempted rename onto an id already used by another node -
-				// unsafe to guess which one wins, so keep editing the
-				// original node under its original id instead of clobbering
-				// the other one.
-				$node_id = $original_id;
-			} else {
-				// Safe rename: move the node to its new id and rewrite every
-				// reference to the old one across the whole graph, the same
-				// as the form builder's own renameNode().
-				self::rename_node_id( $nodes, $schema, $original_id, $typed_id );
-				$node_id = $typed_id;
 			}
 
 			// Update scalar fields.
