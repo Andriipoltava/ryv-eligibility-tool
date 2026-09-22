@@ -29,28 +29,114 @@ if ( ! defined( 'ABSPATH' ) ) {
 class RYV_States_Sync {
 
 	/**
-	 * Node ids the "Nodes" repeater held for a given state post *before*
-	 * this save, keyed by post_id - snapshotted at priority 5, before ACF's
-	 * own priority-10 handler overwrites the stored postmeta with the
-	 * submitted values. sync_nodes_to_schema() (priority 20) diffs against
-	 * this to find rows the admin deleted, so it can delete the
-	 * corresponding node from the schema too. See its own docblock for why
-	 * this can't be recomputed from graph reachability instead.
-	 *
-	 * @var array<int, array<string, true>>
-	 */
-	private $rows_before_save = array();
-
-	/**
 	 * Constructor.
 	 */
+	/**
+	 * The Nodes repeater's rows exactly as submitted in this request,
+	 * captured from raw $_POST before ACF's own save runs - keyed by
+	 * post_id. See capture_submitted_rows() for why sync_nodes_to_schema()
+	 * reads from this instead of get_field().
+	 *
+	 * @var array<int, array>
+	 */
+	private $submitted_rows = array();
+
 	public function __construct() {
 		add_action( 'wp_ajax_ryv_load_state_nodes', array( $this, 'ajax_load_nodes' ) );
 		add_action( 'wp_ajax_ryv_save_node_id', array( $this, 'ajax_save_node_id' ) );
-		add_action( 'acf/save_post', array( $this, 'snapshot_rows_before_save' ), 5 );
+		add_action( 'acf/save_post', array( $this, 'capture_submitted_rows' ), 5 );
 		add_action( 'acf/save_post', array( $this, 'sync_nodes_to_schema' ), 20 );
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_scripts' ) );
 		add_filter( 'acf/load_value/name=ryv_form_nodes', array( $this, 'filter_stale_node_rows' ), 20, 3 );
+	}
+
+	/**
+	 * Capture the Nodes repeater's rows straight from $_POST, keyed by ACF
+	 * sub-field *key* (as submitted) rather than reading them back via
+	 * get_field()/get_field()'s own acf/load_value filter chain.
+	 *
+	 * This exists because get_field('ryv_form_nodes', $post_id) called from
+	 * sync_nodes_to_schema() (a later acf/save_post priority) turned out to
+	 * be unreliable within the same save request: confirmed live via
+	 * temporary logging that it can return something other than the array
+	 * of the just-submitted rows - almost certainly ACF's own internal
+	 * per-request value cache/filter-chain interacting with our
+	 * acf/load_value/name=ryv_form_nodes filter in an inconsistent way for
+	 * a nested repeater-of-repeaters field this size - causing
+	 * sync_nodes_to_schema() to silently bail on `rows empty` and do
+	 * nothing, however many times the admin saved. Reading straight from
+	 * $_POST sidesteps all of that: it's already sanitized by ACF's own
+	 * acf_save_post() (wp_kses_post_deep()) before `acf/save_post` fires at
+	 * all, so this priority-5 hook sees exactly the same data ACF itself is
+	 * about to persist.
+	 *
+	 * @param int $post_id The post ID being saved.
+	 */
+	public function capture_submitted_rows( $post_id ) {
+		if ( get_post_type( $post_id ) !== RYV_States_CPT::POST_TYPE ) {
+			return;
+		}
+
+		$raw = $_POST['acf']['field_ryv_form_nodes'] ?? null; // phpcs:ignore WordPress.Security.NonceVerification.Missing -- verified by ACF itself before acf/save_post fires.
+
+		if ( ! is_array( $raw ) ) {
+			return;
+		}
+
+		$rows = array();
+
+		foreach ( $raw as $raw_row ) {
+			if ( ! is_array( $raw_row ) ) {
+				continue;
+			}
+
+			$row = array(
+				'node_id'              => wp_unslash( $raw_row['field_ryv_node_id'] ?? '' ),
+				'node_original_id'     => wp_unslash( $raw_row['field_ryv_node_original_id'] ?? '' ),
+				'node_type'            => wp_unslash( $raw_row['field_ryv_node_type'] ?? '' ),
+				'node_title'           => wp_unslash( $raw_row['field_ryv_node_title'] ?? '' ),
+				'node_step_name'       => wp_unslash( $raw_row['field_ryv_node_step_name'] ?? '' ),
+				'node_content'         => wp_unslash( $raw_row['field_ryv_node_content'] ?? '' ),
+				'node_help'            => wp_unslash( $raw_row['field_ryv_node_help'] ?? '' ),
+				'node_display_style'   => wp_unslash( $raw_row['field_ryv_node_display_style'] ?? '' ),
+				'node_hidden'          => wp_unslash( $raw_row['field_ryv_node_hidden'] ?? '' ),
+				'node_next_node'       => wp_unslash( $raw_row['field_ryv_node_next_node'] ?? '' ),
+				'node_reference_nodes' => wp_unslash( $raw_row['field_ryv_node_reference_nodes'] ?? '' ),
+				// A select2-enhanced field (`ui => 1`) populated via
+				// states-admin.js's `field.val()` on an AJAX-added row (never
+				// manually touched) can be entirely absent from $_POST, unlike
+				// a genuinely-cleared field which submits as ''. Track
+				// presence separately so sync_nodes_to_schema() can tell "key
+				// missing - leave the existing value alone" apart from "key
+				// present but blank - the admin actually cleared it," instead
+				// of silently wiping real next_node routing on every save of
+				// an untouched row (confirmed: wiped northam_exec/virginia_oos
+				// on Virginia).
+				'node_next_node_submitted' => array_key_exists( 'field_ryv_node_next_node', $raw_row ),
+			);
+
+			$options     = array();
+			$raw_options = $raw_row['field_ryv_node_options'] ?? array();
+
+			if ( is_array( $raw_options ) ) {
+				foreach ( $raw_options as $raw_opt ) {
+					if ( ! is_array( $raw_opt ) ) {
+						continue;
+					}
+					$options[] = array(
+						'option_label'               => wp_unslash( $raw_opt['field_ryv_option_label'] ?? '' ),
+						'option_value'               => wp_unslash( $raw_opt['field_ryv_option_value'] ?? '' ),
+						'option_next_node'           => wp_unslash( $raw_opt['field_ryv_option_next_node'] ?? '' ),
+						'option_next_node_submitted' => array_key_exists( 'field_ryv_option_next_node', $raw_opt ),
+					);
+				}
+			}
+
+			$row['node_options'] = $options;
+			$rows[]              = $row;
+		}
+
+		$this->submitted_rows[ $post_id ] = $rows;
 	}
 
 	/**
@@ -92,34 +178,6 @@ class RYV_States_Sync {
 			$id = trim( $row['node_id'] ?? '' );
 			return '' !== $id && isset( $nodes[ $id ] );
 		} ) );
-	}
-
-	/**
-	 * Record which node ids the repeater held right before this save, while
-	 * `get_field()` still reads the last-saved postmeta (ACF's own save
-	 * runs on this same `acf/save_post` action, at the default priority 10 -
-	 * this fires first). Cheap no-op for any post this save isn't about.
-	 *
-	 * @param int $post_id The post ID being saved.
-	 */
-	public function snapshot_rows_before_save( $post_id ) {
-		if ( get_post_type( $post_id ) !== RYV_States_CPT::POST_TYPE ) {
-			return;
-		}
-
-		$rows = get_field( 'ryv_form_nodes', $post_id );
-		$ids  = array();
-
-		if ( is_array( $rows ) ) {
-			foreach ( $rows as $row ) {
-				$id = trim( $row['node_id'] ?? '' );
-				if ( '' !== $id ) {
-					$ids[ $id ] = true;
-				}
-			}
-		}
-
-		$this->rows_before_save[ $post_id ] = $ids;
 	}
 
 	/**
@@ -435,61 +493,83 @@ class RYV_States_Sync {
 	}
 
 	/**
-	 * Collect all node IDs belonging to a state by walking the graph from
-	 * the state picker option's next_node.
+	 * Collect all node IDs belonging to a state: every node reachable by
+	 * walking the graph from the state picker option's next_node, *plus*
+	 * every node explicitly tagged with this state's own group (e.g.
+	 * `state_virginia`) even if nothing currently routes to it.
+	 *
+	 * The group-tagged half matters on its own: a question that's part of a
+	 * state's content but got disconnected from the graph (a bad edit
+	 * elsewhere, a node left over from reorganizing that state's flow) is
+	 * exactly the kind of thing an admin needs to *see* on the state's own
+	 * screen to notice and fix - reachability alone would hide it, showing
+	 * only whatever subset of the state's real 16 questions happen to still
+	 * be wired in. Confirmed as a real gap: a form group with 16 nodes for a
+	 * state showed fewer in the state screen once some of them fell out of
+	 * the reachable chain.
 	 *
 	 * @param array       $nodes       The full nodes map from the schema.
 	 * @param string|null $entry_node  The schema's entry_node.
 	 * @param string      $state_slug  State slug to find.
-	 * @return string[] Ordered list of node IDs.
+	 * @return string[] Ordered list of node IDs - reachable ones first (in
+	 *                   BFS order), any group-only extras appended after.
 	 */
 	public static function collect_state_node_ids( array $nodes, ?string $entry_node, string $state_slug ): array {
 		$start_node_id = self::find_start_node( $nodes, $entry_node, $state_slug );
+		$collected     = array();
 
-		if ( ! $start_node_id ) {
-			return array();
+		if ( $start_node_id ) {
+			// BFS to collect all reachable nodes from the start.
+			$queue = array( $start_node_id );
+
+			while ( ! empty( $queue ) ) {
+				$current = array_shift( $queue );
+
+				if ( isset( $collected[ $current ] ) || ! isset( $nodes[ $current ] ) ) {
+					continue;
+				}
+
+				// Don't cross into other states via the state picker itself.
+				if ( $current === $entry_node ) {
+					continue;
+				}
+
+				$collected[ $current ] = true;
+				$node = $nodes[ $current ];
+
+				// Follow option routes.
+				if ( ! empty( $node['options'] ) && is_array( $node['options'] ) ) {
+					foreach ( $node['options'] as $option ) {
+						if ( ! empty( $option['next_node'] ) && ! isset( $collected[ $option['next_node'] ] ) ) {
+							$queue[] = $option['next_node'];
+						}
+					}
+				}
+
+				// Follow node-level next_node.
+				if ( ! empty( $node['next_node'] ) && ! isset( $collected[ $node['next_node'] ] ) ) {
+					$queue[] = $node['next_node'];
+				}
+
+				// Follow reference nodes.
+				if ( ! empty( $node['reference_node_ids'] ) && is_array( $node['reference_node_ids'] ) ) {
+					foreach ( $node['reference_node_ids'] as $ref_id ) {
+						if ( ! isset( $collected[ $ref_id ] ) ) {
+							$queue[] = $ref_id;
+						}
+					}
+				}
+			}
 		}
 
-		// BFS to collect all reachable nodes from the start.
-		$collected = array();
-		$queue     = array( $start_node_id );
+		// Every node tagged with this state's group, reachable or not -
+		// matches the "state_{slug}" convention resolve_row_node_id()
+		// stamps on a node created from this state's own screen.
+		$expected_group = 'state_' . sanitize_title( $state_slug );
 
-		while ( ! empty( $queue ) ) {
-			$current = array_shift( $queue );
-
-			if ( isset( $collected[ $current ] ) || ! isset( $nodes[ $current ] ) ) {
-				continue;
-			}
-
-			// Don't cross into other states via the state picker itself.
-			if ( $current === $entry_node ) {
-				continue;
-			}
-
-			$collected[ $current ] = true;
-			$node = $nodes[ $current ];
-
-			// Follow option routes.
-			if ( ! empty( $node['options'] ) && is_array( $node['options'] ) ) {
-				foreach ( $node['options'] as $option ) {
-					if ( ! empty( $option['next_node'] ) && ! isset( $collected[ $option['next_node'] ] ) ) {
-						$queue[] = $option['next_node'];
-					}
-				}
-			}
-
-			// Follow node-level next_node.
-			if ( ! empty( $node['next_node'] ) && ! isset( $collected[ $node['next_node'] ] ) ) {
-				$queue[] = $node['next_node'];
-			}
-
-			// Follow reference nodes.
-			if ( ! empty( $node['reference_node_ids'] ) && is_array( $node['reference_node_ids'] ) ) {
-				foreach ( $node['reference_node_ids'] as $ref_id ) {
-					if ( ! isset( $collected[ $ref_id ] ) ) {
-						$queue[] = $ref_id;
-					}
-				}
+		foreach ( $nodes as $id => $node ) {
+			if ( $id !== $entry_node && ( $node['group'] ?? '' ) === $expected_group ) {
+				$collected[ $id ] = true;
 			}
 		}
 
@@ -592,7 +672,10 @@ class RYV_States_Sync {
 			return;
 		}
 
-		$rows = get_field( 'ryv_form_nodes', $post_id );
+		// Straight from $_POST (captured at priority 5, before ACF's own
+		// save) rather than get_field( 'ryv_form_nodes', $post_id ) - see
+		// capture_submitted_rows() for why the latter is unreliable here.
+		$rows = $this->submitted_rows[ $post_id ] ?? null;
 
 		if ( ! is_array( $rows ) || empty( $rows ) ) {
 			return;
@@ -605,15 +688,25 @@ class RYV_States_Sync {
 		// that was simply never loaded here) needs its node actually removed
 		// from the schema, not just left out of this save's $rows - otherwise
 		// it lingers as dead weight in the form forever, which reads as "I
-		// deleted this and it didn't go away." "Belonged to this state" here
-		// means "was a row in this repeater right before this save" -
-		// snapshot_rows_before_save()'s capture, not graph reachability: a
-		// node just created via "Add Node"/"Save Node ID" and never wired to
-		// anything is unreachable from the moment it exists, so a
-		// reachability-based definition would never even see it as
-		// belonging here, and deleting its row would silently leave it
-		// behind as an orphan instead of actually deleting it.
-		$known_before = array_keys( $this->rows_before_save[ $post_id ] ?? array() );
+		// deleted this and it didn't go away."
+		//
+		// "Belonged to this state before this save" is computed fresh from
+		// the *current* schema via collect_state_node_ids() - every node
+		// reachable from the state's picker, plus every node tagged with
+		// this state's own group - rather than compared against a snapshot
+		// of what was last actually saved to this post's own postmeta. That
+		// snapshot approach (an earlier version of this code) silently
+		// never detected a deletion at all on a state whose repeater had
+		// never been saved with its full node list before - the very common
+		// case where the on-screen rows came from the auto-resync AJAX call
+		// (see states-admin.js) and the admin's first-ever save is the one
+		// where they also delete a row: the "before" snapshot read back an
+		// empty/stale value, so $removed_ids came out empty and nothing was
+		// ever deleted, however many times they saved. Confirmed live on a
+		// real Virginia state with 15 group-tagged questions. Recomputing
+		// from the schema instead has no such gap, since it doesn't depend
+		// on anything having been persisted by a previous save.
+		$known_before = self::collect_state_node_ids( $nodes, $schema['entry_node'] ?? null, $state_slug );
 
 		$kept_ids = array();
 		foreach ( $rows as $row ) {
@@ -625,22 +718,20 @@ class RYV_States_Sync {
 
 		$removed_ids = array_diff( $known_before, array_keys( $kept_ids ) );
 
-		// Every node this state's own picker option can currently reach -
-		// the state picker's own option next_node, and every node's own
-		// next_node/options/reference_node_ids chain from there - is this
-		// state's *internal* wiring, not an external keep-alive. A deleted
-		// node is almost always referenced by exactly one of these (the
-		// picker itself, if it was the state's first question, or the
-		// sibling question that led to it), so without excluding them the
-		// "still referenced, leave it" check below would refuse to delete
-		// almost anything - confirmed live: deleting a node wired in as
-		// the state's own first question never actually removed it,
-		// because the state picker's own Vermont option pointing at it
-		// counted as "still referenced." Only a reference from *outside*
-		// this set (another state's question sharing this node via
-		// reference_node_ids, the documented cross-state case) should
-		// still block deletion.
-		$internal_ids = self::collect_state_node_ids( $nodes, $schema['entry_node'] ?? null, $state_slug );
+		// Every node in $known_before - the state picker's own reachable
+		// chain plus every group-tagged node - is this state's *internal*
+		// wiring, not an external keep-alive. A deleted node is almost
+		// always referenced by exactly one of these (the picker itself, if
+		// it was the state's first question, or the sibling question that
+		// led to it), so without excluding them the "still referenced,
+		// leave it" check below would refuse to delete almost anything -
+		// confirmed live: deleting a node wired in as the state's own first
+		// question never actually removed it, because the state picker's
+		// own Vermont option pointing at it counted as "still referenced."
+		// Only a reference from *outside* this set (another state's
+		// question sharing this node via reference_node_ids, the documented
+		// cross-state case) should still block deletion.
+		$internal_ids = $known_before;
 		if ( ! empty( $schema['entry_node'] ) ) {
 			$internal_ids[] = $schema['entry_node'];
 		}
@@ -728,7 +819,11 @@ class RYV_States_Sync {
 				if ( isset( $nodes[ $node_id ]['next_node'] ) ) {
 					unset( $nodes[ $node_id ]['next_node'] );
 				}
-			} elseif ( isset( $row['node_next_node'] ) ) {
+			} elseif ( ! empty( $row['node_next_node_submitted'] ) ) {
+				// Only trust this field when its key was actually present in
+				// $_POST - see the `node_next_node_submitted` comment in
+				// capture_submitted_rows() for why it can legitimately be
+				// missing on an untouched row.
 				$next = trim( $row['node_next_node'] );
 				if ( '' !== $next ) {
 					$nodes[ $node_id ]['next_node'] = $next;
@@ -753,16 +848,24 @@ class RYV_States_Sync {
 
 			// Options sub-repeater - only choice types route via options.
 			if ( $is_choice_type && isset( $row['node_options'] ) && is_array( $row['node_options'] ) ) {
-				$new_options = array();
-				foreach ( $row['node_options'] as $opt_row ) {
+				$existing_options = $nodes[ $node_id ]['options'] ?? array();
+				$new_options      = array();
+				foreach ( $row['node_options'] as $i => $opt_row ) {
 					$opt = array(
-						'label'     => $opt_row['option_label'] ?? '',
-						'value'     => $opt_row['option_value'] ?? '',
+						'label' => $opt_row['option_label'] ?? '',
+						'value' => $opt_row['option_value'] ?? '',
 					);
 
-					$next = trim( $opt_row['option_next_node'] ?? '' );
-					if ( '' !== $next ) {
-						$opt['next_node'] = $next;
+					if ( ! empty( $opt_row['option_next_node_submitted'] ) ) {
+						$next = trim( $opt_row['option_next_node'] ?? '' );
+						if ( '' !== $next ) {
+							$opt['next_node'] = $next;
+						}
+					} elseif ( isset( $existing_options[ $i ]['next_node'] ) ) {
+						// Key missing from $_POST (same select2/AJAX-row quirk
+						// as node-level next_node) - keep the existing route
+						// instead of silently dropping it.
+						$opt['next_node'] = $existing_options[ $i ]['next_node'];
 					}
 
 					$new_options[] = $opt;

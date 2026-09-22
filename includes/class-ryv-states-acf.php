@@ -960,23 +960,23 @@ class RYV_States_ACF {
 							// typo-proof dropdown the RYV Forms builder uses, instead
 							// of a free-text field a visitor could route to a
 							// nonexistent id with no warning.
-							'instructions' => 'Node ID to advance to (for non-choice nodes).',
-							// Choice nodes route via their own options' next_node,
-							// not this one.
-							'conditional_logic' => array(
-								array(
-									array(
-										'field'    => 'field_ryv_node_type',
-										'operator' => '!=',
-										'value'    => 'radio',
-									),
-									array(
-										'field'    => 'field_ryv_node_type',
-										'operator' => '!=',
-										'value'    => 'checkbox',
-									),
-								),
-							),
+							'instructions' => 'Node ID to advance to (for non-choice nodes). Not shown for Radio/Checkbox questions, which route via their own options instead.',
+							// Deliberately NOT conditional_logic-gated on type, unlike
+							// display_style/reference_nodes above: this is a select2
+							// (`ui => 1`) field, and ACF disables (not just CSS-hides)
+							// a select2 input while its conditional_logic evaluates to
+							// "hidden" - a disabled input never submits at all. A row
+							// populated by states-admin.js's populateRepeater() via
+							// field.val() never gets ACF's conditional-logic
+							// recalculation re-run after node_type is set, so it stays
+							// stuck disabled from the clone template's default type
+							// forever - silently dropping this field from $_POST on
+							// every subsequent save and wiping real next_node routing
+							// (confirmed: wiped northam_exec/virginia_oos and 4 more
+							// Virginia nodes' routing in production). Hiding it in JS
+							// instead (see toggleNextNodeVisibility() in
+							// states-admin.js) keeps the same UX without disabling the
+							// input.
 						),
 						array(
 							'key'     => 'field_ryv_node_reference_nodes',

@@ -308,6 +308,7 @@
 			// this one just arrived with real synced content, so there's
 			// nothing here the admin hasn't already reviewed.
 			$newRow.data('ryv-refresh-summary') && $newRow.data('ryv-refresh-summary')();
+			$newRow.data('ryv-refresh-next-node-visibility') && $newRow.data('ryv-refresh-next-node-visibility')();
 			$newRow.addClass('ryv-sa-collapsed');
 		});
 	}
@@ -332,6 +333,23 @@
 		if ($input.length) {
 			$input.val(value).trigger('change');
 		}
+	}
+
+	/**
+	 * Show/hide the "Next Node" field for a row based on its current node
+	 * type, in plain JS/CSS rather than ACF's own conditional_logic - see
+	 * the comment on field_ryv_node_next_node's definition in
+	 * class-ryv-states-acf.php for why: ACF disables (not just hides) a
+	 * select2 field while conditional_logic evaluates false, and a row
+	 * populated via populateRepeater()'s field.val() calls never gets that
+	 * evaluation re-run, so the field would stay permanently disabled -
+	 * silently dropping it from every future save. Hiding it here instead
+	 * never touches whether the input can submit.
+	 */
+	function toggleNextNodeVisibility($row) {
+		var type = $row.find('[data-name="node_type"] select').first().val() || '';
+		var isChoice = type === 'radio' || type === 'checkbox';
+		$row.find('[data-name="node_next_node"]').first().toggle(!isChoice);
 	}
 
 	/**
@@ -474,16 +492,23 @@
 			};
 
 			refreshSummary();
+			toggleNextNodeVisibility($row);
 			// populateRepeater() calls this once it has actually filled the
 			// row's fields in - ACF's 'append' action (which is what drives
 			// this function) fires the moment the row is created, before
 			// any of its fields have a value yet.
 			$row.data('ryv-refresh-summary', refreshSummary);
+			$row.data('ryv-refresh-next-node-visibility', function () {
+				toggleNextNodeVisibility($row);
+			});
 
 			// Keep the summary in sync while a node is being edited - the
 			// admin retyping a Title shouldn't need a collapse/expand cycle
 			// to see it reflected in the row's own header.
 			$row.on('input change', '[data-name="node_title"] input, [data-name="node_type"] select', refreshSummary);
+			$row.on('input change', '[data-name="node_type"] select', function () {
+				toggleNextNodeVisibility($row);
+			});
 
 			$summary.on('click', function () {
 				$row.toggleClass('ryv-sa-collapsed');
