@@ -319,7 +319,7 @@
 			// this one just arrived with real synced content, so there's
 			// nothing here the admin hasn't already reviewed.
 			$newRow.data('ryv-refresh-summary') && $newRow.data('ryv-refresh-summary')();
-			$newRow.data('ryv-refresh-next-node-visibility') && $newRow.data('ryv-refresh-next-node-visibility')();
+			$newRow.data('ryv-refresh-type-conditional-fields') && $newRow.data('ryv-refresh-type-conditional-fields')();
 			$newRow.addClass('ryv-sa-collapsed');
 		});
 	}
@@ -347,20 +347,33 @@
 	}
 
 	/**
-	 * Show/hide the "Next Node" field for a row based on its current node
-	 * type, in plain JS/CSS rather than ACF's own conditional_logic - see
-	 * the comment on field_ryv_node_next_node's definition in
-	 * class-ryv-states-acf.php for why: ACF disables (not just hides) a
-	 * select2 field while conditional_logic evaluates false, and a row
-	 * populated via populateRepeater()'s field.val() calls never gets that
-	 * evaluation re-run, so the field would stay permanently disabled -
-	 * silently dropping it from every future save. Hiding it here instead
-	 * never touches whether the input can submit.
+	 * Show/hide every node_type-dependent field for a row based on its
+	 * current type, in plain JS/CSS rather than ACF's own conditional_logic.
+	 * None of these fields carry conditional_logic in
+	 * class-ryv-states-acf.php any more - ACF only re-evaluates
+	 * conditional_logic on a genuine 'change' event fired on the trigger
+	 * field, and populateRepeater()'s field.val() calls (used for both the
+	 * AJAX-synced rows this screen loads with and a freshly clicked "Add
+	 * Node" row) never fire one. Left to ACF's own logic, a row showed
+	 * whichever fields matched the *clone template's* default type instead
+	 * of the row's actual type until the admin manually touched the Type
+	 * dropdown - reported live as "wrong/missing fields on first load, fixed
+	 * by switching type". Next Node is additionally select2-enhanced
+	 * (`ui => 1`), where ACF's conditional_logic doesn't just hide a failed
+	 * field but disables it - a disabled input never submits at all, which
+	 * silently dropped real routing on save (see that field's own comment in
+	 * class-ryv-states-acf.php). Called right after populateRepeater() sets
+	 * a row's fields and again on every manual Type change, so it's never
+	 * relying on ACF's own recalculation.
 	 */
-	function toggleNextNodeVisibility($row) {
+	function toggleTypeConditionalFields($row) {
 		var type = $row.find('[data-name="node_type"] select').first().val() || '';
 		var isChoice = type === 'radio' || type === 'checkbox';
 		$row.find('[data-name="node_next_node"]').first().toggle(!isChoice);
+		$row.find('[data-name="node_reference_nodes"]').first().toggle(isChoice);
+		$row.find('[data-name="node_options"]').first().toggle(isChoice);
+		$row.find('[data-name="node_display_style"]').first().toggle(type === 'radio');
+		$row.find('[data-name="node_hidden"]').first().toggle(type === 'markup' || type === 'unsupported');
 	}
 
 	/**
@@ -503,14 +516,14 @@
 			};
 
 			refreshSummary();
-			toggleNextNodeVisibility($row);
+			toggleTypeConditionalFields($row);
 			// populateRepeater() calls this once it has actually filled the
 			// row's fields in - ACF's 'append' action (which is what drives
 			// this function) fires the moment the row is created, before
 			// any of its fields have a value yet.
 			$row.data('ryv-refresh-summary', refreshSummary);
-			$row.data('ryv-refresh-next-node-visibility', function () {
-				toggleNextNodeVisibility($row);
+			$row.data('ryv-refresh-type-conditional-fields', function () {
+				toggleTypeConditionalFields($row);
 			});
 
 			// Keep the summary in sync while a node is being edited - the
@@ -518,7 +531,7 @@
 			// to see it reflected in the row's own header.
 			$row.on('input change', '[data-name="node_title"] input, [data-name="node_type"] select', refreshSummary);
 			$row.on('input change', '[data-name="node_type"] select', function () {
-				toggleNextNodeVisibility($row);
+				toggleTypeConditionalFields($row);
 			});
 
 			$summary.on('click', function () {

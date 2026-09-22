@@ -924,16 +924,19 @@ class RYV_States_ACF {
 							// Matches the admin builder SPA: display_style only
 							// ever applies to single-choice (radio) questions,
 							// never checkbox - see renderQuestionCard() in
-							// renderer.js.
-							'conditional_logic' => array(
-								array(
-									array(
-										'field'    => 'field_ryv_node_type',
-										'operator' => '==',
-										'value'    => 'radio',
-									),
-								),
-							),
+							// renderer.js. NOT conditional_logic-gated - see the
+							// note on field_ryv_node_next_node below: ACF only
+							// re-evaluates conditional_logic on a real 'change'
+							// event on the trigger field, which states-admin.js's
+							// populateRepeater() (field.val(), not a user click)
+							// never fires - so a freshly AJAX-synced row showed
+							// whichever fields matched the *clone template's*
+							// default type, not the row's actual type, until the
+							// admin manually touched the Type dropdown (exactly
+							// the reported symptom: wrong/missing fields on first
+							// load, fixed by switching Type). Visibility is
+							// instead handled in JS by
+							// toggleTypeConditionalFields().
 						),
 						array(
 							'key'           => 'field_ryv_node_hidden',
@@ -945,23 +948,9 @@ class RYV_States_ACF {
 							'instructions'  => 'Hidden nodes are skipped during rendering but remain in the graph.',
 							// Hiding a choice/text/lead_capture node would strand a
 							// visitor with no way to ever answer it - only markup
-							// and unsupported nodes support being hidden.
-							'conditional_logic' => array(
-								array(
-									array(
-										'field'    => 'field_ryv_node_type',
-										'operator' => '==',
-										'value'    => 'markup',
-									),
-								),
-								array(
-									array(
-										'field'    => 'field_ryv_node_type',
-										'operator' => '==',
-										'value'    => 'unsupported',
-									),
-								),
-							),
+							// and unsupported nodes support being hidden. NOT
+							// conditional_logic-gated - see
+							// toggleTypeConditionalFields() note below.
 						),
 						array(
 							'key'          => 'field_ryv_node_next_node',
@@ -1002,22 +991,8 @@ class RYV_States_ACF {
 							'instructions' => 'Comma-separated list of node IDs whose content is shown alongside this node.',
 							// Only choice nodes can carry reference content
 							// (see RYV_Eligibility_Tool CLAUDE.md's reference_node_ids).
-							'conditional_logic' => array(
-								array(
-									array(
-										'field'    => 'field_ryv_node_type',
-										'operator' => '==',
-										'value'    => 'radio',
-									),
-								),
-								array(
-									array(
-										'field'    => 'field_ryv_node_type',
-										'operator' => '==',
-										'value'    => 'checkbox',
-									),
-								),
-							),
+							// NOT conditional_logic-gated - see
+							// toggleTypeConditionalFields() note below.
 						),
 						// --- Options sub-repeater (for radio/checkbox nodes) ---
 						array(
@@ -1029,22 +1004,24 @@ class RYV_States_ACF {
 							'button_label' => 'Add Option',
 							'min'          => 0,
 							'instructions' => 'Only applicable for radio/checkbox node types.',
-							'conditional_logic' => array(
-								array(
-									array(
-										'field'    => 'field_ryv_node_type',
-										'operator' => '==',
-										'value'    => 'radio',
-									),
-								),
-								array(
-									array(
-										'field'    => 'field_ryv_node_type',
-										'operator' => '==',
-										'value'    => 'checkbox',
-									),
-								),
-							),
+							// NOT conditional_logic-gated - ACF only recalculates
+							// conditional_logic on a real 'change' event on the
+							// trigger field (field_ryv_node_type), which
+							// states-admin.js's populateRepeater() (field.val(),
+							// not a genuine user interaction) never fires. A
+							// freshly AJAX-synced row therefore showed/hid fields
+							// based on the clone template's default type, not the
+							// row's actual populated type, until the admin
+							// manually touched the Type dropdown - reported live
+							// as "wrong fields on first load, fixed by switching
+							// type". toggleTypeConditionalFields() in
+							// states-admin.js replaces this: it show/hides
+							// display_style, node_hidden, node_reference_nodes and
+							// this options repeater in plain JS/CSS from the
+							// row's actual current type, run right after
+							// populateRepeater() sets it and again on every manual
+							// Type change - never relying on ACF's own
+							// conditional_logic recalculation.
 							'sub_fields'   => array(
 								array(
 									'key'     => 'field_ryv_option_label',
