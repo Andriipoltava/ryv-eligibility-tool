@@ -286,6 +286,7 @@
 			setSubFieldValue($newRow, 'node_id', nodeData.node_id);
 			setSubFieldValue($newRow, 'node_type', nodeData.node_type);
 			setSubFieldValue($newRow, 'node_title', nodeData.node_title);
+			setSubFieldValue($newRow, 'node_step_name', nodeData.node_step_name);
 			setSubFieldValue($newRow, 'node_help', nodeData.node_help);
 			setSubFieldValue($newRow, 'node_display_style', nodeData.node_display_style);
 			setSubFieldValue($newRow, 'node_hidden', nodeData.node_hidden ? 1 : 0);
