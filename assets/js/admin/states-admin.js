@@ -284,6 +284,16 @@
 			}
 
 			setSubFieldValue($newRow, 'node_id', nodeData.node_id);
+			// node_original_id is what resolve_row_node_id() (PHP) uses to
+			// tell "editing an existing node" apart from "brand-new row added
+			// via Add Node" - node_to_acf_row() always sets it equal to the
+			// node's own id. Never populating it here made every AJAX-synced
+			// row look brand-new on save; since its typed id already existed,
+			// resolve_row_node_id() silently skipped the whole row rather
+			// than editing it - no field on a synced row could ever be
+			// changed and saved (confirmed live: a typed Step Name never
+			// persisted no matter how many times Update was clicked).
+			setSubFieldValue($newRow, 'node_original_id', nodeData.node_original_id || nodeData.node_id);
 			setSubFieldValue($newRow, 'node_type', nodeData.node_type);
 			setSubFieldValue($newRow, 'node_title', nodeData.node_title);
 			setSubFieldValue($newRow, 'node_step_name', nodeData.node_step_name);

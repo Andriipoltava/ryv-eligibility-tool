@@ -833,7 +833,23 @@ class RYV_States_ACF {
 							'key'        => 'field_ryv_node_original_id',
 							'label'      => 'Original Node ID',
 							'name'       => 'node_original_id',
-							'type'       => 'hidden',
+							// NOT 'hidden' - ACF has no such field type (there is no
+							// class-acf-field-hidden.php in core or Pro), so a field
+							// declared with it never rendered a real, submittable
+							// input at all: its key was completely absent from
+							// $_POST on every save, no matter how the row was
+							// populated. resolve_row_node_id() reads this field to
+							// tell "editing an existing node" apart from "a brand-new
+							// Add Node row"; with it always empty, every row looked
+							// brand-new, and since its typed id already existed as a
+							// node, the row was silently skipped in full - no field
+							// edit on any existing row (Step Name included) could
+							// ever be saved from this screen. 'text' is a real field
+							// type that actually submits; the existing
+							// `.acf-field[data-key="field_ryv_node_original_id"]
+							// { display: none !important; }` rule in
+							// states-admin.css already keeps it invisible either way.
+							'type'       => 'text',
 						),
 						array(
 							'key'           => 'field_ryv_node_type',
