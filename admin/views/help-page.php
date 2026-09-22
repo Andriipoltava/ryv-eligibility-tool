@@ -22,6 +22,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 			<li><a href="#ryv-help-overview"><?php esc_html_e( 'Overview', 'ryv-eligibility-tool' ); ?></a></li>
 			<li><a href="#ryv-help-new-form"><?php esc_html_e( 'Creating a New Form', 'ryv-eligibility-tool' ); ?></a></li>
 			<li><a href="#ryv-help-builder"><?php esc_html_e( 'The Form Builder', 'ryv-eligibility-tool' ); ?></a></li>
+			<li><a href="#ryv-help-states-nodes"><?php esc_html_e( 'Editing a State\'s Questions from Its Own Page', 'ryv-eligibility-tool' ); ?></a></li>
 			<li><a href="#ryv-help-import"><?php esc_html_e( 'Importing a Drupal YAML Export', 'ryv-eligibility-tool' ); ?></a></li>
 			<li><a href="#ryv-help-embed"><?php esc_html_e( 'Adding a Form to a Page', 'ryv-eligibility-tool' ); ?></a></li>
 			<li><a href="#ryv-help-styles"><?php esc_html_e( 'Styling a Form', 'ryv-eligibility-tool' ); ?></a></li>
@@ -106,6 +107,28 @@ if ( ! defined( 'ABSPATH' ) ) {
 		<h3><?php esc_html_e( 'Saving', 'ryv-eligibility-tool' ); ?></h3>
 		<p>
 			<?php esc_html_e( 'The Save button writes the entire form in one go. There\'s no autosave and no per-node save - make your changes, then click Save when you\'re happy with them. Every save is recorded in the Activity Log with who made it and a summary of what changed.', 'ryv-eligibility-tool' ); ?>
+		</p>
+	</section>
+
+	<section id="ryv-help-states-nodes" class="card ryv-help-card">
+		<h2><?php esc_html_e( 'Editing a State\'s Questions from Its Own Page', 'ryv-eligibility-tool' ); ?></h2>
+		<p>
+			<?php esc_html_e( 'Every RYV States page (RYV States → All States) has its own "Form Nodes (Eligibility Questions)" section, near the bottom of the editor, below the state\'s own content fields. It\'s a second way to edit a subset of a form\'s questions - the ones belonging to that one state - without opening the full Form Builder and hunting for them in a list of hundreds. There\'s no separate copy of the data behind it: it reads from and writes straight back to that state\'s connected form (picked in the "Form Connection" box), the exact same schema the Form Builder edits.', 'ryv-eligibility-tool' ); ?>
+		</p>
+		<p>
+			<?php esc_html_e( 'The question list fills in automatically once both "Eligibility Form" and "State" are set, and refreshes again any time you change either one - there\'s no separate "Load" button. Click a question\'s row to expand it and edit its fields (Title, Content, Step Name, routing, and so on - the same fields the Form Builder shows for that node type); click it again to collapse it back down.', 'ryv-eligibility-tool' ); ?>
+		</p>
+		<p>
+			<?php esc_html_e( '"Step Name" is worth calling out specifically: it\'s what labels this question\'s entry in the step sidebar for forms using the wizard (one-question-at-a-time) layout. Leaving it blank keeps this question folded into whichever named step came before it, rather than starting a new one - so most questions in a state\'s flow are deliberately left blank, with only the first question of each real step naming it.', 'ryv-eligibility-tool' ); ?>
+		</p>
+		<p>
+			<?php esc_html_e( 'Renaming an existing question\'s Node ID here works the same as in the Form Builder - but because this screen only shows one state\'s slice of the form, use the "Save Node ID" button right under the field to apply a rename immediately, rather than waiting for the state\'s own Update/Save. That also makes the freshly renamed ID immediately pickable from any "Next question" dropdown on this page without a reload.', 'ryv-eligibility-tool' ); ?>
+		</p>
+		<p>
+			<?php esc_html_e( '"Add Node" creates a brand-new question and files it under this state automatically - no need to set a Group by hand. Removing a question\'s row and saving deletes it from the form entirely, the same as deleting it in the Form Builder - so double-check nothing else still routes to it first (the Form Builder\'s node list is the easiest place to check "is this ID referenced anywhere else").', 'ryv-eligibility-tool' ); ?>
+		</p>
+		<p>
+			<?php esc_html_e( 'Saving this screen (the state\'s own Update button) writes every change straight into the connected form\'s schema, exactly like a Form Builder save - it shows up in that form\'s own Activity Log the same way.', 'ryv-eligibility-tool' ); ?>
 		</p>
 	</section>
 
