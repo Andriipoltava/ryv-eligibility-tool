@@ -208,10 +208,12 @@ function buildHelpTooltip(help) {
 function descriptionEl(description) {
   if (!description) return null;
 
-  const p = document.createElement('p');
-  p.className = 'ryv-question-description';
-  p.innerHTML = description;
-  return p;
+  // A div, not a p: the API runs descriptions through wpautop() (see
+  // RYV_API::format_node_html()), so this holds its own <p> paragraphs.
+  const wrapper = document.createElement('div');
+  wrapper.className = 'ryv-question-description';
+  wrapper.innerHTML = description;
+  return wrapper;
 }
 
 /**
@@ -245,6 +247,7 @@ function prependLeadingContent(wrap, leadingMarkup) {
  * doesn't jump while you're still looking at what you just clicked.
  */
 export function appendCard(container, card, animate = true) {
+  openExternalLinksInNewTab(card);
   if (animate) {
     card.classList.add('ryv-card', 'ryv-card-enter');
     container.appendChild(card);
@@ -256,6 +259,25 @@ export function appendCard(container, card, animate = true) {
     container.appendChild(card);
   }
   return card;
+}
+
+/**
+ * Make every link to another site open in a new tab, so a visitor following
+ * a result's outside resource (Vote.org, a court's site, ...) doesn't lose
+ * their place in the questionnaire. Runs once per card from appendCard(),
+ * the single path every card takes into the DOM, so it covers all the
+ * admin-authored HTML inside it (content, description, reference content,
+ * help tooltips) without each render site having to remember to. Same-site
+ * links and mailto:/tel: links are left alone.
+ *
+ * @param {HTMLElement} root
+ */
+export function openExternalLinksInNewTab(root) {
+  root.querySelectorAll('a[href]').forEach((link) => {
+    if (!/^https?:$/.test(link.protocol) || link.host === window.location.host) return;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+  });
 }
 
 /**

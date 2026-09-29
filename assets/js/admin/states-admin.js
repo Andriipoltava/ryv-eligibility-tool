@@ -40,19 +40,16 @@
 
 		enhanceExistingRows(repeater);
 
-		var hasRows = repeater.$el.find('.acf-row:not(.acf-clone)').length > 0;
 		var signature = currentSignature();
 
-		if (hasRows) {
-			// Trust the rows already on screen (they're what was last saved) -
-			// just record their signature so a later field change is detected
-			// as a real change rather than re-fetching immediately. They're
-			// existing, already-reviewed content (unlike a fresh "Add Node"
-			// row), so start collapsed the same way a just-synced row does.
-			repeater.$el.find('.acf-row.ryv-sa-row').addClass('ryv-sa-collapsed');
-			loadedSignature = signature;
-			toggleToolbar(true);
-		} else if (signature) {
+		// Always re-load the rows from the form itself, even when the page
+		// already has rows saved. Those saved rows are only a snapshot from
+		// this state's last Update - the form schema is the source of truth,
+		// and it's often changed since (in the form builder, or on another
+		// screen). Showing the snapshot meant an Update here wrote its stale
+		// routing/text back over the newer schema and deleted every node the
+		// snapshot didn't know about.
+		if (signature) {
 			loadNodes(signature, false);
 		}
 
@@ -156,6 +153,12 @@
 		toggleToolbar(true);
 		setStatus(isResync ? 'Syncing…' : 'Loading…', false);
 
+		// Until the fresh rows arrive, whatever is on screen may be stale - an
+		// Update in that window would write it back over the form (see the
+		// comment in the ready handler). Block saving for the round trip.
+		var $saveButtons = $('#publish, #save-post');
+		$saveButtons.prop('disabled', true);
+
 		$.ajax({
 			url:    ryvStatesAdmin.ajaxUrl,
 			method: 'POST',
@@ -167,8 +170,10 @@
 			},
 			success: function (response) {
 				loadInFlight = false;
+				$saveButtons.prop('disabled', false);
 
 				if (!response.success) {
+					clearStaleRows();
 					setStatus('Error: ' + (response.data || 'Unknown error'), true);
 					return;
 				}
@@ -179,8 +184,25 @@
 			},
 			error: function () {
 				loadInFlight = false;
-				setStatus('Request failed - check your connection and try switching the State field again.', true);
+				$saveButtons.prop('disabled', false);
+				clearStaleRows();
+				setStatus('Request failed - reload the page before editing questions here.', true);
 			}
+		});
+	}
+
+	/**
+	 * Drop the possibly-stale saved rows when a fresh load failed. With no
+	 * rows submitted, RYV_States_Sync::sync_nodes_to_schema() leaves the form
+	 * untouched, so the rest of the state page can still be saved safely.
+	 */
+	function clearStaleRows() {
+		var repeater = getRepeaterField();
+		if (!repeater) {
+			return;
+		}
+		$(repeater.$el.find('.acf-row:not(.acf-clone)').get().reverse()).each(function () {
+			repeater.remove($(this));
 		});
 	}
 
@@ -394,7 +416,18 @@
 			if (editorId && typeof tinymce !== 'undefined') {
 				var editor = tinymce.get(editorId);
 				if (editor) {
-					editor.setContent(value || '');
+					// Node content is stored the way WordPress's classic editor
+					// saves it - paragraphs as blank lines, not <p> tags. A plain
+					// setContent() is parsed as HTML, which collapses those line
+					// breaks into spaces, so the next Update saved the text back
+					// as one run-on paragraph and the breaks were lost for good.
+					// wp.editor.autop() is exactly what WordPress itself applies
+					// when it loads content into the editor.
+					var html = value || '';
+					if (window.wp && wp.editor && typeof wp.editor.autop === 'function') {
+						html = wp.editor.autop(html);
+					}
+					editor.setContent(html);
 				}
 			}
 		}

@@ -1,8 +1,8 @@
 // See the matching comment in ../decision-engine.js - these query strings
 // are the only thing cache-busting these nested imports; bump them with
 // every RYV_VERSION change.
-import { fetchForm, logSubmission, submitLead } from './api-client.js?ver=0.8.67';
-import * as renderer from './renderer.js?ver=0.8.67';
+import { fetchForm, logSubmission, submitLead } from './api-client.js?ver=0.8.81';
+import * as renderer from './renderer.js?ver=0.8.81';
 
 const LOADING_CARD_ID = '__loading__';
 const ERROR_CARD_ID = '__error__';

@@ -112,10 +112,39 @@ class RYV_API {
 				'title'       => $post->post_title,
 				'description' => $post->post_excerpt,
 				'entry_node'  => $schema['entry_node'],
-				'nodes'       => $schema['nodes'],
+				'nodes'       => self::format_node_html( $schema['nodes'] ),
 			),
 			200
 		);
+	}
+
+	/**
+	 * Turn line breaks in a node's rich text into paragraphs/`<br>`, the
+	 * same way WordPress displays post content.
+	 *
+	 * The builder's editor (and the ACF node editor on a state page) is
+	 * WordPress's classic editor, which - like for a normal post - saves
+	 * paragraphs as blank lines rather than `<p>` tags, relying on wpautop()
+	 * at display time to restore them. Without this, a hard return typed or
+	 * pasted into an answer was simply collapsed away on the frontend.
+	 * wpautop() leaves already-formatted HTML alone, so text that has its
+	 * own `<p>`/`<br>` markup renders exactly as before. Display-only: the
+	 * stored schema (and the admin API the builder edits) stays untouched.
+	 *
+	 * @param array $nodes node_id => node.
+	 * @return array
+	 */
+	private static function format_node_html( array $nodes ): array {
+		foreach ( $nodes as &$node ) {
+			foreach ( array( 'content', 'description' ) as $field ) {
+				if ( isset( $node[ $field ] ) && is_string( $node[ $field ] ) && '' !== trim( $node[ $field ] ) ) {
+					$node[ $field ] = wpautop( $node[ $field ] );
+				}
+			}
+		}
+		unset( $node );
+
+		return $nodes;
 	}
 
 	/**
