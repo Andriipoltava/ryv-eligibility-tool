@@ -1539,4 +1539,701 @@
   .ryv-partner-card-link.ryv-partner-card-link:hover .ryv-partner-card-link-arrow {
     transform: translateX(3px);
   }
+
+  /* Resources page widgets (RYV_Resources_Search_Widget / _Sort_ / _Count_).
+   * Plain CSS outside .ryv-app-wrapper like the partner cards above; every
+   * value is a `--ryv-rs-*` / `--ryv-sort-*` custom property the widgets'
+   * Style tabs override per instance. Defaults match the Figma "Resources"
+   * page (CLC Restore Your Vote, node 1353:58): 64px fields on #F8FAFB with
+   * a 1.5px #C9D6DE border, a white "Search →" button, "Sort by:" as plain
+   * text. Fonts come from the widgets' global typography defaults. */
+  .ryv-resources-search {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: stretch;
+    gap: var(--ryv-rs-gap, 16px);
+    margin: 0;
+  }
+  .ryv-resources-search__field {
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+  .ryv-resources-search__field--search {
+    flex: 1 1 320px;
+  }
+  .ryv-resources-search__field--state {
+    flex: 0 1 var(--ryv-rs-state-width, 360px);
+    min-width: 200px;
+  }
+  .ryv-resources-search__sr {
+    position: absolute !important;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+  .ryv-resources-search__icon {
+    position: absolute;
+    left: 20px;
+    width: 22px;
+    height: 22px;
+    pointer-events: none;
+  }
+  .ryv-resources-search .ryv-resources-search__input,
+  .ryv-resources-search .ryv-resources-search__select,
+  .ryv-resources-search .ryv-resources-search__combo-input {
+    width: 100%;
+    height: var(--ryv-rs-height, 64px);
+    margin: 0;
+    padding: 0 20px;
+    font-size: 17px;
+    line-height: normal;
+    color: var(--ryv-rs-field-color, #002A41);
+    background-color: var(--ryv-rs-field-bg, #F8FAFB);
+    border: var(--ryv-rs-border-width, 1.5px) solid var(--ryv-rs-border-color, #C9D6DE);
+    border-radius: var(--ryv-rs-radius, 0);
+    box-shadow: none;
+    outline: none;
+    transition: border-color 0.15s ease;
+  }
+  .ryv-resources-search .ryv-resources-search__input {
+    /* 20px side padding + 22px icon + 14px gap, as in the design. */
+    padding-left: 56px;
+  }
+  .ryv-resources-search .ryv-resources-search__input::placeholder,
+  .ryv-resources-search .ryv-resources-search__combo-input::placeholder {
+    color: var(--ryv-rs-placeholder-color, #6E6E6E);
+    opacity: 1;
+  }
+  .ryv-resources-search .ryv-resources-search__select,
+  .ryv-resources-search .ryv-resources-search__combo-input {
+    padding-right: 48px;
+    cursor: pointer;
+    appearance: none;
+    background-image: url("../img/resources/icon-chevron-down.svg");
+    background-repeat: no-repeat;
+    background-position: right 20px center;
+    background-size: 16px 16px;
+  }
+  .ryv-resources-search .ryv-resources-search__input:focus,
+  .ryv-resources-search .ryv-resources-search__select:focus,
+  .ryv-resources-search .ryv-resources-search__combo-input:focus,
+  .ryv-resources-search__combo.is-open .ryv-resources-search__combo-input {
+    border-color: var(--ryv-rs-focus-color, #002A41);
+  }
+  .ryv-resources-search__combo.is-open .ryv-resources-search__combo-input {
+    cursor: text;
+  }
+  .ryv-resources-search .ryv-resources-search__button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--ryv-rs-button-icon-gap, 10px);
+    height: var(--ryv-rs-height, 64px);
+    margin: 0;
+    padding: 0 var(--ryv-rs-button-padding-x, 34px);
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 1;
+    color: var(--ryv-rs-button-color, #002A41);
+    background-color: var(--ryv-rs-button-bg, #FFFFFF);
+    border: 0;
+    border-radius: var(--ryv-rs-radius, 0);
+    cursor: pointer;
+    transition: background-color 0.15s ease, color 0.15s ease;
+  }
+  .ryv-resources-search .ryv-resources-search__button:hover,
+  .ryv-resources-search .ryv-resources-search__button:focus-visible {
+    color: var(--ryv-rs-button-hover-color, #002A41);
+    background-color: var(--ryv-rs-button-hover-bg, #D4EFFC);
+  }
+  .ryv-resources-search__button-icon {
+    display: inline-flex;
+    font-size: var(--ryv-rs-button-icon-size, 14px);
+  }
+  .ryv-resources-search__button-icon svg {
+    width: 1em;
+    height: 1em;
+    fill: currentColor;
+  }
+  .ryv-resources-search__reset {
+    display: inline-block;
+    margin-top: 14px;
+    color: var(--ryv-rs-reset-color, currentColor);
+    text-decoration: underline;
+  }
+  .ryv-resources-search__reset[hidden] {
+    display: none;
+  }
+  /* Searchable state dropdown (select2 style) - the native <select> stays
+   * in the form as the value holder, visually hidden. */
+  .ryv-resources-search .ryv-resources-search__select--enhanced {
+    position: absolute !important;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    opacity: 0;
+    pointer-events: none;
+  }
+  .ryv-resources-search__combo {
+    position: relative;
+    width: 100%;
+  }
+  .ryv-resources-search__combo-menu {
+    position: absolute;
+    z-index: 50;
+    top: calc(100% - var(--ryv-rs-border-width, 1.5px));
+    left: 0;
+    right: 0;
+    max-height: var(--ryv-rs-menu-max-height, 300px);
+    margin: 0;
+    padding: 4px 0;
+    overflow-y: auto;
+    list-style: none;
+    background: #FFFFFF;
+    border: var(--ryv-rs-border-width, 1.5px) solid var(--ryv-rs-focus-color, #002A41);
+    box-shadow: 0 8px 24px rgba(0, 42, 65, 0.16);
+  }
+  .ryv-resources-search__combo-menu[hidden] {
+    display: none;
+  }
+  .ryv-resources-search__combo-option,
+  .ryv-resources-search__combo-empty {
+    margin: 0;
+    padding: 10px 20px;
+    font-size: 17px;
+    line-height: 1.3;
+    color: var(--ryv-rs-field-color, #002A41);
+  }
+  .ryv-resources-search__combo-option {
+    cursor: pointer;
+  }
+  .ryv-resources-search__combo-option[aria-selected="true"] {
+    font-weight: 700;
+  }
+  .ryv-resources-search__combo-option:hover,
+  .ryv-resources-search__combo-option.is-highlighted {
+    color: var(--ryv-rs-option-hover-color, #FFFFFF);
+    background: var(--ryv-rs-option-hover-bg, #002A41);
+  }
+  .ryv-resources-search__combo-empty {
+    color: var(--ryv-rs-placeholder-color, #6E6E6E);
+  }
+  @media (max-width: 767px) {
+    .ryv-resources-search__field--state,
+    .ryv-resources-search .ryv-resources-search__button {
+      flex: 1 1 100%;
+    }
+  }
+
+  /* "Sort by: Most relevant ⌄" - a native select dressed as text. */
+  .ryv-resources-sort {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0;
+  }
+  .ryv-resources-sort__label {
+    margin: 0;
+    font-size: 15px;
+    white-space: nowrap;
+    color: var(--ryv-sort-label-color, #6E6E6E);
+  }
+  .ryv-resources-sort .ryv-resources-sort__select {
+    width: auto;
+    height: auto;
+    margin: 0;
+    padding: 4px 24px 4px 0;
+    font-size: 18px;
+    font-weight: 700;
+    line-height: normal;
+    color: var(--ryv-sort-value-color, #002A41);
+    background: transparent url("../img/resources/icon-sort-chevron.svg") no-repeat right center / 16px 16px;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    appearance: none;
+    cursor: pointer;
+  }
+  .ryv-resources-sort .ryv-resources-sort__select:focus-visible {
+    outline: 2px solid var(--ryv-sort-value-color, #002A41);
+    outline-offset: 2px;
+  }
+
+  /* "Showing 1–6 of 48 resources for All states" */
+  .ryv-resources-count {
+    margin: 0;
+    font-size: 15px;
+  }
+  .ryv-resources-count:empty {
+    display: none;
+  }
+
+  /* While an AJAX search is loading, dim the grid + tabs being replaced. */
+  .ryv-rs-loading {
+    opacity: 0.45;
+    pointer-events: none;
+    transition: opacity 0.15s ease;
+  }
+
+  /* Opt-in helper classes for the Resources page's Elementor containers -
+   * add them under Advanced > CSS Classes.
+   *
+   * `ryv-search-panel`: the decorative red swoosh from the Figma search
+   * panel, anchored to the container's right side (the blue fill and 2px
+   * navy border are the container's own Background/Border settings, so
+   * they stay editable). Geometry is the design's own: the swoosh starts
+   * at 69.24% across / 21.16% down, is 34.92% of the panel wide, and runs
+   * off the right and bottom edges.
+   *
+   * No `overflow: hidden` on the panel: it also clipped the searchable
+   * state dropdown's list, which opens below the panel. Instead the
+   * pseudo-element is sized to exactly the visible corner (left/top offset
+   * to the panel's bottom-right) and the swoosh is a background that
+   * overflows *that* box - a background never paints outside its box, so
+   * it's clipped for free. 113.52% = 34.92% (swoosh width vs panel) /
+   * 30.76% (box width vs panel, 100% - 69.24%). */
+  .ryv-search-panel {
+    position: relative;
+  }
+  /* The searchable dropdown's list must paint over the results below. */
+  .ryv-search-panel:has(.ryv-resources-search__combo.is-open) {
+    z-index: 30;
+  }
+  /* Elementor containers use ::before for their background overlay and
+   * give it a border + full-size inset of their own, which drew a navy
+   * frame around the swoosh - hence the explicit resets. */
+  .ryv-search-panel.e-con::before,
+  .ryv-search-panel::before {
+    content: "" !important;
+    display: block;
+    position: absolute;
+    left: var(--ryv-search-panel-swoosh-left, 69.24%);
+    top: var(--ryv-search-panel-swoosh-top, 21.16%);
+    right: 0;
+    bottom: 0;
+    width: auto;
+    height: auto;
+    border: 0 !important;
+    border-radius: 0;
+    opacity: 1;
+    mix-blend-mode: normal;
+    background: url("../img/resources/search-panel-swoosh.svg") no-repeat 0 0 / var(--ryv-search-panel-swoosh-size, 113.52%) auto;
+    pointer-events: none;
+  }
+  .ryv-search-panel > * {
+    position: relative;
+    z-index: 1;
+  }
+  @media (max-width: 767px) {
+    .ryv-search-panel.e-con::before,
+    .ryv-search-panel::before {
+      display: none;
+    }
+  }
+
+  /* `ryv-pagination-boxes` (on a Loop Grid): the design's pagination -
+   * 48px square page numbers with a 1.5px border, the current one filled
+   * navy, "← Previous" / "Next →" as red text links. */
+  .ryv-pagination-boxes .elementor-pagination {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding-top: 24px;
+  }
+  .ryv-pagination-boxes .elementor-pagination .page-numbers {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 48px;
+    height: 48px;
+    margin: 0;
+    padding: 0 12px;
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 1;
+    color: var(--ryv-pagination-color, #002A41);
+    background: #FFFFFF;
+    border: 1.5px solid var(--ryv-pagination-border, #C9D6DE);
+    text-decoration: none;
+    transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  }
+  .ryv-pagination-boxes .elementor-pagination a.page-numbers:not(.prev):not(.next):hover {
+    border-color: var(--ryv-pagination-color, #002A41);
+  }
+  .ryv-pagination-boxes .elementor-pagination .page-numbers.current {
+    color: #FFFFFF;
+    background: var(--ryv-pagination-color, #002A41);
+    border-color: var(--ryv-pagination-color, #002A41);
+  }
+  .ryv-pagination-boxes .elementor-pagination .page-numbers.prev,
+  .ryv-pagination-boxes .elementor-pagination .page-numbers.next {
+    padding: 0 16px;
+    color: var(--ryv-pagination-link-color, #A21D1B);
+    background: transparent;
+    border-color: transparent;
+  }
+  .ryv-pagination-boxes .elementor-pagination .page-numbers.prev:hover,
+  .ryv-pagination-boxes .elementor-pagination .page-numbers.next:hover {
+    text-decoration: underline;
+  }
+  .ryv-pagination-boxes .elementor-pagination span.page-numbers.prev,
+  .ryv-pagination-boxes .elementor-pagination span.page-numbers.next {
+    opacity: 0.4;
+  }
+
+  /* ------------------------------------------------------------------
+   * Single blog post template (Figma "Blog Post – Template", 1353:606).
+   * ------------------------------------------------------------------ */
+
+  /* RYV Post Tags: tinted topic/state chips (header, cards), or outlined
+   * chips for a "Filed under" row. */
+  .ryv-post-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--ryv-post-tags-gap, 8px);
+  }
+  .ryv-post-tag {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 8px;
+    font-size: 16px;
+    font-weight: 700;
+    line-height: 1.2;
+    letter-spacing: 1.68px;
+    text-transform: uppercase;
+    text-decoration: none;
+    color: var(--ryv-post-tag-topic-color, #DE3804);
+    background: var(--ryv-post-tag-topic-bg, rgba(222, 56, 4, 0.1));
+  }
+  .ryv-post-tag--state {
+    color: var(--ryv-post-tag-state-color, #2A6A8F);
+    background: var(--ryv-post-tag-state-bg, rgba(42, 106, 143, 0.1));
+  }
+  a.ryv-post-tag:hover {
+    text-decoration: underline;
+  }
+  .ryv-post-tags--outline .ryv-post-tags {
+    gap: var(--ryv-post-tags-gap, 10px);
+  }
+  .ryv-post-tags--outline .ryv-post-tag {
+    padding: 10px 18px;
+    color: var(--ryv-post-tag-topic-color, #6E6E6E);
+    background: var(--ryv-post-tag-topic-bg, #FFFFFF);
+    border: 1.5px solid #C9D6DE;
+  }
+  .ryv-post-tags--outline .ryv-post-tag--state {
+    color: var(--ryv-post-tag-state-color, #6E6E6E);
+    background: var(--ryv-post-tag-state-bg, #FFFFFF);
+  }
+
+  /* RYV Share Links: "SHARE [copy] [email] [print]" */
+  .ryv-share-links {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: var(--ryv-share-gap, 10px);
+  }
+  .ryv-share-links__label {
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: 1.68px;
+    text-transform: uppercase;
+    color: var(--ryv-share-label-color, #002A41);
+  }
+  .ryv-share-links .ryv-share-links__btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--ryv-share-size, 44px);
+    height: var(--ryv-share-size, 44px);
+    margin: 0;
+    padding: 0;
+    background: transparent;
+    border: 1.5px solid var(--ryv-share-border, #C9D6DE);
+    border-radius: 0;
+    cursor: pointer;
+    transition: border-color 0.15s ease;
+  }
+  .ryv-share-links .ryv-share-links__btn:hover,
+  .ryv-share-links .ryv-share-links__btn:focus-visible {
+    background: transparent;
+    border-color: var(--ryv-share-border-hover, #002A41);
+  }
+  .ryv-share-links__btn img {
+    width: 24px;
+    height: 24px;
+  }
+  .ryv-share-links__status {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    padding: 4px 8px;
+    font-size: 13px;
+    white-space: nowrap;
+    color: #FFFFFF;
+    background: #002A41;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s ease;
+  }
+  .ryv-share-links__status.is-visible {
+    opacity: 1;
+  }
+  @media print {
+    .ryv-share-links {
+      display: none;
+    }
+  }
+
+  /* RYV State Picker: the Resources search field, stacked, with a red
+   * "Continue →" button under it. */
+  .ryv-resources-search.ryv-state-picker {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--ryv-rs-gap, 20px);
+  }
+  .ryv-state-picker .ryv-resources-search__field--state {
+    flex: none;
+    width: 100%;
+    min-width: 0;
+  }
+  .ryv-resources-search.ryv-state-picker .ryv-resources-search__button {
+    flex: none;
+    height: 60px;
+    color: var(--ryv-rs-button-color, #FFFFFF);
+    background-color: var(--ryv-rs-button-bg, #A21D1B);
+  }
+  .ryv-resources-search.ryv-state-picker .ryv-resources-search__button:hover,
+  .ryv-resources-search.ryv-state-picker .ryv-resources-search__button:focus-visible {
+    color: var(--ryv-rs-button-hover-color, #FFFFFF);
+    background-color: var(--ryv-rs-button-hover-bg, #002A41);
+  }
+
+  /* `ryv-toc` (Advanced > CSS Classes on an Elementor Pro Table of
+   * Contents widget): the design's "In this article" list - each entry a
+   * 3px left rule, red + navy for the section in view. Colors/typography
+   * stay the widget's own Style controls. */
+  .ryv-toc .elementor-toc__list-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: var(--ryv-toc-gap, 16px);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  /* A post with no H2 gets no "In this article" box at all, rather than
+   * the widget's "no headings" message (the editor still shows it, so it
+   * stays selectable). Until Elementor's JS builds the list this also
+   * keeps the loading spinner from flashing. */
+  body:not(.elementor-editor-active) .ryv-toc:not(:has(.elementor-toc__list-wrapper)) {
+    display: none;
+  }
+  .ryv-toc .elementor-toc__list-item {
+    margin: 0;
+  }
+  .ryv-toc .elementor-toc__list-item-text-wrapper {
+    padding: 2px 0 2px 14px;
+    border-left: 3px solid var(--ryv-toc-rule, #C9D6DE);
+    transition: border-color 0.15s ease;
+  }
+  .ryv-toc .elementor-toc__list-item-text-wrapper:has(.elementor-item-active) {
+    border-left-color: var(--ryv-toc-rule-active, #EC2927);
+  }
+  /* Elementor marks *every* heading currently in view active; the design
+   * highlights one section at a time, so anything after the first active
+   * entry is drawn as inactive again. */
+  .ryv-toc .elementor-toc__list-item:has(.elementor-item-active) ~ .elementor-toc__list-item .elementor-toc__list-item-text-wrapper {
+    border-left-color: var(--ryv-toc-rule, #C9D6DE);
+  }
+  .ryv-toc .elementor-toc__list-item:has(.elementor-item-active) ~ .elementor-toc__list-item .elementor-item-active {
+    color: var(--item-text-color);
+  }
+  .ryv-toc .elementor-toc__list-item-text-wrapper::before,
+  .ryv-toc .elementor-toc__list-item-text-wrapper > i,
+  .ryv-toc .elementor-toc__list-item-text-wrapper > svg {
+    display: none;
+  }
+
+  /* `ryv-article-body` (Advanced > CSS Classes on a Text Editor / Post
+   * Content widget): the Figma article body - 28px between blocks, H2 in
+   * Sentinel 36, bullets as 8px red squares, a red-ruled pull quote. Base
+   * font size/color stay the widget's own Style controls. */
+  /* The TOC widget injects an empty `span.elementor-menu-anchor` before
+   * each heading - skipped here, or the gap would land on the anchor. */
+  .ryv-article-body > * + *:not(.elementor-menu-anchor),
+  .ryv-article-body > .elementor-widget-container > * + *:not(.elementor-menu-anchor) {
+    margin-top: 28px;
+  }
+  .ryv-article-body .elementor-menu-anchor {
+    display: block;
+    margin: 0;
+  }
+  .ryv-article-body p {
+    margin-bottom: 0;
+  }
+  .ryv-article-body h2 {
+    margin: 0;
+    font-family: "Sentinel", Georgia, serif;
+    font-size: 36px;
+    font-weight: 700;
+    line-height: 1.2;
+    color: #002A41;
+  }
+  .ryv-article-body h3 {
+    margin: 0;
+    font-family: "Merriweather", Georgia, serif;
+    font-size: 28px;
+    font-weight: 700;
+    line-height: 1.25;
+    color: #002A41;
+  }
+  .ryv-article-body ul {
+    margin: 0;
+    padding-left: 8px;
+    list-style: none;
+  }
+  .ryv-article-body ul li {
+    position: relative;
+    padding-left: 26px;
+  }
+  .ryv-article-body ul li + li {
+    margin-top: 14px;
+  }
+  .ryv-article-body ul li::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0.62em;
+    width: 8px;
+    height: 8px;
+    background: #EC2927;
+  }
+  .ryv-article-body ol {
+    margin: 0;
+    padding-left: 0;
+    list-style: none;
+    counter-reset: ryv-step;
+  }
+  .ryv-article-body ol li {
+    position: relative;
+    display: flex;
+    align-items: center;
+    min-height: 44px;
+    padding-left: 62px;
+    counter-increment: ryv-step;
+  }
+  .ryv-article-body ol li + li {
+    margin-top: 18px;
+  }
+  .ryv-article-body ol li::before {
+    content: counter(ryv-step);
+    position: absolute;
+    left: 0;
+    top: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    margin-top: -22px;
+    font-size: 18px;
+    font-weight: 700;
+    color: #2A6A8F;
+    background: #FFFFFF;
+    border: 2px solid #C9D6DE;
+    border-radius: 50%;
+  }
+  .ryv-article-body ol li:first-child::before {
+    color: #FFFFFF;
+    background: #EC2927;
+    border-color: #EC2927;
+  }
+  .ryv-article-body blockquote {
+    margin: 0;
+    padding: 8px 0 8px 32px;
+    border-left: 4px solid #EC2927;
+  }
+  .ryv-article-body blockquote p {
+    font-family: "Merriweather", Georgia, serif;
+    font-size: 28px;
+    font-weight: 700;
+    line-height: 1.3;
+    color: #002A41;
+  }
+  .ryv-article-body blockquote cite {
+    display: block;
+    margin-top: 14px;
+    font-size: 16px;
+    font-style: normal;
+    font-weight: 700;
+    letter-spacing: 1.68px;
+    text-transform: uppercase;
+    color: #2A6A8F;
+  }
+  .ryv-article-body figure,
+  .ryv-article-body .wp-caption {
+    max-width: 100%;
+    margin: 0;
+  }
+  .ryv-article-body img {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+  .ryv-article-body figcaption,
+  .ryv-article-body .wp-caption-text {
+    margin-top: 12px;
+    font-size: 15px;
+    color: #6E6E6E;
+  }
+  .ryv-article-body a {
+    color: #A21D1B;
+    text-decoration: underline;
+  }
+  @media (max-width: 767px) {
+    .ryv-article-body h2 {
+      font-size: 28px;
+    }
+    .ryv-article-body blockquote p,
+    .ryv-article-body h3 {
+      font-size: 22px;
+    }
+  }
+
+  /* RYV Resource Tags: "GUIDE · PDF" + state pills on resource cards
+   * (Figma "Resource Card" meta row). */
+  .ryv-resource-tags {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--ryv-rtag-gap, 12px);
+    font-size: 16px;
+    font-weight: 700;
+    line-height: 1.2;
+    letter-spacing: 1.68px;
+    text-transform: uppercase;
+  }
+  .ryv-resource-tags__types {
+    color: var(--ryv-rtag-type-color, #2A6A8F);
+  }
+  .ryv-resource-tag {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 8px;
+    color: var(--ryv-rtag-state-color, #DE3804);
+    background: var(--ryv-rtag-state-bg, rgba(222, 56, 4, 0.1));
+  }
+  .ryv-resource-tag--all {
+    color: var(--ryv-rtag-all-color, #2A6A8F);
+    background: var(--ryv-rtag-all-bg, rgba(42, 106, 143, 0.1));
+  }
+  .ryv-resource-tag--more {
+    cursor: help;
+  }
 }

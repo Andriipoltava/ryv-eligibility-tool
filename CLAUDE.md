@@ -648,6 +648,158 @@ repeated), not bound to anything - which is why real events never appeared.
 Replacing it with a Loop Grid carrying the Query ID above is what wires it
 up.
 
+### Resources page search (`includes/class-ryv-resources-search.php`)
+
+`/resources/` (EN) and `/es/recursos/` (ES, WPML-linked) follow the Figma
+"Resources" page (file `OGiKyiQEdLL0iwuMRib7k2`, node `1353:58`):
+breadcrumb, H1 + intro, a blue search panel, then a results section with
+the category tabs + "Sort by" on one row, a "Showing 1–6 of 48 …" line, the
+card grid (Loop Grid + "Resources Loop Item" template) and numbered
+pagination. Everything is plain Elementor except three small widgets, kept
+separate so each sits where the design puts it:
+
+- **RYV Resources Search** (`widgets/class-ryv-resources-search-widget.php`)
+  - keyword field, 50-state dropdown (DC excluded), Search button with an
+  Elementor icon. A plain GET form (`ryv_search`, `ryv_state`).
+- **RYV Resources Sort** (`...-sort-widget.php`) - `ryv_sort`
+  (`RYV_Resources_Search::SORTS`; "Most relevant" = '' = the grid's own order).
+- **RYV Resources Count** (`...-count-widget.php`) - `{start}–{end} of
+  {total} … {state}` templates.
+
+Any Loop Grid with Query ID `ryv_resources_search` is narrowed to match:
+search hits the title or the ACF Description; a state matches the union of
+resources tagged with that state in the ACF-UI-registered `resource-state`
+taxonomy **and** those picked on the state post's `ryv_resources` field.
+Category tabs work on top - their REST refresh only carries the page URL as
+`Referer`, which is where `get_current_filters()` (and the language, for
+Spanish state names) is read from there.
+
+The count can't be computed by its widget (it renders above the grid,
+before the grid's query ran), so `append_found_count()` stamps a hidden
+`.ryv-rs-found[data-found][data-page][data-per-page][data-state]` marker onto
+the Loop Grid's own markup via `elementor/widget/render_content`; the JS
+fills every `.ryv-resources-count` from it after each refresh, including
+Elementor's own tab/pagination refreshes (MutationObserver).
+
+**Pagination**: Elementor Pro builds page links from the permalink and
+re-adds only its own `e-filter-*` params, so page 2 silently dropped the
+search - `keep_filters_in_pagination()` (`elementor/posts/wp_link_page`)
+re-adds `ryv_*`. The grid uses numbers + prev/next with **AJAX load**, which
+fetches exactly that href.
+
+`assets/js/resources-search.js`: a select2-style searchable state combobox
+over the native `<select>` (still the value holder / no-JS fallback), and
+AJAX mode (a Search-widget toggle the Sort widget follows) - push the new
+URL, fetch that same page, swap in only its Loop Grid + Taxonomy Filter
+elements and re-run Elementor handlers on them. Fetching the real page
+rather than Elementor Pro's `refresh-loop` endpoint also re-computes which
+category tabs still have results, without depending on Elementor Pro's
+internal JS store.
+
+Two opt-in helper classes in `input.css` (Advanced > CSS Classes; listed in
+`tailwind.config.js`'s `safelist` because they only ever appear in Elementor
+data, so Tailwind's purge would drop them): `ryv-search-panel` (the Figma
+swoosh on a container - it overrides the border/inset Elementor gives every
+container's `::before` background-overlay layer, which otherwise drew a navy
+frame around it; and it must never get `overflow: hidden` - that clipped
+the state dropdown's list, so the swoosh is clipped by sizing the
+pseudo-element to the visible corner instead) and `ryv-pagination-boxes` (on a Loop Grid: the design's
+48px boxed page numbers).
+
+Spanish: state names from `RYV_Resources_Search::SPANISH_NAMES`. Spanish
+`ryv_resource_category` terms exist as WPML translations of the English
+ones - assign them to Spanish resources from a Spanish admin context, since
+in a CLI/English context WPML silently swaps them back to the English terms.
+
+**Never start a WP_Query inside the query hook.** Elementor Pro fires
+`elementor/query/{id}` from a `pre_get_posts` callback, so a nested
+`get_posts()` re-enters it (infinite recursion → memory-exhausted blank page;
+hence the `$running` guard), and the Taxonomy Filter builds the grid's query
+with a global `include_field_ids_arg` flag that mangles any nested query (the
+tabs vanished whenever a state was picked). The state lookup is therefore
+plain SQL + `get_objects_in_term()`.
+
+### Single blog post template (`includes/class-ryv-post-meta.php`)
+
+Elementor Theme Builder "Single Post" (`include/singular/post`) plus its
+WPML Spanish translation "Publicación individual" (no conditions of its own
+- WPML swaps it in, same as the State Post template), built from the Figma
+"Blog Post – Template" (node `1353:606`): breadcrumb + hero (tags, H1,
+excerpt, byline, Share), post body with a sidebar ("In this article" +
+"Can I vote in my state?"), and Related Stories. Only those three parts were
+designed; the body is a plain Post Content widget.
+
+- **Topic vs. state tags**: blog posts put both in core `category` ("POLICY",
+  "KENTUCKY"). `RYV_Post_Meta::is_state_term()` = slug (in the default
+  language - WPML keeps per-language terms like "MINESOTA") is a key of
+  `RYV_US_States::MAP`. Primary topic = Yoast's primary category if it's a
+  topic, else the first topic. Rendered by the **RYV Post Tags** widget,
+  which also sits in the "Related Story Card" loop item.
+- **Byline**: dynamic tags `RYV: Author Photo` (ACF user field
+  `ryv_author_photo`, Gravatar fallback), `RYV: Byline Meta` ("Job title ·
+  date · N min read"; job title = ACF user field `ryv_author_title`, reading
+  time = Yoast's stored estimate or words/200), `RYV: Post Topic` / `URL`
+  (breadcrumb). The two ACF fields are on every user profile ("Author
+  Details (blog posts)").
+- **RYV Share Links** (copy / email / print, Figma icons in
+  `assets/img/share/`) - Elementor Pro's Share Buttons has no copy-link.
+  The copy falls back to `execCommand` when the Clipboard API refuses
+  (it does whenever the document isn't focused).
+- **Sidebar**: Elementor Pro Table of Contents (H2s inside `.ryv-post-content`)
+  styled by the `ryv-toc` helper class - hidden entirely on the front end
+  when a post has no H2; only the *first* in-view section is highlighted
+  (Elementor marks every visible one active). **RYV State Picker** submits
+  `?ryv_go_state=<slug>`, which `maybe_redirect_to_state()` turns into a
+  redirect to that state's page in the current language - no JS needed.
+- **Related Stories**: Loop Grid, Query source "Related" (by category,
+  fallback recent), card = "Related Story Card" loop item; the Spanish
+  template points at its own "Related Story Card (ES)" so "min de lectura"
+  isn't English.
+- Nested Elementor containers default to `--width: 100%` in a row, which
+  pushed the sidebar off-screen and wrapped Share under the author: the
+  content column is `width: 50%` + grow, the author block `width: auto`.
+
+### Single resource template
+
+"Single Resource" (`include/singular/ryv_resources`) + WPML Spanish "Recurso
+individual", the same Figma article layout as the blog post template: tags
+(`ryv_resource_category` = topic, `resource-state` = state - RYV_Post_Meta
+switches taxonomies by post type), title, ACF description, a red CTA button
+(`RYV: Resource File / URL` tag -> `RYV_Resources_CPT::get_target_url()`:
+the File if uploaded, else the URL) + "PDF · date", Share, feature image,
+the ACF **Page Content** WYSIWYG (`ryv_resource_content`) styled by the
+`ryv-article-body` helper class (H2 Sentinel 36, red square bullets,
+numbered-circle steps for `<ol>`, red-ruled blockquote with `<cite>`),
+sidebar, and Related Resources ("Related Resource Card" / "(ES)").
+
+Resources with an external link still redirect via `_links_to` - the
+"External Permalink" box under the title, from Admin Site Enhancements'
+External Permalinks module - this page is for the ones without.
+`ryv-article-body` spacing skips the `span.elementor-menu-anchor` the TOC
+injects before each heading, or the 28px gap lands on the empty anchor.
+
+### Resource card tags (type + state)
+
+Every resource card (the one "Resources Loop Item" template, so home page,
+Resources page and state pages alike) shows **RYV Resource Tags**
+(`widgets/class-ryv-resource-tags-widget.php`): the ticked **Resource
+Types** (`ryv_resource_type`, registered in `RYV_Resources_CPT`, seeded with
+PDF / Guide / Resource Link / Tool Kit / Fact Sheet) as teal text joined by
+" · ", then the ticked **Resource States** (`resource-state`, ACF-UI
+taxonomy, forced to checkbox UI + admin column via `register_taxonomy_args`,
+seeded with "All States" + 50 states) as pills - blue for All States,
+orange for a single state, "+N" past the widget's max. Seeding runs once per
+`RYV_Resources_CPT::TAG_TERMS_VERSION` (51 `term_exists()` calls aren't a
+per-request thing).
+
+Both taxonomies are `translate="0"` in `wpml-config.xml`: one shared set of
+checkboxes for every language, Spanish labels from
+`RYV_Resources_CPT::get_term_label()` (`SPANISH_TYPE_NAMES` +
+`RYV_Resources_Search::SPANISH_NAMES`). An "All States" resource matches
+every state in the Resources page's state filter. The old free-text
+`ryv_resource_format` field is only a fallback for the "type · date" line
+when no type is ticked.
+
 ### Hiding empty sections on a state page
 
 `includes/class-ryv-states-template.php`'s `ryv-hide-empty--...` markers
@@ -992,7 +1144,9 @@ normally syncs on.
 A static, read-only documentation page (`admin/views/help-page.php`) under
 **RYV Forms → Help**, last in the submenu - plain-language usage
 instructions (creating a form, the builder's fields, YAML import, embedding,
-styling, lead capture, activity log/submissions) aimed at the
+styling, lead capture, activity log/submissions, and the editorial guide for
+filling in Resources / blog posts / Spanish versions so they render like the
+Figma pages) aimed at the
 `manage_options` admins who actually run this plugin day to day, not at a
 future developer reading this file. No dynamic data, no state, no
 capability beyond `manage_options` for consistency with every other

@@ -23,6 +23,55 @@ class RYV_Resources_CPT {
 	const TAXONOMY = 'ryv_resource_category';
 
 	/**
+	 * "What kind of resource is this" - the type half of a card's tags
+	 * ("GUIDE · PDF"). Registered here in code.
+	 */
+	const TYPE_TAXONOMY = 'ryv_resource_type';
+
+	/**
+	 * "Which state is this for" - the state half ("ALL STATES" /
+	 * "TENNESSEE"). Registered from the ACF UI (ACF → Taxonomies), not in
+	 * code; this class only seeds its terms and adjusts its admin args.
+	 */
+	const STATE_TAXONOMY = 'resource-state';
+
+	/**
+	 * Slug of the "applies everywhere" state term. A resource tagged with it
+	 * matches every state in the Resources page's state filter.
+	 */
+	const ALL_STATES = 'all-states';
+
+	/**
+	 * Resource type terms seeded on first run, slug => name.
+	 */
+	const DEFAULT_TYPES = array(
+		'pdf'           => 'PDF',
+		'guide'         => 'Guide',
+		'resource-link' => 'Resource Link',
+		'tool-kit'      => 'Tool Kit',
+		'fact-sheet'    => 'Fact Sheet',
+	);
+
+	/**
+	 * Spanish display names for the type terms. The taxonomies aren't
+	 * translated per language in WPML (one shared set of checkboxes, so an
+	 * editor never has to tick the same thing twice) - the Spanish pages
+	 * just show these labels instead.
+	 */
+	const SPANISH_TYPE_NAMES = array(
+		'pdf'           => 'PDF',
+		'guide'         => 'Guía',
+		'resource-link' => 'Enlace',
+		'tool-kit'      => 'Kit de herramientas',
+		'fact-sheet'    => 'Hoja informativa',
+	);
+
+	/**
+	 * Bump to re-run maybe_seed_resource_tag_terms() on the next request.
+	 */
+	const TAG_TERMS_VERSION = '1';
+
+	/**
 	 * Default terms seeded on first registration, keyed by slug.
 	 *
 	 * Matches the categories the old ACF select field used to hardcode, so
@@ -43,6 +92,7 @@ class RYV_Resources_CPT {
 	 */
 	public function __construct() {
 		add_action( 'init', array( $this, 'register_taxonomy' ), 0 );
+		add_action( 'init', array( $this, 'register_type_taxonomy' ), 0 );
 		add_action( 'init', array( $this, 'register_post_type' ) );
 		// Same backstop RYV_CPT applies to `ryv_forms`: a post with no WPML
 		// language row is excluded by the INNER JOIN every language-filtered
@@ -50,6 +100,8 @@ class RYV_Resources_CPT {
 		// a state page's own related list on the frontend.
 		add_action( 'save_post_' . self::POST_TYPE, array( 'RYV_CPT', 'assign_default_language_if_missing' ) );
 		add_action( 'init', array( $this, 'maybe_seed_default_terms' ), 20 );
+		add_action( 'init', array( $this, 'maybe_seed_resource_tag_terms' ), 21 );
+		add_filter( 'register_taxonomy_args', array( $this, 'adjust_state_taxonomy_args' ), 10, 2 );
 		add_filter( 'manage_' . self::POST_TYPE . '_posts_columns', array( $this, 'admin_columns' ) );
 		add_action( 'manage_' . self::POST_TYPE . '_posts_custom_column', array( $this, 'render_admin_column' ), 10, 2 );
 
@@ -102,6 +154,29 @@ class RYV_Resources_CPT {
 
 		$presets = self::cta_presets();
 		return $presets[ $preset ] ?? '';
+	}
+
+	/**
+	 * Where a resource's CTA points: its uploaded File, else its URL field,
+	 * else '' (the resource then only has its own page).
+	 *
+	 * @param int $post_id Resource post ID.
+	 * @return string
+	 */
+	public static function get_target_url( int $post_id ): string {
+		if ( ! function_exists( 'get_field' ) ) {
+			return '';
+		}
+
+		$file = get_field( 'ryv_resource_file', $post_id );
+		if ( is_array( $file ) && ! empty( $file['url'] ) ) {
+			return (string) $file['url'];
+		}
+		if ( is_numeric( $file ) && $file ) {
+			return (string) wp_get_attachment_url( (int) $file );
+		}
+
+		return trim( (string) get_field( 'ryv_resource_url', $post_id ) );
 	}
 
 	/**
@@ -159,6 +234,115 @@ class RYV_Resources_CPT {
 			'show_in_nav_menus' => true,
 			'rewrite'           => array( 'slug' => 'resource-category', 'with_front' => false ),
 		) );
+	}
+
+	/**
+	 * Register the ryv_resource_type taxonomy - checkbox UI (hierarchical)
+	 * like Categories, and an admin list column.
+	 */
+	public function register_type_taxonomy() {
+		register_taxonomy(
+			self::TYPE_TAXONOMY,
+			self::POST_TYPE,
+			array(
+				'labels'            => array(
+					'name'          => 'Resource Types',
+					'singular_name' => 'Resource Type',
+					'search_items'  => 'Search Resource Types',
+					'all_items'     => 'All Resource Types',
+					'edit_item'     => 'Edit Resource Type',
+					'update_item'   => 'Update Resource Type',
+					'add_new_item'  => 'Add New Resource Type',
+					'new_item_name' => 'New Resource Type Name',
+					'menu_name'     => 'Resource Types',
+				),
+				'hierarchical'      => true,
+				'public'            => true,
+				'show_ui'           => true,
+				'show_admin_column' => true,
+				'show_in_rest'      => true,
+				// Same reason as the category taxonomy above: Elementor Pro's
+				// query/filter controls only list show_in_nav_menus taxonomies.
+				'show_in_nav_menus' => true,
+				'rewrite'           => array( 'slug' => 'resource-type', 'with_front' => false ),
+			)
+		);
+	}
+
+	/**
+	 * The ACF-registered state taxonomy: force the checkbox UI and an admin
+	 * list column, so picking states works exactly like picking categories
+	 * whatever its ACF UI settings say.
+	 *
+	 * @param array  $args     Taxonomy args.
+	 * @param string $taxonomy Taxonomy being registered.
+	 * @return array
+	 */
+	public function adjust_state_taxonomy_args( $args, $taxonomy ) {
+		if ( self::STATE_TAXONOMY === $taxonomy ) {
+			$args['hierarchical']      = true;
+			$args['show_admin_column'] = true;
+		}
+		return $args;
+	}
+
+	/**
+	 * Seed the Resource Type terms and the "All States" + 50 state terms,
+	 * once per TAG_TERMS_VERSION (51+ term_exists() calls are not something
+	 * to run on every request). Existing terms are never renamed or removed.
+	 */
+	public function maybe_seed_resource_tag_terms() {
+		if ( get_option( 'ryv_resource_tag_terms_version' ) === self::TAG_TERMS_VERSION || ! taxonomy_exists( self::STATE_TAXONOMY ) ) {
+			return;
+		}
+
+		foreach ( self::DEFAULT_TYPES as $slug => $name ) {
+			if ( ! term_exists( $slug, self::TYPE_TAXONOMY ) ) {
+				wp_insert_term( $name, self::TYPE_TAXONOMY, array( 'slug' => $slug ) );
+			}
+		}
+
+		$states = array( self::ALL_STATES => 'All States' ) + RYV_US_States::MAP;
+		unset( $states['district-of-columbia'] );
+
+		foreach ( $states as $slug => $name ) {
+			if ( ! term_exists( $slug, self::STATE_TAXONOMY ) ) {
+				wp_insert_term( $name, self::STATE_TAXONOMY, array( 'slug' => $slug ) );
+			}
+		}
+
+		update_option( 'ryv_resource_tag_terms_version', self::TAG_TERMS_VERSION, false );
+	}
+
+	/**
+	 * A term's display name in the language being viewed - Spanish type and
+	 * state names come from the maps above / RYV_Resources_Search, since
+	 * these taxonomies share one set of terms across languages.
+	 *
+	 * @param WP_Term $term A ryv_resource_type or resource-state term.
+	 * @param string  $lang Language code ('' = current).
+	 * @return string
+	 */
+	public static function get_term_label( WP_Term $term, string $lang = '' ): string {
+		if ( '' === $lang && class_exists( 'RYV_Resources_Search' ) ) {
+			$lang = RYV_Resources_Search::current_language();
+		}
+
+		if ( 'es' === $lang ) {
+			if ( self::TYPE_TAXONOMY === $term->taxonomy && isset( self::SPANISH_TYPE_NAMES[ $term->slug ] ) ) {
+				return self::SPANISH_TYPE_NAMES[ $term->slug ];
+			}
+			if ( self::STATE_TAXONOMY === $term->taxonomy ) {
+				if ( self::ALL_STATES === $term->slug ) {
+					return 'Todos los estados';
+				}
+				if ( isset( RYV_Resources_Search::SPANISH_NAMES[ $term->slug ] ) ) {
+					return RYV_Resources_Search::SPANISH_NAMES[ $term->slug ];
+				}
+			}
+		}
+
+		return $term->name;
 	}
 
 	/**
@@ -259,7 +443,7 @@ class RYV_Resources_CPT {
 					'label'        => 'Format',
 					'name'         => 'ryv_resource_format',
 					'type'         => 'text',
-					'instructions' => 'E.g. "PDF", "Video", "Web Page"',
+					'instructions' => 'Optional, legacy. The tags on cards now come from Resource Types (right sidebar) - this is only shown when no type is ticked.',
 					'wrapper'      => array( 'width' => '50' ),
 				),
 				array(
@@ -268,6 +452,16 @@ class RYV_Resources_CPT {
 					'name'  => 'ryv_resource_description',
 					'type'  => 'textarea',
 					'rows'  => 3,
+				),
+				array(
+					'key'          => 'field_ryv_resource_content',
+					'label'        => 'Page Content',
+					'name'         => 'ryv_resource_content',
+					'type'         => 'wysiwyg',
+					'tabs'         => 'all',
+					'toolbar'      => 'full',
+					'media_upload' => 1,
+					'instructions' => 'Body of this resource\'s own page (shown when it has no external URL). Use Heading 2 for sections - they become the "In this article" list.',
 				),
 				array(
 					'key'     => 'field_ryv_resource_url',

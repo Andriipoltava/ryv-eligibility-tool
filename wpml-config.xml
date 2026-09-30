@@ -61,6 +61,11 @@
 	</custom-types>
 	<taxonomies>
 		<taxonomy translate="1">ryv_resource_category</taxonomy>
+		<!-- One shared set of type/state checkboxes for every language (the
+		     Spanish labels come from RYV_Resources_CPT::get_term_label()), so an
+		     editor never ticks the same thing twice. -->
+		<taxonomy translate="0">ryv_resource_type</taxonomy>
+		<taxonomy translate="0">resource-state</taxonomy>
 	</taxonomies>
 	<custom-fields>
 		<custom-field action="translate">_ryv_story_quote</custom-field>
@@ -121,6 +126,50 @@
 				<field editor_type="LINE">captioned_text</field>
 				<field editor_type="LINE">all_link_text</field>
 				<field key_of="all_link_url" editor_type="LINK">url</field>
+			</fields>
+		</widget>
+		<widget name="ryv_resources_search">
+			<fields>
+				<field editor_type="LINE">search_placeholder</field>
+				<field editor_type="LINE">state_placeholder</field>
+				<field editor_type="LINE">no_results_text</field>
+				<field editor_type="LINE">button_text</field>
+				<field editor_type="LINE">reset_text</field>
+			</fields>
+		</widget>
+		<widget name="ryv_resources_sort">
+			<fields>
+				<field editor_type="LINE">sort_label</field>
+				<field editor_type="LINE">sort_text_relevant</field>
+				<field editor_type="LINE">sort_text_newest</field>
+				<field editor_type="LINE">sort_text_oldest</field>
+				<field editor_type="LINE">sort_text_title_asc</field>
+				<field editor_type="LINE">sort_text_title_desc</field>
+			</fields>
+		</widget>
+		<widget name="ryv_resources_count">
+			<fields>
+				<field editor_type="LINE">text_many</field>
+				<field editor_type="LINE">text_one</field>
+				<field editor_type="LINE">text_none</field>
+				<field editor_type="LINE">text_search</field>
+				<field editor_type="LINE">text_all</field>
+			</fields>
+		</widget>
+		<widget name="ryv_share_links">
+			<fields>
+				<field editor_type="LINE">label</field>
+				<field editor_type="LINE">copy_title</field>
+				<field editor_type="LINE">email_title</field>
+				<field editor_type="LINE">print_title</field>
+				<field editor_type="LINE">copied_text</field>
+			</fields>
+		</widget>
+		<widget name="ryv_state_picker">
+			<fields>
+				<field editor_type="LINE">placeholder</field>
+				<field editor_type="LINE">no_results_text</field>
+				<field editor_type="LINE">button_text</field>
 			</fields>
 		</widget>
 	</elementor-widgets>

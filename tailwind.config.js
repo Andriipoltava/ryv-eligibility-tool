@@ -9,6 +9,9 @@ module.exports = {
     // inside a widget embedded in someone else's page/theme.
     preflight: false,
   },
+  // Helper classes applied only from Elementor (Advanced > CSS Classes),
+  // so they never appear in a scanned file - see input.css.
+  safelist: ['ryv-search-panel', 'ryv-pagination-boxes', 'ryv-toc', 'ryv-post-tags--outline', 'ryv-article-body'],
   content: [
     './includes/**/*.php',
     './admin/**/*.php',

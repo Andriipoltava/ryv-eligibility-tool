@@ -203,7 +203,7 @@ class RYV_State_Queries {
 			return;
 		}
 
-		$ids = $this->get_related_ids( self::get_state_id(), $queries[ $query_id ] );
+		$ids = self::get_related_ids( self::get_state_id(), $queries[ $query_id ] );
 
 		if ( 'ryv_state_events' === $query_id ) {
 			$ids = $this->prepare_event_ids( $ids );
@@ -561,7 +561,7 @@ class RYV_State_Queries {
 	 * @param string $field    ACF relationship field name.
 	 * @return int[]
 	 */
-	private function get_related_ids( int $state_id, string $field ): array {
+	public static function get_related_ids( int $state_id, string $field ): array {
 		if ( ! $state_id ) {
 			return array();
 		}
@@ -588,7 +588,7 @@ class RYV_State_Queries {
 			}
 		}
 
-		return $this->map_ids_to_current_language( array_values( array_unique( $ids ) ) );
+		return self::map_ids_to_current_language( array_values( array_unique( $ids ) ) );
 	}
 
 	/**
@@ -603,7 +603,7 @@ class RYV_State_Queries {
 	 * @param int[] $ids Post ids picked on the state.
 	 * @return int[]
 	 */
-	private function map_ids_to_current_language( array $ids ): array {
+	private static function map_ids_to_current_language( array $ids ): array {
 		if ( ! $ids || ! has_filter( 'wpml_object_id' ) ) {
 			return $ids;
 		}

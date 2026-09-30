@@ -190,6 +190,8 @@ final class RYV_Plugin {
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-states-partners-shortcode.php';
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-states-cpt.php';
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-state-queries.php';
+		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-resources-search.php';
+		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-post-meta.php';
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-events-repair.php';
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-resources-cpt.php';
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-stories-cpt.php';
@@ -278,6 +280,8 @@ final class RYV_Plugin {
 		// picked" (an empty list, never the whole events archive) when ACF
 		// isn't there to have stored any.
 		new RYV_State_Queries();
+		new RYV_Resources_Search();
+		new RYV_Post_Meta();
 		new RYV_Settings_Page();
 		$this->design_tokens = new RYV_Design_Tokens();
 

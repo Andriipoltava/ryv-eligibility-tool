@@ -55,5 +55,26 @@ class RYV_Elementor {
 
 		require_once RYV_PLUGIN_DIR . 'widgets/class-ryv-featured-partners-widget.php';
 		$widgets_manager->register( new RYV_Featured_Partners_Widget() );
+
+		require_once RYV_PLUGIN_DIR . 'widgets/class-ryv-resources-search-widget.php';
+		$widgets_manager->register( new RYV_Resources_Search_Widget() );
+
+		require_once RYV_PLUGIN_DIR . 'widgets/class-ryv-resources-sort-widget.php';
+		$widgets_manager->register( new RYV_Resources_Sort_Widget() );
+
+		require_once RYV_PLUGIN_DIR . 'widgets/class-ryv-resources-count-widget.php';
+		$widgets_manager->register( new RYV_Resources_Count_Widget() );
+
+		require_once RYV_PLUGIN_DIR . 'widgets/class-ryv-post-tags-widget.php';
+		$widgets_manager->register( new RYV_Post_Tags_Widget() );
+
+		require_once RYV_PLUGIN_DIR . 'widgets/class-ryv-resource-tags-widget.php';
+		$widgets_manager->register( new RYV_Resource_Tags_Widget() );
+
+		require_once RYV_PLUGIN_DIR . 'widgets/class-ryv-share-links-widget.php';
+		$widgets_manager->register( new RYV_Share_Links_Widget() );
+
+		require_once RYV_PLUGIN_DIR . 'widgets/class-ryv-state-picker-widget.php';
+		$widgets_manager->register( new RYV_State_Picker_Widget() );
 	}
 }
