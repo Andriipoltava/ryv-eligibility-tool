@@ -284,6 +284,22 @@ happened to find the name on, so a step their branch skipped renders
 un-clickable. A form with no named steps reachable from the entry falls
 back to the old path-derived list.
 
+**Mid-flow "Start Over" (replaced the wizard-only Back button)**:
+`restartKeepingState()` wipes every answer except the state picker's and
+re-walks from the entry node, landing on that state's first question; it
+falls back to a full `restart()` when no state was picked (state-page
+placements skip the picker, so there's nothing to keep). The terminal card's
+own Start Over uses it too. `positionStartOverButton()` homes the single
+long-lived button above the visible card (wizard) or after the last card
+(stacked), and hides it when a terminal card already carries one or the
+widget's "Show Start Over Button" is off. It keeps the `ryv-back-btn` class
+so the old Back Button Style controls still style it; `labels.back`/the
+"Back" label control are now unused. For the "show the whole flow, sidebar
+stays put" look, set the widget to Stacked + Named step sidebar:
+`.ryv-layout-sidebar` is `position: sticky` on desktop (>=783px), offset by
+`--ryv-layout-sidebar-sticky-top` (default 2rem) - raise it under a fixed
+site header.
+
 `computeNext()` still
 defers markup nodes with a `next_node` set until their own "Continue" button
 is clicked (`advanceWizardMarkup()`) instead of auto-advancing, since
@@ -727,7 +743,11 @@ WPML Spanish translation "Publicación individual" (no conditions of its own
 "Blog Post – Template" (node `1353:606`): breadcrumb + hero (tags, H1,
 excerpt, byline, Share), post body with a sidebar ("In this article" +
 "Can I vote in my state?"), and Related Stories. Only those three parts were
-designed; the body is a plain Post Content widget.
+designed; the body is a plain Post Content widget carrying the
+`ryv-article-body` helper class (H2 Sentinel 36, red square bullets,
+numbered-circle steps for `<ol>`, red-ruled blockquote with `<cite>`; its
+spacing skips the `span.elementor-menu-anchor` the TOC injects before each
+heading, or the 28px gap lands on the empty anchor).
 
 - **Topic vs. state tags**: blog posts put both in core `category` ("POLICY",
   "KENTUCKY"). `RYV_Post_Meta::is_state_term()` = slug (in the default
@@ -759,36 +779,29 @@ designed; the body is a plain Post Content widget.
   pushed the sidebar off-screen and wrapped Share under the author: the
   content column is `width: 50%` + grow, the author block `width: auto`.
 
-### Single resource template
+### No single resource page
 
-"Single Resource" (`include/singular/ryv_resources`) + WPML Spanish "Recurso
-individual", the same Figma article layout as the blog post template: tags
-(`ryv_resource_category` = topic, `resource-state` = state - RYV_Post_Meta
-switches taxonomies by post type), title, ACF description, a red CTA button
-(`RYV: Resource File / URL` tag -> `RYV_Resources_CPT::get_target_url()`:
-the File if uploaded, else the URL) + "PDF · date", Share, feature image,
-the ACF **Page Content** WYSIWYG (`ryv_resource_content`) styled by the
-`ryv-article-body` helper class (H2 Sentinel 36, red square bullets,
-numbered-circle steps for `<ol>`, red-ruled blockquote with `<cite>`),
-sidebar, and Related Resources ("Related Resource Card" / "(ES)").
-
-Resources with an external link still redirect via `_links_to` - the
-"External Permalink" box under the title, from Admin Site Enhancements'
-External Permalinks module - this page is for the ones without.
-`ryv-article-body` spacing skips the `span.elementor-menu-anchor` the TOC
-injects before each heading, or the 28px gap lands on the empty anchor.
+Resources have no designed page of their own: every card's button goes to
+the resource permalink, which the "External Permalink" box (`_links_to`,
+Admin Site Enhancements' External Permalinks module) redirects to the file
+or website. A "Single Resource" template (+ ACF Page Content field,
+`RYV: Resource File / URL` tag, "Related Resource Card" loop items) was
+built once from the blog post's Figma - a misread; the Figma article page is
+for blog posts only - and removed again (templates trashed, code deleted).
+Don't rebuild it.
 
 ### Resource card tags (type + state)
 
 Every resource card (the one "Resources Loop Item" template, so home page,
 Resources page and state pages alike) shows **RYV Resource Tags**
-(`widgets/class-ryv-resource-tags-widget.php`): the ticked **Resource
-Types** (`ryv_resource_type`, registered in `RYV_Resources_CPT`, seeded with
-PDF / Guide / Resource Link / Tool Kit / Fact Sheet) as teal text joined by
-" · ", then the ticked **Resource States** (`resource-state`, ACF-UI
-taxonomy, forced to checkbox UI + admin column via `register_taxonomy_args`,
-seeded with "All States" + 50 states) as pills - blue for All States,
-orange for a single state, "+N" past the widget's max. Seeding runs once per
+(`widgets/class-ryv-resource-tags-widget.php`) in place of the old blue
+category line: the ticked **Resource Types** (`ryv_resource_type`,
+registered in `RYV_Resources_CPT`, seeded with PDF / Guide / Resource Link /
+Tool Kit / Fact Sheet) as teal text joined by " · ", then the ticked
+**Resource States** (`resource-state`, ACF-UI taxonomy, forced to checkbox
+UI + admin column via `register_taxonomy_args`, seeded with "All States" +
+50 states) as pills - blue for All States, orange for a single state, "+N"
+past the widget's max. Seeding runs once per
 `RYV_Resources_CPT::TAG_TERMS_VERSION` (51 `term_exists()` calls aren't a
 per-request thing).
 
@@ -796,9 +809,14 @@ Both taxonomies are `translate="0"` in `wpml-config.xml`: one shared set of
 checkboxes for every language, Spanish labels from
 `RYV_Resources_CPT::get_term_label()` (`SPANISH_TYPE_NAMES` +
 `RYV_Resources_Search::SPANISH_NAMES`). An "All States" resource matches
-every state in the Resources page's state filter. The old free-text
-`ryv_resource_format` field is only a fallback for the "type · date" line
-when no type is ticked.
+every state in the Resources page's state filter.
+
+History: these tags were once moved onto blog posts ("News Types/News
+States" on the "Post Loop Item" card) on the theory that the brief meant
+news. It didn't - the client brief is literally "Update to Resources
+Section", and the News card isn't even on /resources/. Moved back; the news
+card is again its category heading (post-terms, spans), and the news
+taxonomies were deleted along with their terms. Keep these on resources.
 
 ### Hiding empty sections on a state page
 

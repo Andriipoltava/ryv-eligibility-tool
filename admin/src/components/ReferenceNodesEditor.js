@@ -1,5 +1,6 @@
 import { __ } from '@wordpress/i18n';
-import { Button, SelectControl } from '@wordpress/components';
+import { Button } from '@wordpress/components';
+import NodeSelect from './NodeSelect';
 import ConfirmButton from './ConfirmButton';
 
 /**
@@ -49,7 +50,7 @@ export default function ReferenceNodesEditor({ referenceNodeIds, referenceNodeOp
         <div className="ryv-builder-reference-node-row" key={index}>
           <span className="ryv-builder-reference-node-position">{index + 1}</span>
 
-          <SelectControl
+          <NodeSelect
             className="ryv-builder-reference-node-select"
             label={__('Node', 'ryv-eligibility-tool')}
             hideLabelFromVision

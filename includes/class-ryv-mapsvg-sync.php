@@ -122,9 +122,9 @@ class RYV_MapSVG_Sync {
 			return;
 		}
 
-		$category  = get_field( 'ryv_map_category', $post_id ) ?: '';
+		$category  = RYV_States_ACF::get_state_categories( $post_id )[0] ?? '';
 		$tooltip   = get_field( 'ryv_map_tooltip_text', $post_id ) ?: '';
-		$mixed     = (bool) get_field( 'ryv_map_mixed_rules', $post_id );
+		$mixed     = count( RYV_States_ACF::get_state_categories( $post_id ) ) > 1;
 		$permalink = get_permalink( $post_id );
 
 		$update_data = array(

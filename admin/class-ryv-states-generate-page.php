@@ -47,6 +47,16 @@ class RYV_States_Generate_Page {
 	const TEMPLATE_NONCE_ACTION = 'ryv_repair_state_template';
 
 	/**
+	 * Nonce action for the "Apply Map Update" buttons.
+	 */
+	const MAP_UPDATE_NONCE_ACTION = 'ryv_apply_map_update';
+
+	/**
+	 * Per-user transient prefix for the map-update result.
+	 */
+	const MAP_UPDATE_RESULT_TRANSIENT_PREFIX = 'ryv_map_update_result_';
+
+	/**
 	 * Nonce action for the "Sync News Categories" button.
 	 */
 	const NEWS_SYNC_NONCE_ACTION = 'ryv_sync_news_categories';
@@ -97,6 +107,7 @@ class RYV_States_Generate_Page {
 		add_action( 'admin_init', array( $this, 'handle_events_repair_submission' ) );
 		add_action( 'admin_init', array( $this, 'handle_template_repair_submission' ) );
 		add_action( 'admin_init', array( $this, 'handle_news_sync_submission' ) );
+		add_action( 'admin_init', array( $this, 'handle_map_update_submission' ) );
 	}
 
 	/**
@@ -366,6 +377,52 @@ class RYV_States_Generate_Page {
 	 */
 	public function consume_events_repair_result(): ?array {
 		$key    = self::EVENTS_RESULT_TRANSIENT_PREFIX . get_current_user_id();
+		$result = get_transient( $key );
+
+		if ( false === $result ) {
+			return null;
+		}
+
+		delete_transient( $key );
+
+		return $result;
+	}
+
+	/**
+	 * "Apply Map Update": RYV_Map_Update::run() - current categories/colors,
+	 * states moved off retired categories, popup text sizes, MapSVG re-sync.
+	 * "Preview Changes" reports without writing.
+	 */
+	public function handle_map_update_submission() {
+		if ( ! isset( $_POST['ryv_apply_map_update_submit'] ) && ! isset( $_POST['ryv_preview_map_update_submit'] ) ) {
+			return;
+		}
+
+		if ( ! current_user_can( self::CAPABILITY ) ) {
+			wp_die( esc_html__( 'You are not allowed to modify the map.', 'ryv-eligibility-tool' ) );
+		}
+
+		check_admin_referer( self::MAP_UPDATE_NONCE_ACTION, 'ryv_map_update_nonce' );
+
+		$result = RYV_Map_Update::run( isset( $_POST['ryv_preview_map_update_submit'] ) );
+
+		set_transient(
+			self::MAP_UPDATE_RESULT_TRANSIENT_PREFIX . get_current_user_id(),
+			$result,
+			MINUTE_IN_SECONDS * 5
+		);
+
+		wp_safe_redirect( admin_url( 'edit.php?post_type=' . RYV_States_CPT::POST_TYPE . '&page=' . RYV_States_Tools_Page::PAGE_SLUG . '&tab=' . self::PAGE_SLUG ) );
+		exit;
+	}
+
+	/**
+	 * Pop (read + delete) this user's pending map-update result.
+	 *
+	 * @return array|null
+	 */
+	public function consume_map_update_result(): ?array {
+		$key    = self::MAP_UPDATE_RESULT_TRANSIENT_PREFIX . get_current_user_id();
 		$result = get_transient( $key );
 
 		if ( false === $result ) {

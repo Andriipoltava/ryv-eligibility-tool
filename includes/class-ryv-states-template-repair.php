@@ -115,7 +115,19 @@ class RYV_States_Template_Repair {
 		// 06 · Latest news (Latest News & Updates - hidden when the state has
 		// no posts in its matching category, see RYV_State_Queries).
 		'78152eaf' => 'ryv-hide-empty--query-ryv_state_news',
+		// "Source: ..." line under the hero stats (added by SOURCE_WIDGET_ID).
+		'ryvsrc1'  => 'ryv-hide-empty--field-ryv_hero_stats_source_name',
 	);
+
+	/**
+	 * Element id of the hero stats card the "Source:" line is appended to
+	 * (last child, so it sits full-width below both stat rows), and the id
+	 * given to the Text Editor widget holding `[ryv_stats_source]`. Its
+	 * typography mirrors the stat description widgets. Added only when
+	 * missing, so re-running is a no-op.
+	 */
+	const SOURCE_PARENT_ID = '39d232c0';
+	const SOURCE_WIDGET_ID = 'ryvsrc1';
 
 	/**
 	 * Loop Grid element id => the Query ID it must carry.
@@ -338,10 +350,60 @@ class RYV_States_Template_Repair {
 				}
 			}
 
+			if ( self::SOURCE_PARENT_ID === $id && ! self::has_child( $element, self::SOURCE_WIDGET_ID ) ) {
+				$element['elements'][]                  = self::build_source_widget();
+				$changes['static_settings_set'][ self::SOURCE_WIDGET_ID ]['added'] = '[ryv_stats_source]';
+			}
+
 			if ( ! empty( $element['elements'] ) ) {
 				self::walk( $element['elements'], $changes, $missing );
 			}
 		}
+	}
+
+	/**
+	 * Whether an element has a direct child with this id.
+	 *
+	 * @param array  $element Elementor element.
+	 * @param string $id      Child id.
+	 * @return bool
+	 */
+	private static function has_child( array $element, string $id ): bool {
+		foreach ( $element['elements'] ?? array() as $child ) {
+			if ( ( $child['id'] ?? '' ) === $id ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * Text Editor widget rendering `[ryv_stats_source]`, styled like the
+	 * stat description text above it.
+	 *
+	 * @return array
+	 */
+	private static function build_source_widget(): array {
+		return array(
+			'id'         => self::SOURCE_WIDGET_ID,
+			'elType'     => 'widget',
+			'widgetType' => 'text-editor',
+			'elements'   => array(),
+			'settings'   => array(
+				'editor'                 => '[ryv_stats_source]',
+				'align'                  => 'left',
+				'typography_typography'  => 'custom',
+				'typography_font_family' => 'Barlow',
+				'typography_font_size'   => array( 'unit' => 'px', 'size' => 15, 'sizes' => array() ),
+				'typography_font_weight' => '400',
+				'typography_line_height' => array( 'unit' => 'em', 'size' => 1.4, 'sizes' => array() ),
+				'_title'                 => 'Text · Stats source',
+				'_element_width'         => 'initial',
+				'_element_custom_width'  => array( 'unit' => '%', 'size' => 100, 'sizes' => array() ),
+				'__globals__'            => array( 'text_color' => 'globals/colors?id=clc_primary' ),
+			),
+		);
 	}
 
 	/**

@@ -294,12 +294,12 @@ class RYV_State_Queries {
 	 * @param int[] $ids Event post ids picked on the state.
 	 * @return int[] Chronological, upcoming-only (unless filtered otherwise).
 	 */
-	private function prepare_event_ids( array $ids ): array {
+	private static function prepare_event_ids( array $ids ): array {
 		if ( ! $ids ) {
 			return $ids;
 		}
 
-		$hide_past = $this->should_hide_past_events();
+		$hide_past = self::should_hide_past_events();
 		$now       = current_time( 'mysql' );
 		$dated     = array();
 
@@ -505,6 +505,20 @@ class RYV_State_Queries {
 	}
 
 	/**
+	 * Whether the state has any event the events grid would actually show:
+	 * published, and not yet finished (unless past events are un-hidden by
+	 * the `ryv_state_events_hide_past` filter). Same rule as the grid's own
+	 * `prepare_event_ids()`, so a section holding that grid can be hidden
+	 * when it would render empty - see RYV_States_Template::is_field_empty().
+	 *
+	 * @param int $state_id `ryv_states` post ID.
+	 * @return bool
+	 */
+	public static function has_upcoming_events( int $state_id ): bool {
+		return (bool) self::prepare_event_ids( self::get_related_ids( $state_id, 'ryv_events' ) );
+	}
+
+	/**
 	 * Whether this state has any published posts in its matching category
 	 * (or categories) - the check behind the
 	 * `ryv-hide-empty--query-ryv_state_news` marker, so the "Latest News &
@@ -628,7 +642,7 @@ class RYV_State_Queries {
 	 *
 	 * @return bool
 	 */
-	private function should_hide_past_events(): bool {
+	private static function should_hide_past_events(): bool {
 		/**
 		 * Filters whether past events are hidden in the state-events query.
 		 *

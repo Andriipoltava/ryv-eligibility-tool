@@ -24,20 +24,39 @@ if ( ! defined( 'ABSPATH' ) ) {
 class RYV_States_ACF {
 
 	/**
-	 * The 8 CLC-reference-map categories (slug/label/color/order) - the one
+	 * The 9 map categories (slug/label/color/order) - the one
 	 * canonical source both the options-page field's own default_value and
 	 * maybe_seed_map_defaults()'s self-healing reconcile pull from, so the
 	 * two can never drift apart.
 	 */
 	const DEFAULT_MAP_CATEGORIES = array(
-		array( 'slug' => 'no-restrictions', 'label' => 'No Restrictions', 'color' => '#cfe7f5', 'order' => 1 ),
-		array( 'slug' => 'prison-only', 'label' => 'Prison Only', 'color' => '#87b7cd', 'order' => 2 ),
-		array( 'slug' => 'prison-parole-probation', 'label' => 'Prison, Parole, & Probation', 'color' => '#1b7a9e', 'order' => 3 ),
-		array( 'slug' => 'prison-parole-probation-lfos', 'label' => 'Prison, Parole, & Probation, & LFOs', 'color' => '#1257a5', 'order' => 4 ),
-		array( 'slug' => 'completion-plus-requirements', 'label' => 'Completion of Sentence Plus Additional Requirements', 'color' => '#0a2a43', 'order' => 5 ),
-		array( 'slug' => 'permanent-multiple-felonies', 'label' => 'Permanent Disenfranchisement for Multiple Felonies', 'color' => '#f7c0a5', 'order' => 6 ),
-		array( 'slug' => 'streamlined-executive-restoration', 'label' => 'Streamlined Executive Restoration', 'color' => '#e8431f', 'order' => 7 ),
-		array( 'slug' => 'permanent-disenfranchisement', 'label' => 'Permanent Disenfranchisement', 'color' => '#8c2a15', 'order' => 8 ),
+		array( 'slug' => 'voting-rights-not-lost', 'label' => 'Voting Rights Not Lost for Felony Convictions', 'color' => '#D4EFFC', 'order' => 1 ),
+		array( 'slug' => 'lost-only-during-incarceration', 'label' => 'Voting Rights Lost Only During Incarceration', 'color' => '#61A8C1', 'order' => 2 ),
+		array( 'slug' => 'restored-after-sentence-completion', 'label' => 'Voting Rights Restored After Sentence Completion', 'color' => '#006C90', 'order' => 3 ),
+		array( 'slug' => 'documents-or-certificate-required', 'label' => 'Documents or Certificate Required for Restoration', 'color' => '#03509F', 'order' => 4 ),
+		array( 'slug' => 'discretionary-action', 'label' => 'Voting Rights Restored by Individual Discretionary Judicial, Executive, or Legislative Action', 'color' => '#DE3804', 'order' => 5 ),
+		array( 'slug' => 'permanent-disenfranchisement', 'label' => 'Permanent Disenfranchisement', 'color' => '#7A1E02', 'order' => 6 ),
+		array( 'slug' => 'payment-legal-debts', 'label' => 'Payment of Legal Debts Required', 'color' => '#002A41', 'order' => 7 ),
+		array( 'slug' => 'payment-child-support', 'label' => 'Payment Child Support Required', 'color' => '#3A657D', 'order' => 8 ),
+		array( 'slug' => 'denied-while-incarcerated-misdemeanor', 'label' => 'Voting Rights Denied While Incarcerated for Misdemeanors', 'color' => '#F5B394', 'order' => 9 ),
+	);
+
+	/**
+	 * Slugs of the previous (8-category) map set that no longer exist. A state
+	 * still holding one is moved to its replacement by
+	 * RYV_Map_Update::migrate_state_categories(), and the row itself is
+	 * dropped from the options-page repeater by reconcile_map_categories().
+	 * `permanent-disenfranchisement` is deliberately absent - it survived into
+	 * the new set under the same slug.
+	 */
+	const LEGACY_MAP_CATEGORIES = array(
+		'no-restrictions',
+		'prison-only',
+		'prison-parole-probation',
+		'prison-parole-probation-lfos',
+		'completion-plus-requirements',
+		'permanent-multiple-felonies',
+		'streamlined-executive-restoration',
 	);
 
 	/**
@@ -57,7 +76,7 @@ class RYV_States_ACF {
 	 * call to actually take effect on a site that was seeded before the
 	 * correction.
 	 */
-	const MAP_DEFAULTS_VERSION = 4;
+	const MAP_DEFAULTS_VERSION = 5;
 
 	/**
 	 * Constructor.
@@ -66,7 +85,8 @@ class RYV_States_ACF {
 		add_action( 'acf/init', array( $this, 'register_field_groups' ) );
 		add_action( 'acf/init', array( $this, 'register_options_pages' ) );
 		add_filter( 'acf/load_field/name=ryv_state_slug', array( $this, 'populate_state_slug_choices' ) );
-		add_filter( 'acf/load_field/name=ryv_map_category', array( $this, 'populate_map_category_choices' ) );
+		add_filter( 'acf/load_field/name=ryv_map_category_list', array( $this, 'populate_map_category_choices' ) );
+		add_filter( 'acf/validate_value/key=field_ryv_map_category_list', array( $this, 'validate_map_category_count' ), 10, 4 );
 		add_filter( 'acf/load_field/key=field_ryv_node_next_node', array( $this, 'populate_next_node_choices' ) );
 		add_filter( 'acf/load_field/key=field_ryv_option_next_node', array( $this, 'populate_next_node_choices' ) );
 		add_action( 'after_setup_theme', array( $this, 'register_image_sizes' ) );
@@ -160,14 +180,15 @@ class RYV_States_ACF {
 			'title'  => 'Map Settings',
 			'fields' => array(
 				array(
-					'key'           => 'field_ryv_map_category',
-					'label'         => 'Map Category',
-					'name'          => 'ryv_map_category',
+					'key'           => 'field_ryv_map_category_list',
+					'label'         => 'Map Categories',
+					'name'          => 'ryv_map_category_list',
 					'type'          => 'select',
 					'choices'       => array(), // Populated dynamically from Options page.
+					'multiple'      => 1,
 					'ui'            => 1,
 					'allow_null'    => 1,
-					'instructions'  => 'Determines the fill color on the state map. Categories are managed under RYV States → Map Settings.',
+					'instructions'  => 'Pick up to 5. The order you pick matters: 1st = fill color, 2nd = diagonal stripes, 3rd = horizontal stripes, 4th = vertical stripes, 5th = state outline. Categories are managed under RYV States → Map Settings.',
 				),
 				array(
 					'key'          => 'field_ryv_map_tooltip_text',
@@ -175,20 +196,8 @@ class RYV_States_ACF {
 					'name'         => 'ryv_map_tooltip_text',
 					'type'         => 'textarea',
 					'rows'         => 4,
-					'instructions' => 'Short 1–2 sentence summary shown on hover over the state on the map.',
-				),
-				array(
-					'key'           => 'field_ryv_map_mixed_rules',
-					'label'         => 'Mixed Rules (Striped Pattern)',
-					'name'          => 'ryv_map_mixed_rules',
-					'type'          => 'select',
-					'choices'       => array(
-						'0' => 'No',
-						'1' => 'Yes',
-					),
-					'default_value' => '0',
-					'allow_null'    => 0,
-					'instructions'  => 'If yes, the state will display with a diagonal striped pattern overlay on the map.',
+					'maxlength'    => 250,
+					'instructions' => 'Short summary shown on hover over the state on the map. Up to 250 characters.',
 				),
 			),
 			'location' => array(
@@ -284,6 +293,24 @@ class RYV_States_ACF {
 							'wrapper' => array( 'width' => '60' ),
 						),
 					),
+				),
+				array(
+					'key'          => 'field_ryv_hero_stats_source_name',
+					'label'        => 'Stats Source Name',
+					'name'         => 'ryv_hero_stats_source_name',
+					'type'         => 'text',
+					'instructions' => 'Shown below the stats as "Source: <name>". Leave empty to hide the source line. E.g. "The Sentencing Project"',
+					'placeholder'  => 'The Sentencing Project',
+					'wrapper'      => array( 'width' => '50' ),
+				),
+				array(
+					'key'          => 'field_ryv_hero_stats_source_url',
+					'label'        => 'Stats Source URL',
+					'name'         => 'ryv_hero_stats_source_url',
+					'type'         => 'url',
+					'instructions' => 'Link for the source name. E.g. "https://www.sentencingproject.org/"',
+					'placeholder'  => 'https://www.sentencingproject.org/',
+					'wrapper'      => array( 'width' => '50' ),
 				),
 			),
 			'location' => array(
@@ -1193,6 +1220,12 @@ class RYV_States_ACF {
 
 		self::reconcile_map_categories();
 
+		// Move any state still on a retired category to its replacement
+		// *before* assign_default_map_categories() looks for uncategorized ones.
+		if ( class_exists( 'RYV_Map_Update' ) ) {
+			RYV_Map_Update::migrate_state_categories();
+		}
+
 		if ( class_exists( 'RYV_States_Generator' ) ) {
 			RYV_States_Generator::assign_default_map_categories( $force );
 		}
@@ -1211,7 +1244,7 @@ class RYV_States_ACF {
 	 * - while any *extra* category an admin added on top (a non-canonical
 	 * slug) is left untouched.
 	 */
-	private static function reconcile_map_categories() {
+	public static function reconcile_map_categories() {
 		$existing = get_field( 'ryv_map_categories', 'option' );
 		$existing = is_array( $existing ) ? $existing : array();
 
@@ -1223,6 +1256,10 @@ class RYV_States_ACF {
 			}
 		}
 
+		foreach ( self::LEGACY_MAP_CATEGORIES as $legacy_slug ) {
+			unset( $by_slug[ $legacy_slug ] );
+		}
+
 		foreach ( self::DEFAULT_MAP_CATEGORIES as $canonical ) {
 			$by_slug[ $canonical['slug'] ] = $canonical;
 		}
@@ -1232,6 +1269,64 @@ class RYV_States_ACF {
 		if ( ! get_field( 'ryv_mapsvg_map_id', 'option' ) ) {
 			update_field( 'field_ryv_map_id', 1, 'option' );
 		}
+	}
+
+	/**
+	 * A state's map categories in priority order: [ fill, diagonal, horizontal, vertical, outline ].
+	 *
+	 * Reads the single multi-select (`ryv_map_category_list`, first pick = fill,
+	 * second = stripes). Falls back to the two single-value fields this replaced
+	 * (`ryv_map_category`, `ryv_map_category_secondary`), read straight from
+	 * postmeta, so a state that hasn't been resaved or migrated yet still shows
+	 * correctly.
+	 *
+	 * @param int $post_id ryv_states post ID.
+	 * @return string[] 0-2 category slugs.
+	 */
+	public static function get_state_categories( int $post_id ): array {
+		$list = get_field( 'ryv_map_category_list', $post_id );
+		$list = is_array( $list ) ? array_values( array_filter( array_map( 'strval', $list ) ) ) : array();
+
+		if ( empty( $list ) ) {
+			$primary   = (string) get_post_meta( $post_id, 'ryv_map_category', true );
+			$secondary = (string) get_post_meta( $post_id, 'ryv_map_category_secondary', true );
+			$list      = array_values( array_filter( array( $primary, $secondary ) ) );
+		}
+
+		return array_slice( array_values( array_unique( $list ) ), 0, 5 );
+	}
+
+	/**
+	 * Store a state's categories ([ fill, diagonal, horizontal, vertical, outline ]) in the multi-select and
+	 * drop the retired single-value fields so they can't linger as stale data.
+	 *
+	 * @param int      $post_id    ryv_states post ID.
+	 * @param string[] $categories Category slugs, fill first.
+	 */
+	public static function set_state_categories( int $post_id, array $categories ) {
+		$categories = array_slice( array_values( array_unique( array_filter( $categories ) ) ), 0, 5 );
+
+		update_field( 'field_ryv_map_category_list', $categories, $post_id );
+
+		foreach ( array( 'ryv_map_category', 'ryv_map_category_secondary', 'ryv_map_mixed_rules' ) as $legacy_key ) {
+			delete_post_meta( $post_id, $legacy_key );
+			delete_post_meta( $post_id, '_' . $legacy_key );
+		}
+	}
+
+	/**
+	 * At most five categories - fill, diagonal, horizontal, vertical, outline.
+	 *
+	 * @param true|string $valid Validation result so far.
+	 * @param mixed       $value Submitted value.
+	 * @return true|string
+	 */
+	public function validate_map_category_count( $valid, $value ) {
+		if ( true === $valid && is_array( $value ) && count( $value ) > 5 ) {
+			return 'Pick at most 5 categories: fill color, diagonal stripes, horizontal stripes, vertical stripes, outline (in that order).';
+		}
+
+		return $valid;
 	}
 
 	/**

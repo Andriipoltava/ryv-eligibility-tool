@@ -452,24 +452,24 @@ export function renderLanguageSwitch(others, onSwitch) {
 }
 
 /**
- * Wizard-mode-only "Back" button (see engine.js's `goBack()`): a single
- * long-lived element, same pattern as renderLanguageSwitch()/
- * positionLanguageSwitch() - built once by mount() and re-homed by
- * positionBackButton() rather than rebuilt per card, so its handler never
- * needs re-wiring. Stacked layout has no equivalent: every card there is
- * already visible and independently editable, so there's nothing for a
- * "back" action to reveal.
+ * Mid-flow "Start Over" button (see engine.js's `restartKeepingState()`),
+ * which replaced the wizard-only Back button: a single long-lived element,
+ * same pattern as renderLanguageSwitch()/positionLanguageSwitch() - built
+ * once by mount() and re-homed by positionStartOverButton() rather than
+ * rebuilt per card, so its handler never needs re-wiring. It keeps the
+ * `ryv-back-btn` class so the widget's existing "Back Button" Style controls
+ * (`--ryv-back-btn-*`) keep applying to it.
  *
- * @param {() => void} onBack
+ * @param {() => void} onStartOver
  * @param {object} labels
  * @returns {HTMLElement}
  */
-export function renderBackButton(onBack, labels = DEFAULT_LABELS) {
+export function renderStartOverButton(onStartOver, labels = DEFAULT_LABELS) {
   return el('button', {
     className: 'ryv-back-btn',
-    text: labels.back,
+    text: labels.startOver,
     attrs: { type: 'button' },
-    on: { click: () => onBack() },
+    on: { click: () => onStartOver() },
   });
 }
 
@@ -1142,7 +1142,7 @@ export function renderLeadCaptureCard(
  *   renderFrom() now merges a visible non-terminal markup node's content
  *   onto whichever real card follows instead of giving it a card of its own
  *   at all (see prependLeadingContent()), so this only still fires via
- *   goBack()/goToStep() revisiting a node directly. Stacked (default)
+ *   goToStep() revisiting a node directly. Stacked (default)
  *   layout keeps today's behavior: no button, the whole chain renders and
  *   stays visible at once.
  * @param {() => void} [onContinue] Called when the Continue button is

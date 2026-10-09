@@ -304,6 +304,17 @@ class RYV_Map_Widget extends \Elementor\Widget_Base {
 			)
 		);
 
+		$this->add_control(
+			'legend_stripes_label',
+			array(
+				'label'       => __( 'Striped Swatch Label', 'ryv-eligibility-tool' ),
+				'type'        => \Elementor\Controls_Manager::TEXT,
+				'default'     => '',
+				'description' => __( 'Optional. Adds an extra legend line with a striped swatch explaining striped states. Off by default - the legend lists only the map categories.', 'ryv-eligibility-tool' ),
+				'condition'   => array( 'show_legend' => 'yes' ),
+			)
+		);
+
 		$this->end_controls_section();
 	}
 
@@ -1588,7 +1599,7 @@ class RYV_Map_Widget extends \Elementor\Widget_Base {
 			'ryvMapWidgetL10n',
 			array(
 				'close'      => __( 'Close', 'ryv-eligibility-tool' ),
-				'learnMore'  => __( 'Learn more →', 'ryv-eligibility-tool' ),
+				'learnMore'  => __( 'Learn More', 'ryv-eligibility-tool' ),
 				'noResults'  => __( 'No matches found', 'ryv-eligibility-tool' ),
 			)
 		);
@@ -1614,7 +1625,7 @@ class RYV_Map_Widget extends \Elementor\Widget_Base {
 	 * visibly duplicated entries rather than a silent, order-dependent
 	 * overwrite.
 	 *
-	 * @return array<string,array{title:string,description:string,link:string}>
+	 * @return array<string,array{title:string,description:string,link:string,primary:string,layers:string[]}>
 	 */
 	private function build_states_data(): array {
 		if ( ! class_exists( 'RYV_States_CPT' ) || ! class_exists( 'RYV_US_States' ) || ! function_exists( 'get_field' ) ) {
@@ -1643,10 +1654,23 @@ class RYV_Map_Widget extends \Elementor\Widget_Base {
 				continue;
 			}
 
+			$categories = RYV_States_ACF::get_state_categories( $state->ID );
+			$primary    = $categories[0] ?? '';
+			// Positional overlays on the fill: 2nd = diagonal stripes,
+			// 3rd = horizontal, 4th = vertical, 5th = outline.
+			$layers = array();
+			foreach ( array_slice( $categories, 1, 4 ) as $extra ) {
+				$layers[] = $extra ? ( RYV_States_ACF::get_category_color( $extra ) ?: '' ) : '';
+			}
+
 			$data[ $svg_id ] = array(
 				'title'       => $state->post_title,
 				'description' => get_field( 'ryv_map_tooltip_text', $state->ID ) ?: '',
 				'link'        => get_permalink( $state ),
+				// Hex colors, not slugs: map-widget.js paints the stripes
+				// (secondary over primary) straight from these.
+				'primary'     => $primary ? ( RYV_States_ACF::get_category_color( $primary ) ?: '' ) : '',
+				'layers'      => $layers,
 			);
 		}
 
@@ -1706,6 +1730,14 @@ class RYV_Map_Widget extends \Elementor\Widget_Base {
 				'<li class="ryv-map-widget-legend-item"><span class="ryv-map-widget-legend-swatch" style="background-color:%s"></span>%s</li>',
 				esc_attr( $color ?: 'transparent' ),
 				esc_html( $label )
+			);
+		}
+
+		$stripes_label = trim( (string) ( $settings['legend_stripes_label'] ?? '' ) );
+		if ( '' !== $stripes_label ) {
+			printf(
+				'<li class="ryv-map-widget-legend-item ryv-map-widget-legend-item--striped"><span class="ryv-map-widget-legend-swatch ryv-map-widget-legend-swatch--striped"></span>%s</li>',
+				esc_html( $stripes_label )
 			);
 		}
 

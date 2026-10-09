@@ -157,29 +157,6 @@ class RYV_Resources_CPT {
 	}
 
 	/**
-	 * Where a resource's CTA points: its uploaded File, else its URL field,
-	 * else '' (the resource then only has its own page).
-	 *
-	 * @param int $post_id Resource post ID.
-	 * @return string
-	 */
-	public static function get_target_url( int $post_id ): string {
-		if ( ! function_exists( 'get_field' ) ) {
-			return '';
-		}
-
-		$file = get_field( 'ryv_resource_file', $post_id );
-		if ( is_array( $file ) && ! empty( $file['url'] ) ) {
-			return (string) $file['url'];
-		}
-		if ( is_numeric( $file ) && $file ) {
-			return (string) wp_get_attachment_url( (int) $file );
-		}
-
-		return trim( (string) get_field( 'ryv_resource_url', $post_id ) );
-	}
-
-	/**
 	 * Mirrors get_cta_text()'s resolved value onto a plain (non-ACF)
 	 * `_ryv_resource_cta_text` postmeta key on every save, so it's directly
 	 * usable from Elementor's built-in "Post Meta"/"Custom Field" dynamic
@@ -443,7 +420,7 @@ class RYV_Resources_CPT {
 					'label'        => 'Format',
 					'name'         => 'ryv_resource_format',
 					'type'         => 'text',
-					'instructions' => 'Optional, legacy. The tags on cards now come from Resource Types (right sidebar) - this is only shown when no type is ticked.',
+					'instructions' => 'Optional, legacy. The tags on cards come from Resource Types (right sidebar).',
 					'wrapper'      => array( 'width' => '50' ),
 				),
 				array(
@@ -452,16 +429,6 @@ class RYV_Resources_CPT {
 					'name'  => 'ryv_resource_description',
 					'type'  => 'textarea',
 					'rows'  => 3,
-				),
-				array(
-					'key'          => 'field_ryv_resource_content',
-					'label'        => 'Page Content',
-					'name'         => 'ryv_resource_content',
-					'type'         => 'wysiwyg',
-					'tabs'         => 'all',
-					'toolbar'      => 'full',
-					'media_upload' => 1,
-					'instructions' => 'Body of this resource\'s own page (shown when it has no external URL). Use Heading 2 for sections - they become the "In this article" list.',
 				),
 				array(
 					'key'     => 'field_ryv_resource_url',

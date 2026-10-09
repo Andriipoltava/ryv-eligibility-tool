@@ -1,5 +1,6 @@
 import { __ } from '@wordpress/i18n';
-import { Button, TextControl, SelectControl } from '@wordpress/components';
+import { Button, TextControl } from '@wordpress/components';
+import NodeSelect from './NodeSelect';
 import ConfirmButton from './ConfirmButton';
 
 export default function OptionsEditor({ options, nextNodeOptions, onChange }) {
@@ -32,7 +33,7 @@ export default function OptionsEditor({ options, nextNodeOptions, onChange }) {
             value={option.label || ''}
             onChange={(label) => updateOption(index, { label })}
           />
-          <SelectControl
+          <NodeSelect
             label={__('Next question', 'ryv-eligibility-tool')}
             value={option.next_node || ''}
             options={nextNodeOptions}

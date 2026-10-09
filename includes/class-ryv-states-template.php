@@ -369,8 +369,7 @@ class RYV_States_Template {
 				return true;
 			}
 			$field_name = substr( $marker, strlen( 'field-' ) );
-			$value      = get_field( $field_name, $post_id );
-			return $this->is_value_empty( $value );
+			return $this->is_field_empty( $field_name, $post_id );
 		}
 
 		// `any-field_a,field_b` - empty only when *every* listed field is,
@@ -397,7 +396,7 @@ class RYV_States_Template {
 			}
 
 			foreach ( $field_names as $field_name ) {
-				if ( ! $this->is_value_empty( get_field( $field_name, $post_id ) ) ) {
+				if ( ! $this->is_field_empty( $field_name, $post_id ) ) {
 					return false;
 				}
 			}
@@ -445,6 +444,27 @@ class RYV_States_Template {
 		}
 
 		return true;
+	}
+
+	/**
+	 * Whether one ACF field counts as empty for a marker.
+	 *
+	 * `ryv_events` is special-cased: the events grid drops finished events
+	 * and unpublished ids (RYV_State_Queries), so a state whose picked events
+	 * have all ended renders an empty grid. Checking only that the field has
+	 * entries kept that section visible - a heading over nothing - so it's
+	 * judged by what the grid would actually show.
+	 *
+	 * @param string $field_name ACF field name.
+	 * @param int    $post_id    State post id.
+	 * @return bool
+	 */
+	private function is_field_empty( string $field_name, int $post_id ): bool {
+		if ( 'ryv_events' === $field_name && class_exists( 'RYV_State_Queries' ) ) {
+			return ! RYV_State_Queries::has_upcoming_events( $post_id );
+		}
+
+		return $this->is_value_empty( get_field( $field_name, $post_id ) );
 	}
 
 	/**

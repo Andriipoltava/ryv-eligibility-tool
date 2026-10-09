@@ -34,6 +34,11 @@ class RYV_States_Field_Shortcode {
 	const TAG = 'ryv_state_field';
 
 	/**
+	 * Shortcode tag for the "Source: <link>" line under the hero stats.
+	 */
+	const SOURCE_TAG = 'ryv_stats_source';
+
+	/**
 	 * Constructor.
 	 */
 	public function __construct() {
@@ -45,6 +50,7 @@ class RYV_States_Field_Shortcode {
 	 */
 	public function register_shortcode() {
 		add_shortcode( self::TAG, array( $this, 'render' ) );
+		add_shortcode( self::SOURCE_TAG, array( $this, 'render_stats_source' ) );
 	}
 
 	/**
@@ -89,6 +95,41 @@ class RYV_States_Field_Shortcode {
 		}
 
 		return wp_kses_post( (string) $value );
+	}
+
+	/**
+	 * `[ryv_stats_source]` - "Source: <linked name>" for the hero stats
+	 * (ACF `ryv_hero_stats_source_name` / `ryv_hero_stats_source_url`).
+	 * Renders nothing when no name is set; the name renders unlinked if
+	 * there's no URL. Place it in a Shortcode widget inside the stats
+	 * container and style that widget to match the stat descriptions.
+	 *
+	 * @return string
+	 */
+	public function render_stats_source(): string {
+		$post_id = $this->get_state_id();
+
+		if ( ! $post_id || ! function_exists( 'get_field' ) ) {
+			return '';
+		}
+
+		$name = trim( (string) get_field( 'ryv_hero_stats_source_name', $post_id ) );
+		$url  = trim( (string) get_field( 'ryv_hero_stats_source_url', $post_id ) );
+
+		if ( '' === $name ) {
+			return '';
+		}
+
+		$label = esc_html( $name );
+		if ( '' !== $url ) {
+			$label = sprintf( '<a href="%s" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline">%s</a>', esc_url( $url ), $label );
+		}
+
+		return sprintf(
+			'<div class="ryv-stats-source">%s %s</div>',
+			esc_html__( 'Source:', 'ryv-eligibility-tool' ),
+			$label
+		);
 	}
 
 	/**

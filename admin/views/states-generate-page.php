@@ -239,6 +239,57 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 	<hr />
 
+	<h2><?php esc_html_e( 'Apply Map Update', 'ryv-eligibility-tool' ); ?></h2>
+
+	<p class="description">
+		<?php esc_html_e( 'Brings this environment to the current state map: the 9 map categories and their colors, every state still on a retired category moved to its replacement (with its striped secondary category where known), the click popup\'s text sizes (title 18px, description 14px, button 16px) written into every map widget, and the map re-synced. A state already on a current category is never changed, so editors\' own choices are kept. Safe to run more than once - run it once per environment after deploying.', 'ryv-eligibility-tool' ); ?>
+	</p>
+
+	<?php $map_update_result = $this->consume_map_update_result(); ?>
+	<?php if ( $map_update_result ) : ?>
+		<div class="notice notice-<?php echo empty( $map_update_result['dry_run'] ) ? 'success' : 'info'; ?> is-dismissible">
+			<p>
+				<?php if ( ! empty( $map_update_result['dry_run'] ) ) : ?>
+					<strong><?php esc_html_e( 'Preview only - nothing was changed.', 'ryv-eligibility-tool' ); ?></strong><br />
+				<?php endif; ?>
+				<?php
+				printf(
+					/* translators: 1: states moved to a new category, 2: Elementor pages/templates with a map widget updated, 3: states pushed to the map */
+					esc_html__( 'States moved to a new category: %1$d. Pages/templates with the popup sizes set: %2$d. States synced to the map: %3$d.', 'ryv-eligibility-tool' ),
+					count( $map_update_result['states'] ),
+					count( $map_update_result['popups'] ),
+					(int) $map_update_result['synced']
+				);
+				?>
+			</p>
+			<?php if ( ! empty( $map_update_result['states'] ) ) : ?>
+				<ul style="margin-left:1.5em;list-style:disc;">
+					<?php foreach ( $map_update_result['states'] as $change ) : ?>
+						<li>
+							<?php echo esc_html( $change['state'] ); ?>
+							<code>#<?php echo (int) $change['post_id']; ?></code>:
+							<code><?php echo esc_html( $change['from'] ); ?></code> → <code><?php echo esc_html( $change['to'] ); ?></code>
+							<?php if ( $change['secondary'] ) : ?>
+								+ <?php esc_html_e( 'stripes', 'ryv-eligibility-tool' ); ?> <code><?php echo esc_html( $change['secondary'] ); ?></code>
+							<?php endif; ?>
+						</li>
+					<?php endforeach; ?>
+				</ul>
+			<?php endif; ?>
+			<?php foreach ( $map_update_result['popups'] as $popup ) : ?>
+				<p><small><?php echo esc_html( $popup['title'] ); ?> <code>#<?php echo (int) $popup['post_id']; ?></code> - <?php esc_html_e( 'popup sizes set', 'ryv-eligibility-tool' ); ?></small></p>
+			<?php endforeach; ?>
+		</div>
+	<?php endif; ?>
+
+	<form method="post" action="">
+		<?php wp_nonce_field( RYV_States_Generate_Page::MAP_UPDATE_NONCE_ACTION, 'ryv_map_update_nonce' ); ?>
+		<?php submit_button( __( 'Preview Changes', 'ryv-eligibility-tool' ), 'secondary', 'ryv_preview_map_update_submit', false ); ?>
+		<?php submit_button( __( 'Apply Map Update', 'ryv-eligibility-tool' ), 'primary', 'ryv_apply_map_update_submit', false ); ?>
+	</form>
+
+	<hr />
+
 	<h2><?php esc_html_e( 'Repair Imported Events', 'ryv-eligibility-tool' ); ?></h2>
 
 	<p class="description">

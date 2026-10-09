@@ -211,83 +211,71 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 	<section id="ryv-help-resources" class="card ryv-help-card">
 		<h2><?php esc_html_e( 'Adding a Resource', 'ryv-eligibility-tool' ); ?></h2>
-		<p><?php esc_html_e( 'RYV Resources → Add New. Resources power the /resources/ page (search, state filter, category tabs), the "Related Resources" blocks, and - for resources that don\'t link to another website - their own page.', 'ryv-eligibility-tool' ); ?></p>
-
-		<h3><?php esc_html_e( '1. Basics', 'ryv-eligibility-tool' ); ?></h3>
+		<p><?php esc_html_e( 'RYV Resources → Add New. A resource is a card on the /resources/ page (search, state filter, category tabs) and on state pages. Resources have no page of their own: the card\'s button takes the visitor straight to the file or website.', 'ryv-eligibility-tool' ); ?></p>
 		<table class="widefat striped ryv-help-table">
 			<thead><tr><th><?php esc_html_e( 'Field', 'ryv-eligibility-tool' ); ?></th><th><?php esc_html_e( 'What to enter', 'ryv-eligibility-tool' ); ?></th><th><?php esc_html_e( 'Where it shows', 'ryv-eligibility-tool' ); ?></th></tr></thead>
 			<tbody>
-				<tr><td><strong><?php esc_html_e( 'Title', 'ryv-eligibility-tool' ); ?></strong></td><td><?php esc_html_e( 'The resource name.', 'ryv-eligibility-tool' ); ?></td><td><?php esc_html_e( 'Card, page heading, search.', 'ryv-eligibility-tool' ); ?></td></tr>
-				<tr><td><strong><?php esc_html_e( 'Featured Image (right sidebar)', 'ryv-eligibility-tool' ); ?></strong></td><td><?php esc_html_e( 'A landscape photo, at least 1440px wide.', 'ryv-eligibility-tool' ); ?></td><td><?php esc_html_e( 'Card, large image on the resource page.', 'ryv-eligibility-tool' ); ?></td></tr>
-				<tr><td><strong><?php esc_html_e( 'Description', 'ryv-eligibility-tool' ); ?></strong></td><td><?php esc_html_e( '1-2 sentences.', 'ryv-eligibility-tool' ); ?></td><td><?php esc_html_e( 'Under the page heading and on the card. Search also matches this text.', 'ryv-eligibility-tool' ); ?></td></tr>
-				<tr><td><strong><?php esc_html_e( 'Resource Types (right sidebar)', 'ryv-eligibility-tool' ); ?></strong></td><td><?php esc_html_e( 'Tick one or more: PDF, Guide, Resource Link, Tool Kit, Fact Sheet.', 'ryv-eligibility-tool' ); ?></td><td><?php esc_html_e( 'The blue type line on every resource card ("GUIDE · PDF") - home page, Resources page and state pages - and the "type · date" line on the resource page.', 'ryv-eligibility-tool' ); ?></td></tr>
-				<tr><td><strong><?php esc_html_e( 'Resource States (right sidebar)', 'ryv-eligibility-tool' ); ?></strong></td><td><?php esc_html_e( 'Tick "All States" for a national resource, or the specific states it applies to.', 'ryv-eligibility-tool' ); ?></td><td><?php esc_html_e( 'The pill next to the type on every card (blue "ALL STATES", orange for a single state) and the state filter on the Resources page. "All States" resources show up under every state in that filter.', 'ryv-eligibility-tool' ); ?></td></tr>
+				<tr><td><strong><?php esc_html_e( 'Title', 'ryv-eligibility-tool' ); ?></strong></td><td><?php esc_html_e( 'The resource name.', 'ryv-eligibility-tool' ); ?></td><td><?php esc_html_e( 'Card heading, search.', 'ryv-eligibility-tool' ); ?></td></tr>
+				<tr><td><strong><?php esc_html_e( 'Featured Image (right sidebar)', 'ryv-eligibility-tool' ); ?></strong></td><td><?php esc_html_e( 'A landscape photo.', 'ryv-eligibility-tool' ); ?></td><td><?php esc_html_e( 'Card image.', 'ryv-eligibility-tool' ); ?></td></tr>
+				<tr><td><strong><?php esc_html_e( 'Description', 'ryv-eligibility-tool' ); ?></strong></td><td><?php esc_html_e( '1-2 sentences.', 'ryv-eligibility-tool' ); ?></td><td><?php esc_html_e( 'Under the card heading. Search also matches this text.', 'ryv-eligibility-tool' ); ?></td></tr>
+				<tr><td><strong><?php esc_html_e( 'Button Text', 'ryv-eligibility-tool' ); ?></strong></td><td><?php esc_html_e( 'Pick a preset (Download, Learn More, Get The Toolkit...) or choose "Custom..." and type your own.', 'ryv-eligibility-tool' ); ?></td><td><?php esc_html_e( 'The card button.', 'ryv-eligibility-tool' ); ?></td></tr>
+				<tr><td><strong><?php esc_html_e( 'External Permalink (box under the title)', 'ryv-eligibility-tool' ); ?></strong></td><td><?php esc_html_e( 'The link the card should open: the uploaded PDF\'s URL (Media Library → the file → Copy URL) or the website address.', 'ryv-eligibility-tool' ); ?></td><td><?php esc_html_e( 'Where the card button goes. Always fill it in - without it the button opens a bare, undesigned page.', 'ryv-eligibility-tool' ); ?></td></tr>
+				<tr><td><strong><?php esc_html_e( 'Categories (right sidebar)', 'ryv-eligibility-tool' ); ?></strong></td><td><?php esc_html_e( 'Know Your Rights, For Partners, By State... - tick as many as apply.', 'ryv-eligibility-tool' ); ?></td><td><?php esc_html_e( 'The category tabs on /resources/.', 'ryv-eligibility-tool' ); ?></td></tr>
+				<tr><td><strong><?php esc_html_e( 'Resource Types (right sidebar)', 'ryv-eligibility-tool' ); ?></strong></td><td><?php esc_html_e( 'Tick one or more: PDF, Guide, Resource Link, Tool Kit, Fact Sheet.', 'ryv-eligibility-tool' ); ?></td><td><?php esc_html_e( 'The blue type line at the top of the card ("GUIDE · PDF") - the same card on the home page, the Resources page and state pages.', 'ryv-eligibility-tool' ); ?></td></tr>
+				<tr><td><strong><?php esc_html_e( 'Resource States (right sidebar)', 'ryv-eligibility-tool' ); ?></strong></td><td><?php esc_html_e( 'Tick "All States" for a national resource, or the specific states it applies to.', 'ryv-eligibility-tool' ); ?></td><td><?php esc_html_e( 'The pill next to the type on the card (blue "ALL STATES", orange for a single state; past two states the rest collapse into "+N"), and the state filter on /resources/ - an "All States" resource shows up under every state.', 'ryv-eligibility-tool' ); ?></td></tr>
 			</tbody>
 		</table>
-
-		<h3><?php esc_html_e( '2. Where the button goes', 'ryv-eligibility-tool' ); ?></h3>
 		<ul>
-			<li><strong><?php esc_html_e( 'File', 'ryv-eligibility-tool' ); ?></strong> - <?php esc_html_e( 'upload a PDF or other file. The button opens it.', 'ryv-eligibility-tool' ); ?></li>
-			<li><strong><?php esc_html_e( 'URL', 'ryv-eligibility-tool' ); ?></strong> - <?php esc_html_e( 'a link, used when there is no file.', 'ryv-eligibility-tool' ); ?></li>
-			<li><strong><?php esc_html_e( 'Button Text', 'ryv-eligibility-tool' ); ?></strong> - <?php esc_html_e( 'pick a preset (Download, Learn More, Get The Toolkit...) or choose "Custom..." and type your own.', 'ryv-eligibility-tool' ); ?></li>
+			<li><strong><?php esc_html_e( 'State pages', 'ryv-eligibility-tool' ); ?></strong> - <?php esc_html_e( 'pick the resource on a state\'s own page (RYV States → the state → Resources field). It then appears on that state page and under that state in the /resources/ state filter.', 'ryv-eligibility-tool' ); ?></li>
+			<li><strong><?php esc_html_e( 'Missing a type?', 'ryv-eligibility-tool' ); ?></strong> - <?php esc_html_e( 'add it under RYV Resources → Resource Types. The 50 states and "All States" already exist.', 'ryv-eligibility-tool' ); ?></li>
+			<li><strong><?php esc_html_e( 'Publish', 'ryv-eligibility-tool' ); ?></strong> - <?php esc_html_e( 'once published, the resource appears right away on /resources/, in search and in the filters.', 'ryv-eligibility-tool' ); ?></li>
 		</ul>
-		<p><?php esc_html_e( 'If a resource should go straight to another website with no page of its own, fill in the External Permalink box (under the title). The card then opens the external link directly, and Page Content can stay empty.', 'ryv-eligibility-tool' ); ?></p>
-
-		<h3><?php esc_html_e( '3. Page Content (the resource\'s own page)', 'ryv-eligibility-tool' ); ?></h3>
-		<p><?php esc_html_e( 'Fill this in when the resource doesn\'t link to an external site. The editor buttons map to the design like this:', 'ryv-eligibility-tool' ); ?></p>
-		<table class="widefat striped ryv-help-table">
-			<thead><tr><th><?php esc_html_e( 'In the editor', 'ryv-eligibility-tool' ); ?></th><th><?php esc_html_e( 'On the site', 'ryv-eligibility-tool' ); ?></th></tr></thead>
-			<tbody>
-				<tr><td><strong><?php esc_html_e( 'Normal paragraph', 'ryv-eligibility-tool' ); ?></strong></td><td><?php esc_html_e( '22px body text', 'ryv-eligibility-tool' ); ?></td></tr>
-				<tr><td><strong><?php esc_html_e( 'Format dropdown → Heading 2', 'ryv-eligibility-tool' ); ?></strong></td><td><?php esc_html_e( 'A large section heading. Every H2 is added to "In this article" in the sidebar automatically.', 'ryv-eligibility-tool' ); ?></td></tr>
-				<tr><td><strong><?php esc_html_e( 'Heading 3', 'ryv-eligibility-tool' ); ?></strong></td><td><?php esc_html_e( 'A smaller subheading (not added to "In this article").', 'ryv-eligibility-tool' ); ?></td></tr>
-				<tr><td><strong><?php esc_html_e( 'Bulleted list', 'ryv-eligibility-tool' ); ?></strong></td><td><?php esc_html_e( 'Items with red square bullets.', 'ryv-eligibility-tool' ); ?></td></tr>
-				<tr><td><strong><?php esc_html_e( 'Numbered list', 'ryv-eligibility-tool' ); ?></strong></td><td><?php esc_html_e( 'Steps 1-2-3 in circles, the first one red.', 'ryv-eligibility-tool' ); ?></td></tr>
-				<tr><td><strong><?php esc_html_e( 'Quote button (Blockquote)', 'ryv-eligibility-tool' ); ?></strong></td><td><?php esc_html_e( 'A large quote with a red line on the left.', 'ryv-eligibility-tool' ); ?></td></tr>
-				<tr><td><strong><?php esc_html_e( 'Add Media → image with a Caption', 'ryv-eligibility-tool' ); ?></strong></td><td><?php esc_html_e( 'A full-width image with a grey caption underneath.', 'ryv-eligibility-tool' ); ?></td></tr>
-				<tr><td><strong><?php esc_html_e( 'Link', 'ryv-eligibility-tool' ); ?></strong></td><td><?php esc_html_e( 'Red, underlined.', 'ryv-eligibility-tool' ); ?></td></tr>
-			</tbody>
-		</table>
-		<p><?php esc_html_e( 'Quote attribution: switch to the Text tab and add a <cite> line inside the quote, after the quote text:', 'ryv-eligibility-tool' ); ?></p>
-		<pre class="ryv-help-code">&lt;blockquote&gt;
-  &lt;p&gt;"Quote text&hellip;"&lt;/p&gt;
-  &lt;cite&gt;&mdash; Free Hearts, Nashville&lt;/cite&gt;
-&lt;/blockquote&gt;</pre>
-		<p><?php esc_html_e( 'Tip: aim for 3-5 Heading 2 sections per page. If there are none, the "In this article" box is simply hidden.', 'ryv-eligibility-tool' ); ?></p>
-
-		<h3><?php esc_html_e( '4. Categories and states (right sidebar)', 'ryv-eligibility-tool' ); ?></h3>
-		<ul>
-			<li><strong><?php esc_html_e( 'Categories', 'ryv-eligibility-tool' ); ?></strong> - <?php esc_html_e( 'Know Your Rights, For Partners, By State... - drive the tabs on the Resources page and the tags on the resource page. Tick as many as apply, and mark the one that should come first (red tag and breadcrumb) with Yoast\'s "Make primary".', 'ryv-eligibility-tool' ); ?></li>
-			<li><strong><?php esc_html_e( 'Resource Types & Resource States', 'ryv-eligibility-tool' ); ?></strong> - <?php esc_html_e( 'the card tags - see the table above. Add a new type under RYV Resources → Resource Types if one is missing; the 50 states and "All States" already exist.', 'ryv-eligibility-tool' ); ?></li>
-			<li><strong><?php esc_html_e( 'State pages', 'ryv-eligibility-tool' ); ?></strong> - <?php esc_html_e( 'you can also pick the resource on a state\'s own page (RYV States → the state → Resources field). It then appears on that state page and under that state in the filter.', 'ryv-eligibility-tool' ); ?></li>
-		</ul>
-
-		<h3><?php esc_html_e( '5. Publish', 'ryv-eligibility-tool' ); ?></h3>
-		<p><?php esc_html_e( 'Once published, the resource appears right away on /resources/, in search, in the filters, and under "Related Resources" on similar resources.', 'ryv-eligibility-tool' ); ?></p>
 	</section>
 
 	<section id="ryv-help-posts" class="card ryv-help-card">
 		<h2><?php esc_html_e( 'Writing a Blog Post', 'ryv-eligibility-tool' ); ?></h2>
-		<p><?php esc_html_e( 'Posts → Add New. Every post uses the "Single Post" template: tags, headline, byline, Share, the "In this article" sidebar and Related Stories are all filled in automatically from these fields.', 'ryv-eligibility-tool' ); ?></p>
+		<p><?php esc_html_e( 'Posts → Add New. Every post uses the "Single Post" template (Spanish: "Publicación individual"): tags, headline, byline, Share, the "In this article" sidebar, "Can I vote in my state?" and Related Stories are all filled in automatically from these fields.', 'ryv-eligibility-tool' ); ?></p>
+		<h3><?php esc_html_e( '1. Fields', 'ryv-eligibility-tool' ); ?></h3>
 		<table class="widefat striped ryv-help-table">
 			<thead><tr><th><?php esc_html_e( 'Field', 'ryv-eligibility-tool' ); ?></th><th><?php esc_html_e( 'What to enter', 'ryv-eligibility-tool' ); ?></th><th><?php esc_html_e( 'Where it shows', 'ryv-eligibility-tool' ); ?></th></tr></thead>
 			<tbody>
 				<tr><td><strong><?php esc_html_e( 'Title', 'ryv-eligibility-tool' ); ?></strong></td><td><?php esc_html_e( 'The headline.', 'ryv-eligibility-tool' ); ?></td><td><?php esc_html_e( 'H1 and the Related Stories cards.', 'ryv-eligibility-tool' ); ?></td></tr>
 				<tr><td><strong><?php esc_html_e( 'Excerpt (right sidebar)', 'ryv-eligibility-tool' ); ?></strong></td><td><?php esc_html_e( '1-2 sentences.', 'ryv-eligibility-tool' ); ?></td><td><?php esc_html_e( 'Under the headline.', 'ryv-eligibility-tool' ); ?></td></tr>
-				<tr><td><strong><?php esc_html_e( 'Featured Image', 'ryv-eligibility-tool' ); ?></strong></td><td><?php esc_html_e( 'A photo.', 'ryv-eligibility-tool' ); ?></td><td><?php esc_html_e( 'Thumbnail on Related Stories cards.', 'ryv-eligibility-tool' ); ?></td></tr>
-				<tr><td><strong><?php esc_html_e( 'Body', 'ryv-eligibility-tool' ); ?></strong></td><td><?php esc_html_e( 'Same formatting as for resources: Heading 2, lists, quotes.', 'ryv-eligibility-tool' ); ?></td><td><?php esc_html_e( 'The post body. Heading 2s go into "In this article".', 'ryv-eligibility-tool' ); ?></td></tr>
+				<tr><td><strong><?php esc_html_e( 'Featured Image', 'ryv-eligibility-tool' ); ?></strong></td><td><?php esc_html_e( 'A photo.', 'ryv-eligibility-tool' ); ?></td><td><?php esc_html_e( 'News & Updates and Related Stories cards.', 'ryv-eligibility-tool' ); ?></td></tr>
+				<tr><td><strong><?php esc_html_e( 'Body', 'ryv-eligibility-tool' ); ?></strong></td><td><?php esc_html_e( 'The article - formatting below.', 'ryv-eligibility-tool' ); ?></td><td><?php esc_html_e( 'The post body. Heading 2s go into "In this article".', 'ryv-eligibility-tool' ); ?></td></tr>
 				<tr><td><strong><?php esc_html_e( 'Categories', 'ryv-eligibility-tool' ); ?></strong></td><td><?php esc_html_e( 'One topic (Policy, Program News...) plus a state if relevant (KENTUCKY, TENNESSEE...).', 'ryv-eligibility-tool' ); ?></td><td><?php esc_html_e( 'Red topic tag, blue state tag, breadcrumb, and which posts appear as Related Stories.', 'ryv-eligibility-tool' ); ?></td></tr>
 			</tbody>
 		</table>
-		<p><?php esc_html_e( 'Formatting works exactly as described for resources above.', 'ryv-eligibility-tool' ); ?></p>
 		<ul>
 			<li><?php esc_html_e( 'A category counts as a state only when its slug exactly matches the state name in lowercase English: kentucky, new-york, north-carolina. Any other category is treated as a topic.', 'ryv-eligibility-tool' ); ?></li>
-			<li><?php esc_html_e( 'Mark the main topic with Yoast\'s "Make primary".', 'ryv-eligibility-tool' ); ?></li>
+			<li><?php esc_html_e( 'Mark the main topic with Yoast\'s "Make primary" - it becomes the first tag and the breadcrumb.', 'ryv-eligibility-tool' ); ?></li>
 			<li><?php esc_html_e( 'Reading time is calculated automatically.', 'ryv-eligibility-tool' ); ?></li>
-			<li><?php esc_html_e( 'If the post only points to an article on another website, fill in the External Permalink box (under the title).', 'ryv-eligibility-tool' ); ?></li>
+			<li><?php esc_html_e( 'If the post only points to an article on another website, fill in the External Permalink box (under the title) - the post then has no page of its own.', 'ryv-eligibility-tool' ); ?></li>
 		</ul>
 
-		<h3><?php esc_html_e( 'Author profile (once per author)', 'ryv-eligibility-tool' ); ?></h3>
+		<h3><?php esc_html_e( '2. Formatting the body', 'ryv-eligibility-tool' ); ?></h3>
+		<p><?php esc_html_e( 'The editor\'s formatting maps to the design like this:', 'ryv-eligibility-tool' ); ?></p>
+		<table class="widefat striped ryv-help-table">
+			<thead><tr><th><?php esc_html_e( 'In the editor', 'ryv-eligibility-tool' ); ?></th><th><?php esc_html_e( 'On the site', 'ryv-eligibility-tool' ); ?></th></tr></thead>
+			<tbody>
+				<tr><td><strong><?php esc_html_e( 'Normal paragraph', 'ryv-eligibility-tool' ); ?></strong></td><td><?php esc_html_e( 'Body text', 'ryv-eligibility-tool' ); ?></td></tr>
+				<tr><td><strong><?php esc_html_e( 'Heading 2', 'ryv-eligibility-tool' ); ?></strong></td><td><?php esc_html_e( 'A large section heading. Every H2 is added to "In this article" in the sidebar automatically.', 'ryv-eligibility-tool' ); ?></td></tr>
+				<tr><td><strong><?php esc_html_e( 'Heading 3', 'ryv-eligibility-tool' ); ?></strong></td><td><?php esc_html_e( 'A smaller subheading (not added to "In this article").', 'ryv-eligibility-tool' ); ?></td></tr>
+				<tr><td><strong><?php esc_html_e( 'Bulleted list', 'ryv-eligibility-tool' ); ?></strong></td><td><?php esc_html_e( 'Items with red square bullets.', 'ryv-eligibility-tool' ); ?></td></tr>
+				<tr><td><strong><?php esc_html_e( 'Numbered list', 'ryv-eligibility-tool' ); ?></strong></td><td><?php esc_html_e( 'Steps 1-2-3 in circles, the first one red.', 'ryv-eligibility-tool' ); ?></td></tr>
+				<tr><td><strong><?php esc_html_e( 'Quote (Blockquote)', 'ryv-eligibility-tool' ); ?></strong></td><td><?php esc_html_e( 'A large quote with a red line on the left.', 'ryv-eligibility-tool' ); ?></td></tr>
+				<tr><td><strong><?php esc_html_e( 'Image with a caption', 'ryv-eligibility-tool' ); ?></strong></td><td><?php esc_html_e( 'A full-width image with a grey caption underneath.', 'ryv-eligibility-tool' ); ?></td></tr>
+				<tr><td><strong><?php esc_html_e( 'Link', 'ryv-eligibility-tool' ); ?></strong></td><td><?php esc_html_e( 'Red, underlined.', 'ryv-eligibility-tool' ); ?></td></tr>
+			</tbody>
+		</table>
+		<p><?php esc_html_e( 'Quote attribution: in the HTML / Text view add a <cite> line inside the quote, after the quote text:', 'ryv-eligibility-tool' ); ?></p>
+		<pre class="ryv-help-code">&lt;blockquote&gt;
+  &lt;p&gt;"Quote text&hellip;"&lt;/p&gt;
+  &lt;cite&gt;&mdash; Free Hearts, Nashville&lt;/cite&gt;
+&lt;/blockquote&gt;</pre>
+		<p><?php esc_html_e( 'Tip: aim for 3-5 Heading 2 sections per post. If there are none, the "In this article" box is simply hidden.', 'ryv-eligibility-tool' ); ?></p>
+
+		<h3><?php esc_html_e( '3. Author profile (once per author)', 'ryv-eligibility-tool' ); ?></h3>
 		<p><?php esc_html_e( 'Users → Profile for the author:', 'ryv-eligibility-tool' ); ?></p>
 		<ul>
 			<li><strong><?php esc_html_e( 'Display name publicly as', 'ryv-eligibility-tool' ); ?></strong> - <?php esc_html_e( 'the name readers see (e.g. "Blair Bowie", not an email address).', 'ryv-eligibility-tool' ); ?></li>
@@ -299,19 +287,19 @@ if ( ! defined( 'ABSPATH' ) ) {
 	<section id="ryv-help-spanish-content" class="card ryv-help-card">
 		<h2><?php esc_html_e( 'Spanish Versions & Publishing Checklist', 'ryv-eligibility-tool' ); ?></h2>
 		<ul>
-			<li><?php esc_html_e( 'Open the resource or post and, in the Language box (WPML), click "+" next to Español.', 'ryv-eligibility-tool' ); ?></li>
-			<li><?php esc_html_e( 'Translate every text field: Title, Description, Page Content, Button Text.', 'ryv-eligibility-tool' ); ?></li>
+			<li><?php esc_html_e( 'Open the post or resource and, in the Language box (WPML), click "+" next to Español.', 'ryv-eligibility-tool' ); ?></li>
+			<li><?php esc_html_e( 'Translate every text field: Title, Excerpt and Body for a post; Title, Description and Button Text for a resource.', 'ryv-eligibility-tool' ); ?></li>
 			<li><?php esc_html_e( 'On the Spanish version, choose the Spanish categories (CONOCE TUS DERECHOS, POR ESTADO, PARA ALIADOS...). English categories don\'t show on Spanish pages.', 'ryv-eligibility-tool' ); ?></li>
-			<li><?php esc_html_e( 'Resource Types and Resource States are one shared list for both languages: tick the same boxes on the Spanish version, and the tags show in Spanish automatically (Guía, Todos los estados, Nueva York...).', 'ryv-eligibility-tool' ); ?></li>
-			<li><?php esc_html_e( 'The file and the image can stay the same.', 'ryv-eligibility-tool' ); ?></li>
+			<li><?php esc_html_e( 'Resource Types and Resource States are one shared list for both languages: tick the same boxes on the Spanish version of a resource, and the card tags show in Spanish automatically (Guía, Todos los estados, Nueva York...).', 'ryv-eligibility-tool' ); ?></li>
+			<li><?php esc_html_e( 'Images, files and External Permalinks can stay the same.', 'ryv-eligibility-tool' ); ?></li>
 		</ul>
 
 		<h3><?php esc_html_e( 'Quick check after publishing', 'ryv-eligibility-tool' ); ?></h3>
 		<ol>
-			<li><?php esc_html_e( 'The resource appears on /resources/ and can be found by searching a word from its title.', 'ryv-eligibility-tool' ); ?></li>
-			<li><?php esc_html_e( 'Filtering by the relevant state shows it.', 'ryv-eligibility-tool' ); ?></li>
-			<li><?php esc_html_e( 'The card button opens the resource page (or the external link), and "Download" on the resource page opens the file.', 'ryv-eligibility-tool' ); ?></li>
-			<li><?php esc_html_e( '"In this article" lists your Heading 2 sections.', 'ryv-eligibility-tool' ); ?></li>
+			<li><?php esc_html_e( 'Post: the page shows the topic/state tags, byline and reading time, and "In this article" lists your Heading 2 sections.', 'ryv-eligibility-tool' ); ?></li>
+			<li><?php esc_html_e( 'Post: Related Stories at the bottom shows posts from the same category.', 'ryv-eligibility-tool' ); ?></li>
+			<li><?php esc_html_e( 'Resource: it appears on /resources/, can be found by searching a word from its title, and shows up when filtering by its state.', 'ryv-eligibility-tool' ); ?></li>
+			<li><?php esc_html_e( 'Resource: the card button opens the file or website.', 'ryv-eligibility-tool' ); ?></li>
 		</ol>
 	</section>
 
