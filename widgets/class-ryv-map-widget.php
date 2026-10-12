@@ -1625,7 +1625,7 @@ class RYV_Map_Widget extends \Elementor\Widget_Base {
 	 * visibly duplicated entries rather than a silent, order-dependent
 	 * overwrite.
 	 *
-	 * @return array<string,array{title:string,description:string,link:string,primary:string,layers:string[]}>
+	 * @return array<string,array{title:string,description:string,link:string,categories:array<int,array{slug:string,label:string,color:string}>}>
 	 */
 	private function build_states_data(): array {
 		if ( ! class_exists( 'RYV_States_CPT' ) || ! class_exists( 'RYV_US_States' ) || ! function_exists( 'get_field' ) ) {
@@ -1654,13 +1654,19 @@ class RYV_Map_Widget extends \Elementor\Widget_Base {
 				continue;
 			}
 
-			$categories = RYV_States_ACF::get_state_categories( $state->ID );
-			$primary    = $categories[0] ?? '';
-			// Positional overlays on the fill: 2nd = diagonal stripes,
-			// 3rd = horizontal, 4th = vertical, 5th = outline.
-			$layers = array();
-			foreach ( array_slice( $categories, 1, 4 ) as $extra ) {
-				$layers[] = $extra ? ( RYV_States_ACF::get_category_color( $extra ) ?: '' ) : '';
+			// Each category is one equal diagonal stripe, in the order the
+			// editor picked them (a single category is a solid fill).
+			$categories = array();
+			foreach ( RYV_States_ACF::get_state_categories( $state->ID ) as $slug_cat ) {
+				$color = RYV_States_ACF::get_category_color( $slug_cat );
+				if ( ! $color ) {
+					continue;
+				}
+				$categories[] = array(
+					'slug'  => $slug_cat,
+					'label' => RYV_States_ACF::get_category_label( $slug_cat ) ?: $slug_cat,
+					'color' => $color,
+				);
 			}
 
 			$data[ $svg_id ] = array(
@@ -1668,9 +1674,9 @@ class RYV_Map_Widget extends \Elementor\Widget_Base {
 				'description' => get_field( 'ryv_map_tooltip_text', $state->ID ) ?: '',
 				'link'        => get_permalink( $state ),
 				// Hex colors, not slugs: map-widget.js paints the stripes
-				// (secondary over primary) straight from these.
-				'primary'     => $primary ? ( RYV_States_ACF::get_category_color( $primary ) ?: '' ) : '',
-				'layers'      => $layers,
+				// straight from these; slug/label drive the legend
+				// highlight and the popup's category list.
+				'categories'  => $categories,
 			);
 		}
 
@@ -1727,7 +1733,8 @@ class RYV_Map_Widget extends \Elementor\Widget_Base {
 			$color = $cat['color'] ?? '';
 
 			printf(
-				'<li class="ryv-map-widget-legend-item"><span class="ryv-map-widget-legend-swatch" style="background-color:%s"></span>%s</li>',
+				'<li class="ryv-map-widget-legend-item" data-category="%s"><span class="ryv-map-widget-legend-swatch" style="background-color:%s"></span>%s</li>',
+				esc_attr( (string) ( $cat['slug'] ?? '' ) ),
 				esc_attr( $color ?: 'transparent' ),
 				esc_html( $label )
 			);

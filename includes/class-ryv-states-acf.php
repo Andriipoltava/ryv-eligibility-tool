@@ -30,15 +30,15 @@ class RYV_States_ACF {
 	 * two can never drift apart.
 	 */
 	const DEFAULT_MAP_CATEGORIES = array(
-		array( 'slug' => 'voting-rights-not-lost', 'label' => 'Voting Rights Not Lost for Felony Convictions', 'color' => '#D4EFFC', 'order' => 1 ),
-		array( 'slug' => 'lost-only-during-incarceration', 'label' => 'Voting Rights Lost Only During Incarceration', 'color' => '#61A8C1', 'order' => 2 ),
-		array( 'slug' => 'restored-after-sentence-completion', 'label' => 'Voting Rights Restored After Sentence Completion', 'color' => '#006C90', 'order' => 3 ),
-		array( 'slug' => 'documents-or-certificate-required', 'label' => 'Documents or Certificate Required for Restoration', 'color' => '#03509F', 'order' => 4 ),
-		array( 'slug' => 'discretionary-action', 'label' => 'Voting Rights Restored by Individual Discretionary Judicial, Executive, or Legislative Action', 'color' => '#DE3804', 'order' => 5 ),
-		array( 'slug' => 'permanent-disenfranchisement', 'label' => 'Permanent Disenfranchisement', 'color' => '#7A1E02', 'order' => 6 ),
-		array( 'slug' => 'payment-legal-debts', 'label' => 'Payment of Legal Debts Required', 'color' => '#002A41', 'order' => 7 ),
-		array( 'slug' => 'payment-child-support', 'label' => 'Payment Child Support Required', 'color' => '#3A657D', 'order' => 8 ),
-		array( 'slug' => 'denied-while-incarcerated-misdemeanor', 'label' => 'Voting Rights Denied While Incarcerated for Misdemeanors', 'color' => '#F5B394', 'order' => 9 ),
+		array( 'slug' => 'voting-rights-not-lost', 'label' => 'Voting Rights Not Lost for Felony Convictions', 'color' => '#276227', 'order' => 1 ),
+		array( 'slug' => 'lost-only-during-incarceration', 'label' => 'Voting Rights Lost Only During Incarceration', 'color' => '#92E092', 'order' => 2 ),
+		array( 'slug' => 'restored-after-sentence-completion', 'label' => 'Voting Rights Restored After Sentence Completion', 'color' => '#FFF000', 'order' => 3 ),
+		array( 'slug' => 'documents-or-certificate-required', 'label' => 'Documents or Certificate Required for Restoration', 'color' => '#FFA500', 'order' => 4 ),
+		array( 'slug' => 'discretionary-action', 'label' => 'Voting Rights Restored by Individual Discretionary Judicial, Executive, or Legislative Action', 'color' => '#DE1428', 'order' => 5 ),
+		array( 'slug' => 'permanent-disenfranchisement', 'label' => 'Permanent Disenfranchisement', 'color' => '#54060E', 'order' => 6 ),
+		array( 'slug' => 'payment-legal-debts', 'label' => 'Payment of Legal Debts Required', 'color' => '#B264B5', 'order' => 7 ),
+		array( 'slug' => 'payment-child-support', 'label' => 'Payment Child Support Required', 'color' => '#4A074D', 'order' => 8 ),
+		array( 'slug' => 'denied-while-incarcerated-misdemeanor', 'label' => 'Voting Rights Denied While Incarcerated for Misdemeanors', 'color' => '#03509F', 'order' => 9 ),
 	);
 
 	/**
@@ -76,7 +76,7 @@ class RYV_States_ACF {
 	 * call to actually take effect on a site that was seeded before the
 	 * correction.
 	 */
-	const MAP_DEFAULTS_VERSION = 5;
+	const MAP_DEFAULTS_VERSION = 6;
 
 	/**
 	 * Constructor.
@@ -188,7 +188,7 @@ class RYV_States_ACF {
 					'multiple'      => 1,
 					'ui'            => 1,
 					'allow_null'    => 1,
-					'instructions'  => 'Pick up to 5. The order you pick matters: 1st = fill color, 2nd = diagonal stripes, 3rd = horizontal stripes, 4th = vertical stripes, 5th = state outline. Categories are managed under RYV States → Map Settings.',
+					'instructions'  => 'Pick up to 5. A state with one category is a solid fill; with more, it is drawn as equal diagonal stripes, one per category, in the order picked. Categories are managed under RYV States → Map Settings.',
 				),
 				array(
 					'key'          => 'field_ryv_map_tooltip_text',
@@ -196,8 +196,8 @@ class RYV_States_ACF {
 					'name'         => 'ryv_map_tooltip_text',
 					'type'         => 'textarea',
 					'rows'         => 4,
-					'maxlength'    => 250,
-					'instructions' => 'Short summary shown on hover over the state on the map. Up to 250 characters.',
+					'maxlength'    => 300,
+					'instructions' => 'Short summary shown on hover over the state on the map. Up to 300 characters.',
 				),
 			),
 			'location' => array(
@@ -1272,7 +1272,7 @@ class RYV_States_ACF {
 	}
 
 	/**
-	 * A state's map categories in priority order: [ fill, diagonal, horizontal, vertical, outline ].
+	 * A state's map categories in priority order: [ 1st stripe ... 5th stripe ].
 	 *
 	 * Reads the single multi-select (`ryv_map_category_list`, first pick = fill,
 	 * second = stripes). Falls back to the two single-value fields this replaced
@@ -1297,7 +1297,7 @@ class RYV_States_ACF {
 	}
 
 	/**
-	 * Store a state's categories ([ fill, diagonal, horizontal, vertical, outline ]) in the multi-select and
+	 * Store a state's categories ([ 1st stripe ... 5th stripe ]) in the multi-select and
 	 * drop the retired single-value fields so they can't linger as stale data.
 	 *
 	 * @param int      $post_id    ryv_states post ID.
@@ -1315,7 +1315,7 @@ class RYV_States_ACF {
 	}
 
 	/**
-	 * At most five categories - fill, diagonal, horizontal, vertical, outline.
+	 * At most five categories - one diagonal stripe each.
 	 *
 	 * @param true|string $valid Validation result so far.
 	 * @param mixed       $value Submitted value.
@@ -1323,7 +1323,7 @@ class RYV_States_ACF {
 	 */
 	public function validate_map_category_count( $valid, $value ) {
 		if ( true === $valid && is_array( $value ) && count( $value ) > 5 ) {
-			return 'Pick at most 5 categories: fill color, diagonal stripes, horizontal stripes, vertical stripes, outline (in that order).';
+			return 'Pick at most 5 categories (each one becomes a diagonal stripe on the map).';
 		}
 
 		return $valid;

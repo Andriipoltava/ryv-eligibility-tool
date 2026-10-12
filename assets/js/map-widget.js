@@ -78,13 +78,21 @@
 
 
 	/**
-	 * A state in several categories is drawn as its first category's fill with
-	 * the others layered on top, in the order they were picked: 2nd = diagonal
-	 * stripes, 3rd = horizontal stripes, 4th = vertical stripes, 5th = outline.
-	 * MapSVG only fills a region with one flat status color, so the stripes are
-	 * an SVG <pattern> defined in the map's own <svg>, applied through a
-	 * stylesheet rule (an inline fill gets wiped by MapSVG's hover handling).
+	 * A state in several categories (up to 5) is drawn as equal-width
+	 * diagonal stripes, one per category in the order the editor picked
+	 * them, all running the same direction. MapSVG only fills a region with
+	 * one flat status color, so the stripes are an SVG <pattern> defined in
+	 * the map's own <svg>, applied through a stylesheet rule (an inline fill
+	 * gets wiped by MapSVG's hover handling).
 	 */
+	var STRIPE_WIDTH = 4;
+
+	function regionColors( region ) {
+		return ( region && region.categories ? region.categories : [] ).map( function ( cat ) {
+			return cat.color;
+		} ).filter( Boolean );
+	}
+
 	function applyStripes( root, paths ) {
 		var data = window.ryvMapWidgetData || {};
 		var svg = root.querySelector( 'svg' );
@@ -109,62 +117,33 @@
 		}
 
 		var rules = [];
-		var overlays = [];
 
 		paths.forEach( function ( path ) {
-			var region = data[ path.id ];
-			var layers = region && region.layers ? region.layers : [];
-			if ( ! region || ! region.primary || ! layers.length ) {
+			var colors = regionColors( data[ path.id ] );
+			if ( colors.length < 2 ) {
 				return;
 			}
 			path.classList.add( 'ryv-striped' );
 
-			var diagonal = layers[ 0 ] || '';
-			var horizontal = layers[ 1 ] || '';
-			var vertical = layers[ 2 ] || '';
-			var outline = layers[ 3 ] || '';
-
-			if ( diagonal || horizontal || vertical ) {
-				var id = 'ryv-stripe-' + [ region.primary, diagonal, horizontal, vertical ].join( '' ).replace( /[^a-z0-9]/gi, '' );
-				if ( ! defs.querySelector( '#' + id ) ) {
-					var pattern = el( 'pattern', { id: id, patternUnits: 'userSpaceOnUse', width: 12, height: 12 } );
-					pattern.appendChild( el( 'rect', { width: 12, height: 12, fill: region.primary } ) );
-					if ( diagonal ) {
-						// Two polygons tile one 45-degree band across the cell.
-						pattern.appendChild( el( 'polygon', { points: '0,6 6,0 12,0 0,12', fill: diagonal } ) );
-						pattern.appendChild( el( 'polygon', { points: '12,6 12,12 6,12', fill: diagonal } ) );
-					}
-					if ( horizontal ) {
-						pattern.appendChild( el( 'rect', { x: 0, y: 0, width: 12, height: 2.5, fill: horizontal } ) );
-					}
-					if ( vertical ) {
-						pattern.appendChild( el( 'rect', { x: 0, y: 0, width: 2.5, height: 12, fill: vertical } ) );
-					}
-					defs.appendChild( pattern );
-				}
-				rules.push( 'path[id="' + path.id + '"]{fill:url(#' + id + ') !important;}' );
+			var id = 'ryv-stripe-' + colors.join( '' ).replace( /[^a-z0-9]/gi, '' );
+			if ( ! defs.querySelector( '#' + id ) ) {
+				// One band per color across the cell, then the whole tile
+				// rotated 45 degrees - so every striped state's bands run the
+				// same way whatever the number of categories.
+				var period = STRIPE_WIDTH * colors.length;
+				var pattern = el( 'pattern', {
+					id: id,
+					patternUnits: 'userSpaceOnUse',
+					width: period,
+					height: period,
+					patternTransform: 'rotate(45)',
+				} );
+				colors.forEach( function ( color, i ) {
+					pattern.appendChild( el( 'rect', { x: i * STRIPE_WIDTH, y: 0, width: STRIPE_WIDTH, height: period, fill: color } ) );
+				} );
+				defs.appendChild( pattern );
 			}
-
-			if ( outline ) {
-				// A stroke on the path itself is half-covered by every
-				// neighbour painted after it, so the outline is a copy of the
-				// shape (no fill, no pointer events) appended last, which
-				// paints above all states.
-				overlays.push( { path: path, color: outline } );
-			}
-		} );
-
-		overlays.forEach( function ( item ) {
-			var copy = item.path.cloneNode( false );
-			copy.removeAttribute( 'id' );
-			copy.removeAttribute( 'style' );
-			copy.setAttribute( 'class', 'ryv-outline-overlay' );
-			copy.setAttribute( 'fill', 'none' );
-			copy.setAttribute( 'stroke', item.color );
-			copy.setAttribute( 'stroke-width', '3' );
-			copy.setAttribute( 'stroke-linejoin', 'round' );
-			copy.setAttribute( 'pointer-events', 'none' );
-			item.path.parentNode.appendChild( copy );
+			rules.push( 'path[id="' + path.id + '"]{fill:url(#' + id + ') !important;}' );
 		} );
 
 		// An !important stylesheet rule survives MapSVG rewriting the path's own
@@ -200,7 +179,9 @@
 			// around RYV's own .ryv-map-widget-popup on every click, so it
 			// is force-hidden here rather than relied on to stay closed.
 			'.mapsvg-details-container { display: none !important; }' +
-			'.ryv-outline-overlay { fill: none !important; pointer-events: none !important; }' +
+			// State borders 50% thicker than the SVG's own 0.75 (an inline
+			// style on every path, hence !important).
+			'svg path[id] { stroke-width: 1.125 !important; }' +
 			MOBILE_CSS;
 		root.appendChild( style );
 
@@ -381,18 +362,17 @@
 				} );
 				return;
 			}
+			var slug = item.getAttribute( 'data-category' ) || '';
 			var hex = rgbToHex( getComputedStyle( swatch ).backgroundColor ).toLowerCase();
 
 			item.addEventListener( 'mouseenter', function () {
 				var data = window.ryvMapWidgetData || {};
 				paths.forEach( function ( path ) {
-					var region = data[ path.id ] || {};
+					var cats = ( data[ path.id ] || {} ).categories || [];
 					// A striped state belongs to each of its categories.
-					var matches = ( region.primary && region.primary.toLowerCase() === hex )
-						|| ( region.layers || [] ).some( function ( layer ) {
-							return layer && layer.toLowerCase() === hex;
-						} )
-						|| rgbToHex( getComputedStyle( path ).fill ).toLowerCase() === hex;
+					var matches = cats.some( function ( cat ) {
+						return slug ? cat.slug === slug : ( cat.color || '' ).toLowerCase() === hex;
+					} );
 					path.classList.add( matches ? 'ryv-region-highlight' : 'ryv-region-dim' );
 				} );
 			} );
@@ -419,8 +399,24 @@
 		popup.hidden = true;
 		mapEl.appendChild( popup );
 
+		var legendItems = widgetEl.querySelectorAll( '.ryv-map-widget-legend-item[data-category]' );
+
+		// While a state's popup is open, its own categories keep full color
+		// in the legend and every other category fades.
+		function highlightLegend( region ) {
+			var slugs = ( region && region.categories ? region.categories : [] ).map( function ( cat ) {
+				return cat.slug;
+			} );
+			legendItems.forEach( function ( item ) {
+				var on = slugs.indexOf( item.getAttribute( 'data-category' ) ) !== -1;
+				item.classList.toggle( 'is-active', slugs.length > 0 && on );
+				item.classList.toggle( 'is-faded', slugs.length > 0 && ! on );
+			} );
+		}
+
 		function closePopup() {
 			popup.hidden = true;
+			highlightLegend( null );
 			// openPopup() below sets an inline `display: block` (to force
 			// a layout so offsetWidth is measurable before `hidden` is
 			// cleared) - an inline style always beats the UA stylesheet's
@@ -450,6 +446,25 @@
 			h.textContent = title;
 			popup.appendChild( h );
 
+			var cats = region && region.categories ? region.categories : [];
+			if ( cats.length ) {
+				// Same classes as the description so its Style-tab
+				// typography/color apply to the list too.
+				var list = document.createElement( 'ul' );
+				list.className = 'ryv-map-widget-popup-desc ryv-map-widget-popup-cats';
+				cats.forEach( function ( cat ) {
+					var li = document.createElement( 'li' );
+					li.className = 'ryv-map-widget-popup-cat';
+					var dot = document.createElement( 'span' );
+					dot.className = 'ryv-map-widget-popup-cat-swatch';
+					dot.style.backgroundColor = cat.color;
+					li.appendChild( dot );
+					li.appendChild( document.createTextNode( cat.label ) );
+					list.appendChild( li );
+				} );
+				popup.appendChild( list );
+			}
+
 			if ( region && region.description ) {
 				var p = document.createElement( 'div' );
 				p.className = 'ryv-map-widget-popup-desc';
@@ -475,6 +490,7 @@
 			popup.style.left = x + 'px';
 			popup.style.top = y + 'px';
 			popup.hidden = false;
+			highlightLegend( region );
 		}
 
 		// Capture-phase listener on the shadow root, so this runs before
