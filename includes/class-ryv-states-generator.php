@@ -37,14 +37,30 @@ class RYV_States_Generator {
 	 * time. Every state slug appears in exactly one list.
 	 */
 	const CLC_CATEGORY_STATES = array(
-		'no-restrictions'                   => array( 'maine', 'vermont', 'district-of-columbia' ),
-		'prison-only'                       => array( 'california', 'colorado', 'connecticut', 'hawaii', 'illinois', 'indiana', 'maryland', 'massachusetts', 'michigan', 'minnesota', 'montana', 'nevada', 'new-hampshire', 'new-jersey', 'new-mexico', 'new-york', 'north-dakota', 'ohio', 'oregon', 'pennsylvania', 'rhode-island', 'utah', 'washington' ),
-		'prison-parole-probation'           => array( 'alaska', 'arkansas', 'georgia', 'idaho', 'kansas', 'missouri', 'nebraska', 'north-carolina', 'oklahoma', 'south-carolina', 'south-dakota', 'west-virginia', 'wisconsin' ),
-		'prison-parole-probation-lfos'      => array( 'alabama', 'florida', 'louisiana', 'texas' ),
-		'completion-plus-requirements'      => array( 'iowa', 'tennessee', 'wyoming' ),
-		'permanent-multiple-felonies'       => array( 'arizona' ),
-		'streamlined-executive-restoration' => array( 'kentucky', 'virginia' ),
-		'permanent-disenfranchisement'      => array( 'delaware', 'mississippi' ),
+		'voting-rights-not-lost'             => array( 'maine', 'vermont', 'district-of-columbia' ),
+		'lost-only-during-incarceration'     => array( 'california', 'colorado', 'connecticut', 'hawaii', 'illinois', 'indiana', 'maryland', 'massachusetts', 'michigan', 'minnesota', 'montana', 'nevada', 'new-hampshire', 'new-jersey', 'new-mexico', 'new-york', 'north-dakota', 'ohio', 'oregon', 'pennsylvania', 'rhode-island', 'utah', 'washington' ),
+		'restored-after-sentence-completion' => array( 'alaska', 'georgia', 'idaho', 'kansas', 'missouri', 'nebraska', 'north-carolina', 'oklahoma', 'south-carolina', 'south-dakota', 'west-virginia', 'wisconsin', 'alabama', 'florida', 'louisiana', 'texas', 'arizona' ),
+		'documents-or-certificate-required'  => array( 'arkansas', 'iowa', 'tennessee', 'wyoming' ),
+		'discretionary-action'               => array( 'kentucky', 'virginia' ),
+		'permanent-disenfranchisement'       => array( 'delaware', 'mississippi' ),
+	);
+
+	/**
+	 * State slug => secondary category (drawn as stripes on the map). Only the
+	 * states whose second category is known are listed - Arkansas and
+	 * Connecticut are the client's own examples; the four LFO states and
+	 * Arizona carry over what the previous map already implied (an added
+	 * payment requirement / a permanent-for-multiple-felonies carve-out). Any
+	 * other state gets its secondary category by hand on its own edit screen.
+	 */
+	const CLC_SECONDARY_CATEGORY_STATES = array(
+		'arkansas'    => 'payment-legal-debts',
+		'connecticut' => 'restored-after-sentence-completion',
+		'alabama'     => 'payment-legal-debts',
+		'florida'     => 'payment-legal-debts',
+		'louisiana'   => 'payment-legal-debts',
+		'texas'       => 'payment-legal-debts',
+		'arizona'     => 'permanent-disenfranchisement',
 	);
 
 	/**
@@ -105,19 +121,15 @@ class RYV_States_Generator {
 				continue;
 			}
 
-			if ( get_field( 'ryv_map_category', $post_id ) && ! $force ) {
+			if ( RYV_States_ACF::get_state_categories( $post_id ) && ! $force ) {
 				$result['skipped'][] = $state_slug;
 				continue;
 			}
 
 			$category = $slug_to_category[ $canonical_slug ];
 
-			update_field( 'field_ryv_map_category', $category, $post_id );
-			update_field(
-				'field_ryv_map_mixed_rules',
-				in_array( $canonical_slug, self::CLC_MIXED_RULES_STATES, true ) ? '1' : '0',
-				$post_id
-			);
+			$secondary = self::CLC_SECONDARY_CATEGORY_STATES[ $canonical_slug ] ?? '';
+			RYV_States_ACF::set_state_categories( $post_id, array( $category, $secondary ) );
 
 			if ( ! get_field( 'ryv_map_tooltip_text', $post_id ) ) {
 				$category_label = class_exists( 'RYV_States_ACF' ) ? RYV_States_ACF::get_category_label( $category ) : null;
@@ -150,7 +162,7 @@ class RYV_States_Generator {
 	 * @param string $state_slug Raw `ryv_state_slug` value.
 	 * @return string|null Full-name slug, or null if unrecognized.
 	 */
-	private static function resolve_canonical_state_slug( string $state_slug ): ?string {
+	public static function resolve_canonical_state_slug( string $state_slug ): ?string {
 		if ( isset( RYV_US_States::SVG_IDS[ $state_slug ] ) ) {
 			return $state_slug;
 		}

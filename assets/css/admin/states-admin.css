@@ -211,7 +211,10 @@
 .acf-field[data-key="field_ryv_partner_image"],
 .acf-field[data-key="field_ryv_partner_video_url"],
 .acf-field[data-key="field_ryv_partner_link_url"],
-.acf-field[data-key="field_ryv_partner_link_text"] {
+.acf-field[data-key="field_ryv_partner_link_text"],
+/* Superseded by the Stats Sources repeater (field_ryv_hero_stats_sources). */
+.acf-field[data-key="field_ryv_hero_stats_source_name"],
+.acf-field[data-key="field_ryv_hero_stats_source_url"] {
 	display: none !important;
 }
 

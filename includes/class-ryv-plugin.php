@@ -216,6 +216,7 @@ final class RYV_Plugin {
 			require_once RYV_PLUGIN_DIR . 'includes/class-ryv-mapsvg-sync.php';
 			require_once RYV_PLUGIN_DIR . 'includes/class-ryv-news-categories-sync.php';
 			require_once RYV_PLUGIN_DIR . 'includes/class-ryv-states-generator.php';
+			require_once RYV_PLUGIN_DIR . 'includes/class-ryv-map-update.php';
 			require_once RYV_PLUGIN_DIR . 'includes/class-ryv-states-template.php';
 			require_once RYV_PLUGIN_DIR . 'includes/class-ryv-states-i18n.php';
 			require_once RYV_PLUGIN_DIR . 'includes/class-ryv-states-template-repair.php';

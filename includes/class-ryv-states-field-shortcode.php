@@ -34,6 +34,11 @@ class RYV_States_Field_Shortcode {
 	const TAG = 'ryv_state_field';
 
 	/**
+	 * Shortcode tag for the "Source: <link>" line under the hero stats.
+	 */
+	const SOURCE_TAG = 'ryv_stats_source';
+
+	/**
 	 * Constructor.
 	 */
 	public function __construct() {
@@ -45,6 +50,7 @@ class RYV_States_Field_Shortcode {
 	 */
 	public function register_shortcode() {
 		add_shortcode( self::TAG, array( $this, 'render' ) );
+		add_shortcode( self::SOURCE_TAG, array( $this, 'render_stats_source' ) );
 	}
 
 	/**
@@ -89,6 +95,102 @@ class RYV_States_Field_Shortcode {
 		}
 
 		return wp_kses_post( (string) $value );
+	}
+
+	/**
+	 * `[ryv_stats_source]` - "Source: <linked name>" lines for the hero
+	 * stats (ACF repeater `ryv_hero_stats_sources`, one row per source).
+	 * Renders nothing when there are no sources; a name renders unlinked if
+	 * its row has no URL. Place it in a Shortcode widget inside the stats
+	 * container and style that widget to match the stat descriptions.
+	 *
+	 * @return string
+	 */
+	public function render_stats_source(): string {
+		$post_id = $this->get_state_id();
+
+		if ( ! $post_id || ! function_exists( 'get_field' ) ) {
+			return '';
+		}
+
+		$lines = '';
+
+		foreach ( self::get_sources( $post_id ) as $source ) {
+			$label = esc_html( $source['name'] );
+
+			if ( '' !== $source['url'] ) {
+				$label = sprintf( '<a href="%s" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline">%s</a>', esc_url( $source['url'] ), $label );
+			}
+
+			$lines .= sprintf(
+				'<div class="ryv-stats-source">%s %s</div>',
+				esc_html( class_exists( 'RYV_Featured_Partners_Renderer' ) ? RYV_Featured_Partners_Renderer::localized( __( 'Source:', 'ryv-eligibility-tool' ), 'Fuente:' ) : __( 'Source:', 'ryv-eligibility-tool' ) ),
+				$label
+			);
+		}
+
+		return $lines;
+	}
+
+	/**
+	 * The state's sources: the `ryv_hero_stats_sources` rows, or - while
+	 * that is empty - the old single name/URL pair, read straight from
+	 * postmeta (it was never an array, and a translated page's fallback to
+	 * the original language is applied by hand, since this bypasses ACF's
+	 * filters).
+	 *
+	 * @param int $post_id A `ryv_states` post.
+	 * @return array<int,array{name:string,url:string}> Nameless rows dropped.
+	 */
+	public static function get_sources( int $post_id ): array {
+		$sources = array();
+		$rows    = class_exists( 'RYV_States_I18n' ) ? RYV_States_I18n::get_value( 'ryv_hero_stats_sources', $post_id ) : get_field( 'ryv_hero_stats_sources', $post_id );
+
+		if ( class_exists( 'RYV_States_I18n' ) ) {
+			$rows = RYV_States_I18n::name_rows(
+				$rows,
+				array(
+					'field_ryv_hero_stats_source_row_name' => 'name',
+					'field_ryv_hero_stats_source_row_url'  => 'url',
+				)
+			);
+		}
+
+		foreach ( is_array( $rows ) ? $rows : array() as $row ) {
+			$name = trim( (string) ( $row['name'] ?? '' ) );
+
+			if ( '' !== $name ) {
+				$sources[] = array(
+					'name' => $name,
+					'url'  => trim( (string) ( $row['url'] ?? '' ) ),
+				);
+			}
+		}
+
+		if ( $sources ) {
+			return $sources;
+		}
+
+		$ids = array( $post_id );
+
+		if ( class_exists( 'RYV_States_I18n' ) && RYV_States_I18n::get_source_post_id( $post_id ) ) {
+			$ids[] = RYV_States_I18n::get_source_post_id( $post_id );
+		}
+
+		foreach ( $ids as $id ) {
+			$name = trim( (string) get_post_meta( $id, 'ryv_hero_stats_source_name', true ) );
+
+			if ( '' !== $name ) {
+				return array(
+					array(
+						'name' => $name,
+						'url'  => trim( (string) get_post_meta( $id, 'ryv_hero_stats_source_url', true ) ),
+					),
+				);
+			}
+		}
+
+		return array();
 	}
 
 	/**

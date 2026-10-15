@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
+import NodeSelect from './NodeSelect';
 import { TextControl, SelectControl, TabPanel, TextareaControl, ToggleControl } from '@wordpress/components';
 import OptionsEditor from './OptionsEditor';
 import ReferenceNodesEditor from './ReferenceNodesEditor';
@@ -292,7 +293,7 @@ export default function NodeEditor({ node, nodeId, allNodeIds, allNodes, onChang
           />
         </>
       ) : (
-        <SelectControl
+        <NodeSelect
           label={__('Next question', 'ryv-eligibility-tool')}
           value={node.next_node || ''}
           options={nextNodeOptions}

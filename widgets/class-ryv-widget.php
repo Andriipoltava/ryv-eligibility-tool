@@ -156,6 +156,7 @@ class RYV_Widget extends \Elementor\Widget_Base {
 		$this->register_header_style_controls();
 		$this->register_button_style_controls();
 		$this->register_continue_button_style_controls();
+		$this->register_start_over_end_button_style_controls();
 		$this->register_dropdown_style_controls();
 		$this->register_input_style_controls();
 		$this->register_radio_style_controls();
@@ -1423,6 +1424,62 @@ class RYV_Widget extends \Elementor\Widget_Base {
 		$this->end_controls_tab();
 
 		$this->end_controls_tabs();
+
+		$this->end_controls_section();
+	}
+
+	/**
+	 * The red "Start Over" button shown at the end of the workflow
+	 * (.ryv-start-over-end-btn) - styled independently of Continue.
+	 */
+	private function register_start_over_end_button_style_controls() {
+		$this->start_controls_section(
+			'start_over_end_button_style_section',
+			array(
+				'label' => __( 'Start Over Button (end of workflow)', 'ryv-eligibility-tool' ),
+				'tab'   => \Elementor\Controls_Manager::TAB_STYLE,
+			)
+		);
+
+		$this->add_group_control(
+			\Elementor\Group_Control_Typography::get_type(),
+			array(
+				'name'     => 'start_over_end_button_typography',
+				'label'    => __( 'Typography', 'ryv-eligibility-tool' ),
+				'selector' => '{{WRAPPER}} .ryv-start-over-end-btn',
+			)
+		);
+
+		$vars = array(
+			'start_over_end_button_text_color'     => array( __( 'Text Color', 'ryv-eligibility-tool' ), '--ryv-start-over-end-btn-text-color' ),
+			'start_over_end_button_bg_color'       => array( __( 'Background Color', 'ryv-eligibility-tool' ), '--ryv-start-over-end-btn-bg' ),
+			'start_over_end_button_bg_color_hover' => array( __( 'Hover Background Color', 'ryv-eligibility-tool' ), '--ryv-start-over-end-btn-bg-hover' ),
+		);
+		foreach ( $vars as $id => $def ) {
+			$this->add_control(
+				$id,
+				array(
+					'label'     => $def[0],
+					'type'      => \Elementor\Controls_Manager::COLOR,
+					'selectors' => array(
+						'{{WRAPPER}} .ryv-app-wrapper' => $def[1] . ': {{VALUE}};',
+					),
+				)
+			);
+		}
+
+		$this->add_control(
+			'start_over_end_button_margin_top',
+			array(
+				'label'      => __( 'Top Spacing', 'ryv-eligibility-tool' ),
+				'type'       => \Elementor\Controls_Manager::SLIDER,
+				'size_units' => array( 'px' ),
+				'range'      => array( 'px' => array( 'min' => 0, 'max' => 60 ) ),
+				'selectors'  => array(
+					'{{WRAPPER}} .ryv-app-wrapper' => '--ryv-start-over-end-btn-margin-top: {{SIZE}}{{UNIT}};',
+				),
+			)
+		);
 
 		$this->end_controls_section();
 	}

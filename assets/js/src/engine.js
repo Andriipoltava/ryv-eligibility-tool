@@ -1,8 +1,8 @@
 // See the matching comment in ../decision-engine.js - these query strings
 // are the only thing cache-busting these nested imports; bump them with
 // every RYV_VERSION change.
-import { fetchForm, logSubmission, submitLead } from './api-client.js?ver=0.8.93';
-import * as renderer from './renderer.js?ver=0.8.93';
+import { fetchForm, logSubmission, submitLead } from './api-client.js?ver=0.9.20';
+import * as renderer from './renderer.js?ver=0.9.20';
 
 const LOADING_CARD_ID = '__loading__';
 const ERROR_CARD_ID = '__error__';
@@ -78,10 +78,11 @@ export class RYVDecisionEngine {
     // stays correct however the editions arrive.
     this.languageCode = (this.languageEditions.find((e) => String(e.form_id) === String(this.formId)) || {}).code || '';
     this.langSwitchEl = null;
-    // Wizard-mode-only "Back" button (see mount()/positionBackButton()/
-    // goBack()) - stacked layout has no equivalent, see renderBackButton()'s
-    // own docblock.
-    this.backBtnEl = null;
+    // "Start Over" button that replaces the old wizard-only Back button (see
+    // mount()/positionStartOverButton()/restartKeepingState()) - unlike the
+    // terminal card's own Start Over, it's available mid-flow, in both
+    // layouts, and keeps the chosen state.
+    this.startOverBtnEl = null;
     // One id per attempt at the questionnaire - restart() rolls a new one so
     // an abandoned-then-restarted trail stays on record as its own row
     // (see RYV_Submission_Log) instead of being overwritten in place.
@@ -95,7 +96,7 @@ export class RYVDecisionEngine {
     // Real (cardElements-having) node id -> the wizard-mode leading markup
     // nodes merged onto its card when first built (see renderFrom()) - kept
     // so a rebuild of that same card (onAnswerChange()) or a revisit
-    // (goBack()/goToStep()) can re-show the same merged content instead of
+    // (goToStep()) can re-show the same merged content instead of
     // silently dropping it.
     this.leadingMarkupByNode = new Map();
   }
@@ -172,9 +173,7 @@ export class RYVDecisionEngine {
 
     this.list = renderer.createList();
     this.root.appendChild(this.list);
-    if (this.wizardMode) {
-      this.backBtnEl = renderer.renderBackButton(() => this.goBack(), this.labels);
-    }
+    this.startOverBtnEl = renderer.renderStartOverButton(() => this.restartKeepingState(), this.labels);
     this.mountLanguageSwitch();
     this.loadForm();
   }
@@ -275,13 +274,12 @@ export class RYVDecisionEngine {
     this.sessionId = this.generateSessionId();
 
     // Unlike the language switch button and every card (rebuilt below by
-    // loadForm()), the wizard "Back" button is a single long-lived element
-    // (see mount()) that outlives a language switch - relabel it in place
-    // rather than rebuilding, or it would keep showing whatever language it
-    // was first mounted in (reported: switching to Spanish left it reading
-    // "← Back").
-    if (this.backBtnEl) {
-      this.backBtnEl.textContent = this.labels.back;
+    // loadForm()), the mid-flow "Start Over" button is a single long-lived
+    // element (see mount()) that outlives a language switch - relabel it in
+    // place rather than rebuilding, or it would keep showing whatever
+    // language it was first mounted in.
+    if (this.startOverBtnEl) {
+      this.startOverBtnEl.textContent = this.labels.startOver;
     }
 
     // Rebuilt rather than relabeled: the button set is "every edition except
@@ -337,6 +335,39 @@ export class RYVDecisionEngine {
     this.allSteps = this.buildAllSteps();
     this.truncateFrom(0);
     this.renderFrom(this.entryNode, true);
+  }
+
+  /**
+   * "Start Over" that keeps the visitor on the state they already picked:
+   * wipes every answer except the state picker's, then re-walks from the
+   * entry node, which (with that one answer pre-filled) lands straight on
+   * the state's first question instead of the full picker. Changing state is
+   * still possible by re-picking it, as on any other card.
+   *
+   * Falls back to a full restart() when there's no picked state to keep - a
+   * state-page placement (entryNodeOverride skips the picker, so it's never
+   * answered and restart() already lands on that state's first question) or
+   * a visitor who hasn't picked one yet.
+   *
+   * The state answer is set *after* truncateFrom(0), which forgets every
+   * removed card's cached answer, the picker's included.
+   */
+  restartKeepingState() {
+    const stateAnswer = this.answers.get(this.trueEntryNode);
+    if (!stateAnswer || stateAnswer.length === 0) {
+      this.restart();
+      return;
+    }
+
+    // Fresh session id, same reasoning as restart(): the abandoned trail
+    // stays on record as its own row.
+    this.sessionId = this.generateSessionId();
+    this.allSteps = this.buildAllSteps(stateAnswer);
+    this.truncateFrom(0);
+    this.answers.set(this.trueEntryNode, stateAnswer);
+    this.renderFrom(this.entryNode, true);
+    this.logProgress();
+    this.root.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
   /**
@@ -512,7 +543,7 @@ export class RYVDecisionEngine {
       return;
     }
 
-    // Same ordering note as goBack(): read before truncateFrom() deletes it,
+    // Same ordering note as onAnswerChange(): read before truncateFrom() deletes it,
     // then restore it after - nothing else re-populates this map for a card
     // rebuilt here, so a later revisit/answer-change on this same node would
     // otherwise silently lose the merged content once.
@@ -525,7 +556,7 @@ export class RYVDecisionEngine {
     this.truncateFrom(index);
     this.leadingMarkupByNode.set(nodeId, leadingMarkup);
     if (previousAnswer !== undefined) this.answers.set(nodeId, previousAnswer);
-    // Same reasoning as goBack(): jumping back to the state-picker step
+    // Same reasoning as restart(): jumping back to the state-picker step
     // itself (clicked from the sidebar) re-opens the state as a live
     // question again, so the checklist shouldn't stay narrowed to whichever
     // state's shape was last answered until they pick again.
@@ -601,33 +632,56 @@ export class RYVDecisionEngine {
   }
 
   /**
-   * Places the wizard-mode Back button immediately above the currently
-   * visible card, and hides it entirely when there's nowhere to go back to
-   * (the very first real card on screen). No-op outside wizard mode -
-   * `backBtnEl` is never created there (see mount()).
+   * Places the mid-flow "Start Over" button and hides it when it would be
+   * pointless: no question beyond the first is on screen yet, or the last card
+   * is a terminal one that already carries its own Start Over (see
+   * buildCard()). Deliberately not gated on the widget's "Show Start Over
+   * Button" setting, which only governs that terminal button - the old Back
+   * button this replaces was never gated either.
+   *
+   * Wizard layout shows it immediately above the single visible card, where
+   * Back used to sit; stacked layout puts it after the last card, below the
+   * whole growing list.
    */
-  positionBackButton() {
-    if (!this.backBtnEl) return;
-
-    if (this.previousRealIndex() < 0) {
-      this.backBtnEl.remove();
-      return;
-    }
+  positionStartOverButton() {
+    if (!this.startOverBtnEl) return;
 
     let lastRealId = null;
     this.renderedOrder.forEach((id) => {
       if (this.cardElements.has(id)) lastRealId = id;
     });
     const lastCard = lastRealId ? this.cardElements.get(lastRealId) : null;
-    if (lastCard) lastCard.before(this.backBtnEl);
-    else this.backBtnEl.remove();
+    const lastNode = lastRealId ? this.nodes[lastRealId] : null;
+    const terminalHasOwn = this.showStartOver && !!lastNode
+      && (lastNode.type === 'markup' || lastNode.type === 'unsupported')
+      && !lastNode.next_node;
+
+    if (!lastCard || this.previousRealIndex() < 0 || terminalHasOwn) {
+      this.startOverBtnEl.remove();
+      return;
+    }
+
+    // At the true end of the workflow (a terminal result card) the button
+    // reads as the primary red call-to-action, same as the homepage; mid-flow
+    // it stays the quiet text link. Swapping the class (not stacking both)
+    // keeps .ryv-back-btn's own !important rules from fighting the button's.
+    const atEnd = !!lastNode
+      && (lastNode.type === 'markup' || lastNode.type === 'unsupported')
+      && !lastNode.next_node;
+    this.startOverBtnEl.className = atEnd ? 'ryv-start-over-end-btn' : 'ryv-back-btn';
+    // .ryv-list is a flex column, which would stretch the button to the full
+    // card width - keep it sized to its label like a Continue button.
+    this.startOverBtnEl.style.alignSelf = 'flex-start';
+
+    if (this.wizardMode) lastCard.before(this.startOverBtnEl);
+    else this.list.appendChild(this.startOverBtnEl);
   }
 
   /**
    * Index (in `renderedOrder`) of the real card immediately before the one
    * currently on screen, or -1 when the visible card is the first (or there
-   * is none yet). Shared by positionBackButton() (whether to show the
-   * button) and goBack() (where it truncates back to).
+   * is none yet). Used by positionStartOverButton() (whether to show the
+   * button).
    */
   previousRealIndex() {
     let lastRealIndex = -1;
@@ -640,44 +694,6 @@ export class RYVDecisionEngine {
       if (this.cardElements.has(this.renderedOrder[i])) return i;
     }
     return -1;
-  }
-
-  /**
-   * Wizard mode only: truncate back to the previous real card and re-show
-   * it, leaving its previous answer in place - same truncate-and-re-append
-   * shape as goToStep()'s wizard branch, deliberately not a forward
-   * renderFrom() walk (which would just recompute through the still-cached
-   * answers and land right back here).
-   */
-  goBack() {
-    const index = this.previousRealIndex();
-    if (index < 0) return;
-
-    const nodeId = this.renderedOrder[index];
-    // Read before truncateFrom(), which deletes this same id's entries (it's
-    // part of the range being removed, `index` inclusive) - reading after
-    // would always see them already gone.
-    const leadingMarkup = this.leadingMarkupByNode.get(nodeId) || [];
-    const previousAnswer = this.answers.get(nodeId);
-    this.truncateFrom(index);
-    // Restore both: nothing else re-populates these for a card rebuilt
-    // here, so a later revisit/answer-change on this same node would
-    // otherwise silently lose the merged content and pre-filled answer.
-    this.leadingMarkupByNode.set(nodeId, leadingMarkup);
-    if (previousAnswer !== undefined) this.answers.set(nodeId, previousAnswer);
-    // Landing back on the state picker itself re-opens "which state" as a
-    // live question again - even though its previous answer is still
-    // pre-filled above, the visitor hasn't re-confirmed it, so the sidebar
-    // shouldn't keep showing the shape of whichever state that answer
-    // happened to be. Back to the full graph-wide checklist (same reasoning
-    // as restart()) until they pick again, which re-narrows it via
-    // onAnswerChange() same as any other selection.
-    if (nodeId === this.trueEntryNode) {
-      this.allSteps = this.buildAllSteps();
-    }
-    const node = this.nodes[nodeId];
-    if (!node) return;
-    this.appendCard(nodeId, node.hidden ? null : this.buildCard(nodeId, node, false, leadingMarkup), true);
   }
 
   /**
@@ -833,7 +849,7 @@ export class RYVDecisionEngine {
         return renderer.renderMarkupCard(
           node,
           isTerminal && this.showStartOver,
-          () => this.restart(),
+          () => this.restartKeepingState(),
           this.labels,
           this.wizardMode && !isTerminal,
           () => this.onMarkupContinue(nodeId),
@@ -844,7 +860,7 @@ export class RYVDecisionEngine {
         return renderer.renderUnsupportedCard(
           node,
           isTerminal && this.showStartOver,
-          () => this.restart(),
+          () => this.restartKeepingState(),
           this.labels,
           this.icons,
           leadingMarkup
@@ -855,7 +871,7 @@ export class RYVDecisionEngine {
   onAnswerChange(nodeId, value) {
     const index = this.indexOf(nodeId);
 
-    // Same ordering note as goBack()/goToStep(): read before truncateFrom()
+    // Same ordering note as goToStep(): read before truncateFrom()
     // deletes this same id's entry (it's part of the range being removed).
     const leadingMarkup = this.leadingMarkupByNode.get(nodeId) || [];
     // truncateFrom() now also forgets the cached answer for every card it
@@ -952,7 +968,7 @@ export class RYVDecisionEngine {
     this.updateSteps();
     this.updateStateBadge();
     this.updateWizardVisibility();
-    this.positionBackButton();
+    this.positionStartOverButton();
     this.positionLanguageSwitch();
   }
 
@@ -973,7 +989,7 @@ export class RYVDecisionEngine {
    * now-orphaned cache entries.
    *
    * A caller that wants to keep pre-filling one specific node's answer after
-   * truncating past it (goBack()/goToStep(), re-showing exactly the node
+   * truncating past it (goToStep(), re-showing exactly the node
    * they truncated to) has to explicitly restore it afterward - same pattern
    * already used here for `leadingMarkupByNode`.
    */
@@ -990,7 +1006,7 @@ export class RYVDecisionEngine {
     this.updateSteps();
     this.updateStateBadge();
     this.updateWizardVisibility();
-    this.positionBackButton();
+    this.positionStartOverButton();
     this.positionLanguageSwitch();
   }
 }

@@ -81,6 +81,15 @@ class RYV_States_I18n {
 			return $value;
 		}
 
+		// A repeater's value is its row count in raw form and its rows in
+		// formatted form; handing ACF rows from here made it return them
+		// keyed by field *key* (`field_xxx`) instead of by name, so a
+		// Spanish page's partners/sources lost every field. Repeaters fall
+		// back through get_value() at the point of use instead.
+		if ( 'repeater' === ( $field['type'] ?? '' ) ) {
+			return $value;
+		}
+
 		$field_name = $field['name'] ?? '';
 
 		if ( '' === $field_name || in_array( $field_name, self::NEVER_FALL_BACK, true ) ) {
@@ -98,6 +107,59 @@ class RYV_States_I18n {
 		self::$resolving = false;
 
 		return self::is_empty( $source_value ) ? $value : $source_value;
+	}
+
+	/**
+	 * A field's value for a state page, reading through to the original
+	 * language's post when this (translated) one has none. Same rule as the
+	 * load_value filter above, for the cases that filter can't serve -
+	 * repeaters.
+	 *
+	 * @param string $field_name ACF field name.
+	 * @param int    $post_id    A `ryv_states` post.
+	 * @return mixed Formatted value.
+	 */
+	public static function get_value( string $field_name, int $post_id ) {
+		$value = get_field( $field_name, $post_id );
+
+		if ( ! self::is_empty( $value ) || in_array( $field_name, self::NEVER_FALL_BACK, true ) ) {
+			return $value;
+		}
+
+		$source_id = self::get_source_post_id( $post_id );
+
+		return $source_id ? get_field( $field_name, $source_id ) : $value;
+	}
+
+	/**
+	 * Re-key repeater rows that came back keyed by sub-field *key*
+	 * (`field_xxx`) to their names. That is the shape a translated page's
+	 * value arrives in when the field is set to "copy" in ACF Multilingual:
+	 * the original's raw rows are returned without being formatted, so a
+	 * renderer reading `$row['name']` finds nothing.
+	 *
+	 * @param mixed                $rows    get_field() value of a repeater.
+	 * @param array<string,string> $key_map Sub-field key => name.
+	 * @return array
+	 */
+	public static function name_rows( $rows, array $key_map ): array {
+		$named = array();
+
+		foreach ( is_array( $rows ) ? $rows : array() as $row ) {
+			if ( ! is_array( $row ) ) {
+				continue;
+			}
+
+			foreach ( $key_map as $key => $name ) {
+				if ( array_key_exists( $key, $row ) && ! array_key_exists( $name, $row ) ) {
+					$row[ $name ] = $row[ $key ];
+				}
+			}
+
+			$named[] = $row;
+		}
+
+		return $named;
 	}
 
 	/**

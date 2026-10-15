@@ -369,8 +369,7 @@ class RYV_States_Template {
 				return true;
 			}
 			$field_name = substr( $marker, strlen( 'field-' ) );
-			$value      = get_field( $field_name, $post_id );
-			return $this->is_value_empty( $value );
+			return $this->is_field_empty( $field_name, $post_id );
 		}
 
 		// `any-field_a,field_b` - empty only when *every* listed field is,
@@ -397,7 +396,7 @@ class RYV_States_Template {
 			}
 
 			foreach ( $field_names as $field_name ) {
-				if ( ! $this->is_value_empty( get_field( $field_name, $post_id ) ) ) {
+				if ( ! $this->is_field_empty( $field_name, $post_id ) ) {
 					return false;
 				}
 			}
@@ -446,6 +445,65 @@ class RYV_States_Template {
 
 		return true;
 	}
+
+	/**
+	 * Whether one ACF field counts as empty for a marker.
+	 *
+	 * `ryv_events` is special-cased: the events grid drops finished events
+	 * and unpublished ids (RYV_State_Queries), so a state whose picked events
+	 * have all ended renders an empty grid. Checking only that the field has
+	 * entries kept that section visible - a heading over nothing - so it's
+	 * judged by what the grid would actually show.
+	 *
+	 * @param string $field_name ACF field name.
+	 * @param int    $post_id    State post id.
+	 * @return bool
+	 */
+	private function is_field_empty( string $field_name, int $post_id ): bool {
+		if ( 'ryv_events' === $field_name && class_exists( 'RYV_State_Queries' ) ) {
+			return ! RYV_State_Queries::has_upcoming_events( $post_id );
+		}
+
+		if ( ! $this->is_value_empty( $this->get_field_value( $field_name, $post_id ) ) ) {
+			return false;
+		}
+
+		// The template's markers predate the repeaters that replaced these
+		// single fields. A state that only has the new data would otherwise
+		// lose its whole section (or its sources line) because the old field
+		// is blank - so a marker on an old field also counts the field that
+		// superseded it.
+		foreach ( self::SUPERSEDED_BY[ $field_name ] ?? array() as $newer ) {
+			if ( ! $this->is_value_empty( $this->get_field_value( $newer, $post_id ) ) ) {
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	/**
+	 * get_field() with the translated-page fallback applied to repeaters too
+	 * (RYV_States_I18n's load_value filter skips them).
+	 *
+	 * @param string $field_name ACF field name.
+	 * @param int    $post_id    State post id.
+	 * @return mixed
+	 */
+	private function get_field_value( string $field_name, int $post_id ) {
+		return class_exists( 'RYV_States_I18n' ) ? RYV_States_I18n::get_value( $field_name, $post_id ) : get_field( $field_name, $post_id );
+	}
+
+	/**
+	 * Old single field => the field(s) that replaced it.
+	 *
+	 * @var array<string,string[]>
+	 */
+	const SUPERSEDED_BY = array(
+		'ryv_partner_name'             => array( 'featured_partners' ),
+		'ryv_partner_description'      => array( 'featured_partners', 'featured_partners_description' ),
+		'ryv_hero_stats_source_name'   => array( 'ryv_hero_stats_sources' ),
+	);
 
 	/**
 	 * @param mixed $value An ACF get_field() return value.
