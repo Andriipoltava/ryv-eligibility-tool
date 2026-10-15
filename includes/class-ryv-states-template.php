@@ -77,30 +77,33 @@ class RYV_States_Template {
 		add_action( 'save_post_elementor_library', array( __CLASS__, 'flush_marker_cache' ) );
 		add_action( 'elementor/editor/after_save', array( __CLASS__, 'flush_marker_cache' ) );
 
-		// One template serves every state, and Elementor's element cache
-		// (`_elementor_element_cache`) keeps whatever markup the first render
-		// produced - observed to freeze a state page without its Events and
-		// Resources sections even on states that have them. Render live on
-		// state pages, and drop a template's cache whenever it is saved or
-		// imported so a stale copy can never outlive an edit.
-		add_filter( 'elementor/element/should_render_shortcode', array( $this, 'disable_element_cache_on_state_pages' ) );
+		// One template serves every state, and Elementor's document-level
+		// element cache (`_elementor_element_cache`, 24h) keeps whatever markup
+		// the first render produced - observed to freeze a state page without
+		// its Events and Resources sections even on states that have them.
+		// Skip it on state pages (Elementor treats a TTL of 'disable' as "cache
+		// off" and renders live), and drop a template's stored cache whenever
+		// it is saved or imported so a stale copy can't outlive an edit. Not
+		// done via `elementor/element/should_render_shortcode`: Elementor adds
+		// its own `__return_true` there while building the cache, which wins.
+		add_filter( 'pre_option_elementor_element_cache_ttl', array( $this, 'disable_element_cache_on_state_pages' ) );
 		add_action( 'save_post_elementor_library', array( __CLASS__, 'clear_element_cache' ), 99 );
 		add_action( 'elementor/editor/after_save', array( __CLASS__, 'clear_element_cache' ), 99 );
 	}
 
 	/**
-	 * Turn Elementor's per-element render cache off while a state page is
-	 * being rendered. Every other page keeps it.
+	 * Turn Elementor's element cache off while a state page is being
+	 * rendered; every other page keeps whatever TTL is configured.
 	 *
-	 * @param bool $should_render_shortcode Elementor's own answer.
-	 * @return bool
+	 * @param mixed $pre Short-circuit value (false = use the stored option).
+	 * @return mixed
 	 */
-	public function disable_element_cache_on_state_pages( $should_render_shortcode ) {
-		if ( $should_render_shortcode && is_singular( RYV_States_CPT::POST_TYPE ) ) {
-			return false;
+	public function disable_element_cache_on_state_pages( $pre ) {
+		if ( is_singular( RYV_States_CPT::POST_TYPE ) ) {
+			return 'disable';
 		}
 
-		return $should_render_shortcode;
+		return $pre;
 	}
 
 	/**
