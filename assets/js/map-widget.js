@@ -76,6 +76,7 @@
 		var extras = addMissingRegions( root );
 		paths = Array.prototype.slice.call( paths ).concat( extras );
 		applyStripes( root, paths );
+		applyLightStateHover( root, paths );
 		wireLegendHover( widgetEl, paths );
 		wireClickPopup( widgetEl, mapHost, root );
 	}
@@ -274,6 +275,60 @@
 			var style = document.createElement( 'style' );
 			style.className = 'ryv-stripe-styles';
 			style.textContent = rules.join( '' ) + 'path.ryv-striped:hover{opacity:.82;}';
+			root.appendChild( style );
+		}
+	}
+
+	// MapSVG's hover/selected feedback lightens the state's own color by a flat
+	// 20% / 40%, which turns an already-light category (the light green) white
+	// - indistinguishable from the map background. For light states, paint a
+	// gentler lightening ourselves; an !important stylesheet rule wins over
+	// the inline fill MapSVG writes.
+	function toHsl( hex ) {
+		var m = /^#?([0-9a-f]{6})$/i.exec( hex || '' );
+		if ( ! m ) {
+			return null;
+		}
+		var n = parseInt( m[ 1 ], 16 );
+		var r = ( n >> 16 & 255 ) / 255, g = ( n >> 8 & 255 ) / 255, b = ( n & 255 ) / 255;
+		var max = Math.max( r, g, b ), min = Math.min( r, g, b ), l = ( max + min ) / 2, h = 0, sat = 0;
+		if ( max !== min ) {
+			var d = max - min;
+			sat = l > 0.5 ? d / ( 2 - max - min ) : d / ( max + min );
+			h = max === r ? ( g - b ) / d + ( g < b ? 6 : 0 ) : max === g ? ( b - r ) / d + 2 : ( r - g ) / d + 4;
+			h *= 60;
+		}
+		return { h: h, s: sat, l: l };
+	}
+
+	// A light state's hover/selected shade: same hue, a few points lighter
+	// than its own color (never white), so it still reads as that category.
+	function lightShade( hsl, delta ) {
+		return 'hsl(' + Math.round( hsl.h ) + ',' + Math.round( hsl.s * 100 ) + '%,' + Math.round( Math.min( hsl.l + delta, 0.9 ) * 100 ) + '%)';
+	}
+
+	function applyLightStateHover( root, paths ) {
+		var data = window.ryvMapWidgetData || {};
+		var rules = [];
+
+		paths.forEach( function ( path ) {
+			var colors = regionColors( data[ regionKey( path ) ] );
+			if ( colors.length !== 1 ) {
+				return;
+			}
+			var hsl = toHsl( colors[ 0 ] );
+			if ( ! hsl || hsl.l < 0.6 ) {
+				return;
+			}
+			var sel = 'path[id="' + path.id + '"]';
+			rules.push( sel + ':hover{fill:' + lightShade( hsl, 0.08 ) + ' !important;}' );
+			rules.push( sel + '.ryv-region-selected{fill:' + lightShade( hsl, 0.1 ) + ' !important;}' );
+		} );
+
+		if ( rules.length ) {
+			var style = document.createElement( 'style' );
+			style.className = 'ryv-light-hover-styles';
+			style.textContent = rules.join( '' );
 			root.appendChild( style );
 		}
 	}
@@ -547,8 +602,20 @@
 			} );
 		}
 
+		function markSelected( regionId ) {
+			Array.prototype.forEach.call( root.querySelectorAll( '.ryv-region-selected' ), function ( el ) {
+				el.classList.remove( 'ryv-region-selected' );
+			} );
+			if ( regionId ) {
+				Array.prototype.forEach.call( root.querySelectorAll( '[id="' + regionId + '"], [data-ryv-region="' + regionId + '"]' ), function ( el ) {
+					el.classList.add( 'ryv-region-selected' );
+				} );
+			}
+		}
+
 		function closePopup() {
 			popup.hidden = true;
+			markSelected( null );
 			deselectRegions();
 			highlightLegend( null );
 			// openPopup() below sets an inline `display: block` (to force
@@ -624,6 +691,7 @@
 			popup.style.left = x + 'px';
 			popup.style.top = y + 'px';
 			popup.hidden = false;
+			markSelected( regionId );
 			highlightLegend( region );
 		}
 

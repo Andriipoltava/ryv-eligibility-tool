@@ -35,7 +35,7 @@ class RYV_States_ACF {
 		array( 'slug' => 'restored-after-sentence-completion', 'label' => 'Voting Rights Automatically Restored After Sentence Completion, Including Probation and Parole', 'color' => '#FFBF00', 'order' => 3 ),
 		array( 'slug' => 'documents-or-certificate-required', 'label' => 'Documents or Certificate Required for Restoration', 'color' => '#C75300', 'order' => 4 ),
 		array( 'slug' => 'discretionary-action', 'label' => 'Voting Rights Restored by Individual Discretionary Judicial, Executive, or Legislative Action', 'color' => '#DE1428', 'order' => 5 ),
-		array( 'slug' => 'permanent-disenfranchisement', 'label' => 'Permanent Disenfranchisement', 'color' => '#B10000', 'order' => 6 ),
+		array( 'slug' => 'permanent-disenfranchisement', 'label' => 'Permanent Disenfranchisement', 'color' => '#532D00', 'order' => 6 ),
 		array( 'slug' => 'payment-legal-debts', 'label' => 'Payment of Legal Debts Required', 'color' => '#B264B5', 'order' => 7 ),
 		array( 'slug' => 'payment-child-support', 'label' => 'Payment of Child Support Required', 'color' => '#4A074D', 'order' => 8 ),
 		array( 'slug' => 'denied-while-incarcerated-misdemeanor', 'label' => 'Voting Rights Denied While Incarcerated for Misdemeanors', 'color' => '#03509F', 'order' => 9 ),
@@ -76,7 +76,7 @@ class RYV_States_ACF {
 	 * call to actually take effect on a site that was seeded before the
 	 * correction.
 	 */
-	const MAP_DEFAULTS_VERSION = 10;
+	const MAP_DEFAULTS_VERSION = 11;
 
 	/**
 	 * Constructor.

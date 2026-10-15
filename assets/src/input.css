@@ -1614,12 +1614,6 @@
     line-height: 1.5;
     color: var(--ryv-partner-quote-color, #1F2937);
   }
-  .ryv-partner-card-quote.ryv-partner-card-quote p::before {
-    content: '"';
-  }
-  .ryv-partner-card-quote.ryv-partner-card-quote p::after {
-    content: '"';
-  }
   .ryv-partner-card-link.ryv-partner-card-link {
     display: inline-flex;
     align-items: center;
