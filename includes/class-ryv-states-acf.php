@@ -33,7 +33,7 @@ class RYV_States_ACF {
 		array( 'slug' => 'voting-rights-not-lost', 'label' => 'Voting Rights Not Lost for Felony Convictions', 'color' => '#276227', 'order' => 1 ),
 		array( 'slug' => 'lost-only-during-incarceration', 'label' => 'Voting Rights Lost Only During Incarceration', 'color' => '#92E092', 'order' => 2 ),
 		array( 'slug' => 'restored-after-sentence-completion', 'label' => 'Voting Rights Automatically Restored After Sentence Completion, Including Probation and Parole', 'color' => '#FFBF00', 'order' => 3 ),
-		array( 'slug' => 'documents-or-certificate-required', 'label' => 'Documents or Certificate Required for Restoration', 'color' => '#FFA500', 'order' => 4 ),
+		array( 'slug' => 'documents-or-certificate-required', 'label' => 'Documents or Certificate Required for Restoration', 'color' => '#C75300', 'order' => 4 ),
 		array( 'slug' => 'discretionary-action', 'label' => 'Voting Rights Restored by Individual Discretionary Judicial, Executive, or Legislative Action', 'color' => '#DE1428', 'order' => 5 ),
 		array( 'slug' => 'permanent-disenfranchisement', 'label' => 'Permanent Disenfranchisement', 'color' => '#B10000', 'order' => 6 ),
 		array( 'slug' => 'payment-legal-debts', 'label' => 'Payment of Legal Debts Required', 'color' => '#B264B5', 'order' => 7 ),
@@ -76,7 +76,7 @@ class RYV_States_ACF {
 	 * call to actually take effect on a site that was seeded before the
 	 * correction.
 	 */
-	const MAP_DEFAULTS_VERSION = 9;
+	const MAP_DEFAULTS_VERSION = 10;
 
 	/**
 	 * Constructor.

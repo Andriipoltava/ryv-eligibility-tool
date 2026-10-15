@@ -76,6 +76,46 @@ class RYV_States_Template {
 		add_action( 'wp_head', array( $this, 'output_hide_empty_css' ), 20 );
 		add_action( 'save_post_elementor_library', array( __CLASS__, 'flush_marker_cache' ) );
 		add_action( 'elementor/editor/after_save', array( __CLASS__, 'flush_marker_cache' ) );
+
+		// One template serves every state, and Elementor's element cache
+		// (`_elementor_element_cache`) keeps whatever markup the first render
+		// produced - observed to freeze a state page without its Events and
+		// Resources sections even on states that have them. Render live on
+		// state pages, and drop a template's cache whenever it is saved or
+		// imported so a stale copy can never outlive an edit.
+		add_filter( 'elementor/element/should_render_shortcode', array( $this, 'disable_element_cache_on_state_pages' ) );
+		add_action( 'save_post_elementor_library', array( __CLASS__, 'clear_element_cache' ), 99 );
+		add_action( 'elementor/editor/after_save', array( __CLASS__, 'clear_element_cache' ), 99 );
+	}
+
+	/**
+	 * Turn Elementor's per-element render cache off while a state page is
+	 * being rendered. Every other page keeps it.
+	 *
+	 * @param bool $should_render_shortcode Elementor's own answer.
+	 * @return bool
+	 */
+	public function disable_element_cache_on_state_pages( $should_render_shortcode ) {
+		if ( $should_render_shortcode && is_singular( RYV_States_CPT::POST_TYPE ) ) {
+			return false;
+		}
+
+		return $should_render_shortcode;
+	}
+
+	/**
+	 * Delete the stored element cache of a template that was just saved.
+	 *
+	 * @param int|\Elementor\Core\Base\Document $post_or_document Post id (save_post) or document (editor save).
+	 */
+	public static function clear_element_cache( $post_or_document ) {
+		$post_id = is_object( $post_or_document ) && method_exists( $post_or_document, 'get_main_id' )
+			? (int) $post_or_document->get_main_id()
+			: (int) $post_or_document;
+
+		if ( $post_id ) {
+			delete_post_meta( $post_id, '_elementor_element_cache' );
+		}
 	}
 
 	/**
