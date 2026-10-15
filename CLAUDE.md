@@ -869,6 +869,29 @@ Debugging aid: the `ryv_hide_empty_should_hide` filter (`$hide, $marker,
 $post_id`) is the only way to see why a section vanished, since a hidden one
 leaves no trace in the markup.
 
+### State page: sources, partners, glance, resources wiring
+
+- **Stats sources** are a repeater (`ryv_hero_stats_sources`: name + url),
+  rendered by `[ryv_stats_source]` via `RYV_States_Field_Shortcode::get_sources()`
+  (one "Source:" line per row). The old single `ryv_hero_stats_source_name/url`
+  fields stay registered but hidden (admin CSS); opening a state's edit screen
+  copies them into row 1 (`RYV_States_ACF::migrate_legacy_sources()`), and the
+  frontend falls back to them while the repeater is empty.
+- **Partner rows** are logo + name + URL only (location/description/quote were
+  removed; stored meta is untouched). The list-wide description/quote remain.
+- `RYV_States_Template::SUPERSEDED_BY`: a hide-empty marker on an old field
+  (`ryv_partner_name`, `ryv_hero_stats_source_name`) also counts the field that
+  replaced it, so the template's markers needn't be edited when a field is
+  superseded.
+- **"Repair State Post Template"** also: binds the `ryv-partner-hero-image`
+  Image widget to the `ryv-featured-partners-image` tag (it was bound to the
+  post's featured image, which state pages never set), writes the Loop Grid's
+  real `post_query_query_id` control (earlier it wrote a bare `query_id` that
+  nothing reads, so the Resources grid ran its default query), strips the
+  Resources grid's static term filter (ANDed with the picked ids), adds the
+  At-a-glance full-width/hide markers, and deletes the template's stale
+  `_elementor_element_cache`.
+
 ### Translated state pages fall back to the original's content
 
 `includes/class-ryv-states-i18n.php` reads any **empty** ACF field on a

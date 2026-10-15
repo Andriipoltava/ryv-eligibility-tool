@@ -352,6 +352,20 @@ if ( ! defined( 'ABSPATH' ) ) {
 				?>
 			</p>
 
+			<?php foreach ( $template_result['spanish_synced'] ?? array() as $synced ) : ?>
+				<p>
+					<?php
+					printf(
+						/* translators: 1: Spanish template title, 2: its id, 3: English template id */
+						esc_html__( 'Spanish template "%1$s" (#%2$d) rebuilt from the English one (#%3$d). Its previous data is kept in the _ryv_backup_elementor_data meta.', 'ryv-eligibility-tool' ),
+						esc_html( $synced['title'] ),
+						(int) $synced['target'],
+						(int) $synced['source']
+					);
+					?>
+				</p>
+			<?php endforeach; ?>
+
 			<?php if ( ! empty( $template_result['templates'] ) ) : ?>
 				<ul style="margin-left:1.5em;list-style:disc;">
 					<?php foreach ( $template_result['templates'] as $template ) : ?>

@@ -998,6 +998,11 @@
     font-size: 0.75rem;
     margin-bottom: var(--ryv-map-legend-title-spacing, 0.75rem);
   }
+  .ryv-map-widget-legend-desc {
+    font-size: 1.4rem;
+    line-height: 1.4;
+    margin: calc(var(--ryv-map-legend-title-spacing, 0.75rem) * -0.5) 0 var(--ryv-map-legend-title-spacing, 0.75rem);
+  }
   .ryv-map-widget-legend-toggle.ryv-map-widget-legend-toggle {
     display: flex;
     align-items: center;

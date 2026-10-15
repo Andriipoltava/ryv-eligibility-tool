@@ -86,7 +86,7 @@ class RYV_States_Partners_Shortcode {
 
 		return sprintf(
 			/* translators: %s: state name */
-			esc_html__( 'Our Partners on the Ground in %s', 'ryv-eligibility-tool' ),
+			esc_html( RYV_Featured_Partners_Renderer::localized( __( 'Our Partners on the Ground in %s', 'ryv-eligibility-tool' ), 'Nuestros socios sobre el terreno en %s' ) ),
 			esc_html( get_the_title( $post_id ) )
 		);
 	}

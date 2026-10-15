@@ -76,6 +76,46 @@ class RYV_States_Template {
 		add_action( 'wp_head', array( $this, 'output_hide_empty_css' ), 20 );
 		add_action( 'save_post_elementor_library', array( __CLASS__, 'flush_marker_cache' ) );
 		add_action( 'elementor/editor/after_save', array( __CLASS__, 'flush_marker_cache' ) );
+
+		// One template serves every state, and Elementor's element cache
+		// (`_elementor_element_cache`) keeps whatever markup the first render
+		// produced - observed to freeze a state page without its Events and
+		// Resources sections even on states that have them. Render live on
+		// state pages, and drop a template's cache whenever it is saved or
+		// imported so a stale copy can never outlive an edit.
+		add_filter( 'elementor/element/should_render_shortcode', array( $this, 'disable_element_cache_on_state_pages' ) );
+		add_action( 'save_post_elementor_library', array( __CLASS__, 'clear_element_cache' ), 99 );
+		add_action( 'elementor/editor/after_save', array( __CLASS__, 'clear_element_cache' ), 99 );
+	}
+
+	/**
+	 * Turn Elementor's per-element render cache off while a state page is
+	 * being rendered. Every other page keeps it.
+	 *
+	 * @param bool $should_render_shortcode Elementor's own answer.
+	 * @return bool
+	 */
+	public function disable_element_cache_on_state_pages( $should_render_shortcode ) {
+		if ( $should_render_shortcode && is_singular( RYV_States_CPT::POST_TYPE ) ) {
+			return false;
+		}
+
+		return $should_render_shortcode;
+	}
+
+	/**
+	 * Delete the stored element cache of a template that was just saved.
+	 *
+	 * @param int|\Elementor\Core\Base\Document $post_or_document Post id (save_post) or document (editor save).
+	 */
+	public static function clear_element_cache( $post_or_document ) {
+		$post_id = is_object( $post_or_document ) && method_exists( $post_or_document, 'get_main_id' )
+			? (int) $post_or_document->get_main_id()
+			: (int) $post_or_document;
+
+		if ( $post_id ) {
+			delete_post_meta( $post_id, '_elementor_element_cache' );
+		}
 	}
 
 	/**
@@ -464,8 +504,46 @@ class RYV_States_Template {
 			return ! RYV_State_Queries::has_upcoming_events( $post_id );
 		}
 
-		return $this->is_value_empty( get_field( $field_name, $post_id ) );
+		if ( ! $this->is_value_empty( $this->get_field_value( $field_name, $post_id ) ) ) {
+			return false;
+		}
+
+		// The template's markers predate the repeaters that replaced these
+		// single fields. A state that only has the new data would otherwise
+		// lose its whole section (or its sources line) because the old field
+		// is blank - so a marker on an old field also counts the field that
+		// superseded it.
+		foreach ( self::SUPERSEDED_BY[ $field_name ] ?? array() as $newer ) {
+			if ( ! $this->is_value_empty( $this->get_field_value( $newer, $post_id ) ) ) {
+				return false;
+			}
+		}
+
+		return true;
 	}
+
+	/**
+	 * get_field() with the translated-page fallback applied to repeaters too
+	 * (RYV_States_I18n's load_value filter skips them).
+	 *
+	 * @param string $field_name ACF field name.
+	 * @param int    $post_id    State post id.
+	 * @return mixed
+	 */
+	private function get_field_value( string $field_name, int $post_id ) {
+		return class_exists( 'RYV_States_I18n' ) ? RYV_States_I18n::get_value( $field_name, $post_id ) : get_field( $field_name, $post_id );
+	}
+
+	/**
+	 * Old single field => the field(s) that replaced it.
+	 *
+	 * @var array<string,string[]>
+	 */
+	const SUPERSEDED_BY = array(
+		'ryv_partner_name'             => array( 'featured_partners' ),
+		'ryv_partner_description'      => array( 'featured_partners', 'featured_partners_description' ),
+		'ryv_hero_stats_source_name'   => array( 'ryv_hero_stats_sources' ),
+	);
 
 	/**
 	 * @param mixed $value An ACF get_field() return value.

@@ -32,12 +32,12 @@ class RYV_States_ACF {
 	const DEFAULT_MAP_CATEGORIES = array(
 		array( 'slug' => 'voting-rights-not-lost', 'label' => 'Voting Rights Not Lost for Felony Convictions', 'color' => '#276227', 'order' => 1 ),
 		array( 'slug' => 'lost-only-during-incarceration', 'label' => 'Voting Rights Lost Only During Incarceration', 'color' => '#92E092', 'order' => 2 ),
-		array( 'slug' => 'restored-after-sentence-completion', 'label' => 'Voting Rights Restored After Sentence Completion', 'color' => '#FFF000', 'order' => 3 ),
-		array( 'slug' => 'documents-or-certificate-required', 'label' => 'Documents or Certificate Required for Restoration', 'color' => '#FFA500', 'order' => 4 ),
+		array( 'slug' => 'restored-after-sentence-completion', 'label' => 'Voting Rights Automatically Restored After Sentence Completion, Including Probation and Parole', 'color' => '#FFBF00', 'order' => 3 ),
+		array( 'slug' => 'documents-or-certificate-required', 'label' => 'Documents or Certificate Required for Restoration', 'color' => '#C75300', 'order' => 4 ),
 		array( 'slug' => 'discretionary-action', 'label' => 'Voting Rights Restored by Individual Discretionary Judicial, Executive, or Legislative Action', 'color' => '#DE1428', 'order' => 5 ),
-		array( 'slug' => 'permanent-disenfranchisement', 'label' => 'Permanent Disenfranchisement', 'color' => '#54060E', 'order' => 6 ),
+		array( 'slug' => 'permanent-disenfranchisement', 'label' => 'Permanent Disenfranchisement', 'color' => '#B10000', 'order' => 6 ),
 		array( 'slug' => 'payment-legal-debts', 'label' => 'Payment of Legal Debts Required', 'color' => '#B264B5', 'order' => 7 ),
-		array( 'slug' => 'payment-child-support', 'label' => 'Payment Child Support Required', 'color' => '#4A074D', 'order' => 8 ),
+		array( 'slug' => 'payment-child-support', 'label' => 'Payment of Child Support Required', 'color' => '#4A074D', 'order' => 8 ),
 		array( 'slug' => 'denied-while-incarcerated-misdemeanor', 'label' => 'Voting Rights Denied While Incarcerated for Misdemeanors', 'color' => '#03509F', 'order' => 9 ),
 	);
 
@@ -76,7 +76,7 @@ class RYV_States_ACF {
 	 * call to actually take effect on a site that was seeded before the
 	 * correction.
 	 */
-	const MAP_DEFAULTS_VERSION = 6;
+	const MAP_DEFAULTS_VERSION = 10;
 
 	/**
 	 * Constructor.
@@ -90,6 +90,52 @@ class RYV_States_ACF {
 		add_filter( 'acf/load_field/key=field_ryv_node_next_node', array( $this, 'populate_next_node_choices' ) );
 		add_filter( 'acf/load_field/key=field_ryv_option_next_node', array( $this, 'populate_next_node_choices' ) );
 		add_action( 'after_setup_theme', array( $this, 'register_image_sizes' ) );
+		add_action( 'load-post.php', array( $this, 'maybe_migrate_legacy_sources' ) );
+	}
+
+	/**
+	 * Opening a state's edit screen fills its Stats Sources repeater from the
+	 * old single Source Name/URL pair when the repeater is still empty, so an
+	 * editor sees the existing source as row 1 instead of a blank list while
+	 * the frontend (RYV_States_Field_Shortcode::get_sources()) shows it from
+	 * the legacy fields. Idempotent: never touches a post that already has
+	 * rows, and the legacy values are left in place.
+	 */
+	public function maybe_migrate_legacy_sources() {
+		$post_id = isset( $_GET['post'] ) ? absint( $_GET['post'] ) : 0; // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only screen load.
+
+		if ( ! $post_id || RYV_States_CPT::POST_TYPE !== get_post_type( $post_id ) || ! function_exists( 'update_field' ) ) {
+			return;
+		}
+
+		self::migrate_legacy_sources( $post_id );
+	}
+
+	/**
+	 * @param int $post_id A `ryv_states` post.
+	 * @return bool Whether a row was written.
+	 */
+	public static function migrate_legacy_sources( int $post_id ): bool {
+		if ( (int) get_post_meta( $post_id, 'ryv_hero_stats_sources', true ) > 0 ) {
+			return false;
+		}
+
+		$name = trim( (string) get_post_meta( $post_id, 'ryv_hero_stats_source_name', true ) );
+
+		if ( '' === $name ) {
+			return false;
+		}
+
+		return (bool) update_field(
+			'field_ryv_hero_stats_sources',
+			array(
+				array(
+					'field_ryv_hero_stats_source_row_name' => $name,
+					'field_ryv_hero_stats_source_row_url'  => trim( (string) get_post_meta( $post_id, 'ryv_hero_stats_source_url', true ) ),
+				),
+			),
+			$post_id
+		);
 	}
 
 	/**
@@ -189,6 +235,16 @@ class RYV_States_ACF {
 					'ui'            => 1,
 					'allow_null'    => 1,
 					'instructions'  => 'Pick up to 5. A state with one category is a solid fill; with more, it is drawn as equal diagonal stripes, one per category, in the order picked. Categories are managed under RYV States → Map Settings.',
+				),
+				array(
+					'key'           => 'field_ryv_page_ready',
+					'label'         => 'State Page Ready',
+					'name'          => 'ryv_page_ready',
+					'type'          => 'true_false',
+					'ui'            => 1,
+					'default_value' => 0,
+					'message'       => '',
+					'instructions'  => 'Turn on once this state\'s page content is complete. Until then the map popup shows no "Learn More" link for this state.',
 				),
 				array(
 					'key'          => 'field_ryv_map_tooltip_text',
@@ -294,23 +350,53 @@ class RYV_States_ACF {
 						),
 					),
 				),
+				// Sources shown under the stats - one row per source, same
+				// shape as Featured Partners. Replaces the single name/URL
+				// pair below, which stays registered (hidden by
+				// assets/css/admin/states-admin.css) so its stored value can
+				// still be read and migrated - see
+				// RYV_States_ACF::migrate_legacy_sources().
 				array(
-					'key'          => 'field_ryv_hero_stats_source_name',
-					'label'        => 'Stats Source Name',
-					'name'         => 'ryv_hero_stats_source_name',
-					'type'         => 'text',
-					'instructions' => 'Shown below the stats as "Source: <name>". Leave empty to hide the source line. E.g. "The Sentencing Project"',
-					'placeholder'  => 'The Sentencing Project',
-					'wrapper'      => array( 'width' => '50' ),
+					'key'          => 'field_ryv_hero_stats_sources',
+					'label'        => 'Stats Sources',
+					'name'         => 'ryv_hero_stats_sources',
+					'type'         => 'repeater',
+					'layout'       => 'block',
+					'button_label' => 'Add Source',
+					'instructions' => 'Shown below the stats as "Source: <name>", one line per source. Leave empty to hide the source line.',
+					'sub_fields'   => array(
+						array(
+							'key'         => 'field_ryv_hero_stats_source_row_name',
+							'label'       => 'Source Name',
+							'name'        => 'name',
+							'type'        => 'text',
+							'placeholder' => 'The Sentencing Project',
+							'required'    => 1,
+							'wrapper'     => array( 'width' => '50' ),
+						),
+						array(
+							'key'         => 'field_ryv_hero_stats_source_row_url',
+							'label'       => 'Source URL',
+							'name'        => 'url',
+							'type'        => 'url',
+							'placeholder' => 'https://www.sentencingproject.org/',
+							'wrapper'     => array( 'width' => '50' ),
+						),
+					),
+				),
+				// Legacy single source - hidden from the edit screen,
+				// superseded by the repeater above.
+				array(
+					'key'   => 'field_ryv_hero_stats_source_name',
+					'label' => 'Stats Source Name (legacy)',
+					'name'  => 'ryv_hero_stats_source_name',
+					'type'  => 'text',
 				),
 				array(
-					'key'          => 'field_ryv_hero_stats_source_url',
-					'label'        => 'Stats Source URL',
-					'name'         => 'ryv_hero_stats_source_url',
-					'type'         => 'url',
-					'instructions' => 'Link for the source name. E.g. "https://www.sentencingproject.org/"',
-					'placeholder'  => 'https://www.sentencingproject.org/',
-					'wrapper'      => array( 'width' => '50' ),
+					'key'   => 'field_ryv_hero_stats_source_url',
+					'label' => 'Stats Source URL (legacy)',
+					'name'  => 'ryv_hero_stats_source_url',
+					'type'  => 'url',
 				),
 			),
 			'location' => array(
@@ -465,7 +551,7 @@ class RYV_States_ACF {
 					'type'         => 'repeater',
 					'layout'       => 'block',
 					'button_label' => 'Add Partner',
-					'instructions' => 'One full card per partner - logo, name, location, description, quote, and a link to their site. Every field is optional except Partner Name; an empty field simply does not render for that card (see RYV_Featured_Partners_Renderer). Shown instead of the legacy single-partner fields above once at least one row exists.',
+					'instructions' => 'One card per partner - logo, name and a link to their site. Only Partner Name is required; an empty field simply does not render for that card (see RYV_Featured_Partners_Renderer). Shown instead of the legacy single-partner fields above once at least one row exists.',
 					'sub_fields'   => array(
 						array(
 							'key'           => 'field_ryv_featured_partner_logo',
@@ -490,28 +576,6 @@ class RYV_States_ACF {
 							'name'   => 'url',
 							'type'   => 'url',
 							'wrapper' => array( 'width' => '40' ),
-						),
-						array(
-							'key'          => 'field_ryv_featured_partner_location',
-							'label'        => 'Location',
-							'name'         => 'location',
-							'type'         => 'text',
-							'instructions' => 'E.g. "Nashville · led by formerly incarcerated women"',
-						),
-						array(
-							'key'          => 'field_ryv_featured_partner_description',
-							'label'        => 'Description',
-							'name'         => 'description',
-							'type'         => 'wysiwyg',
-							'tabs'         => 'all',
-							'media_upload' => 0,
-						),
-						array(
-							'key'   => 'field_ryv_featured_partner_quote',
-							'label' => 'Quote',
-							'name'  => 'quote',
-							'type'  => 'textarea',
-							'rows'  => 3,
 						),
 					),
 				),

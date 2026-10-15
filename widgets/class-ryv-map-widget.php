@@ -271,7 +271,19 @@ class RYV_Map_Widget extends \Elementor\Widget_Base {
 			array(
 				'label'     => __( 'Legend Title', 'ryv-eligibility-tool' ),
 				'type'      => \Elementor\Controls_Manager::TEXT,
-				'default'   => __( 'Legend', 'ryv-eligibility-tool' ),
+				'default'   => __( 'Click By State', 'ryv-eligibility-tool' ),
+				'condition' => array( 'show_legend' => 'yes' ),
+			)
+		);
+
+		$this->add_control(
+			'legend_description',
+			array(
+				'label'     => __( 'Legend Description', 'ryv-eligibility-tool' ),
+				'type'      => \Elementor\Controls_Manager::TEXTAREA,
+				'rows'      => 4,
+				'default'   => __( 'Stripes indicate additional requirements or that restoration laws vary depending on the details of the convictions. Click on a state to learn more.', 'ryv-eligibility-tool' ),
+				'description' => __( 'Small text shown under the title. Leave empty to hide.', 'ryv-eligibility-tool' ),
 				'condition' => array( 'show_legend' => 'yes' ),
 			)
 		);
@@ -819,6 +831,25 @@ class RYV_Map_Widget extends \Elementor\Widget_Base {
 			array(
 				'name'     => 'legend_title_typography',
 				'selector' => '{{WRAPPER}} .ryv-map-widget-legend-title',
+			)
+		);
+
+		$this->add_control(
+			'legend_description_color',
+			array(
+				'label'     => __( 'Description Color', 'ryv-eligibility-tool' ),
+				'type'      => \Elementor\Controls_Manager::COLOR,
+				'selectors' => array(
+					'{{WRAPPER}} .ryv-map-widget-legend-desc' => 'color: {{VALUE}};',
+				),
+			)
+		);
+
+		$this->add_group_control(
+			\Elementor\Group_Control_Typography::get_type(),
+			array(
+				'name'     => 'legend_description_typography',
+				'selector' => '{{WRAPPER}} .ryv-map-widget-legend-desc',
 			)
 		);
 
@@ -1672,7 +1703,8 @@ class RYV_Map_Widget extends \Elementor\Widget_Base {
 			$data[ $svg_id ] = array(
 				'title'       => $state->post_title,
 				'description' => get_field( 'ryv_map_tooltip_text', $state->ID ) ?: '',
-				'link'        => get_permalink( $state ),
+				// Only a state whose page is finished gets a "Learn More" link.
+				'link'        => get_field( 'ryv_page_ready', $state->ID ) ? get_permalink( $state ) : '',
 				// Hex colors, not slugs: map-widget.js paints the stripes
 				// straight from these; slug/label drive the legend
 				// highlight and the popup's category list.
@@ -1721,6 +1753,11 @@ class RYV_Map_Widget extends \Elementor\Widget_Base {
 			} else {
 				printf( '<div class="ryv-map-widget-legend-title">%s</div>', esc_html( $title ) );
 			}
+		}
+
+		$description = trim( (string) ( $settings['legend_description'] ?? '' ) );
+		if ( '' !== $description ) {
+			printf( '<p class="ryv-map-widget-legend-desc">%s</p>', esc_html( $description ) );
 		}
 
 		printf( '<ul class="ryv-map-widget-legend-list" id="%s">', esc_attr( $list_id ) );

@@ -224,6 +224,17 @@ class RYV_State_Queries {
 		// hiding bug rather than a query one.
 		$query->set( 'lang', 'all' );
 
+		// `lang => all` alone is not honoured by WPML's SQL filter on a
+		// non-default-language page (measured: the Spanish Tennessee page
+		// still got `language_code = 'es'` joined onto a query for English
+		// resource ids, so the grid said "nothing found"). The ids are
+		// already mapped to the right language here, so for resources the
+		// language filter is simply switched off. Events are left alone:
+		// they depend on The Events Calendar's own query filters.
+		if ( 'ryv_state_resources' === $query_id ) {
+			$query->set( 'suppress_filters', true );
+		}
+
 		// An *empty* `post__in` is ignored by WP_Query rather than matching
 		// nothing - a state with nothing picked would silently list every
 		// post of that type. `array( 0 )` is the standard way to say "no

@@ -53,7 +53,18 @@ class RYV_Featured_Partners_Renderer {
 			return '';
 		}
 
-		$rows = get_field( 'featured_partners', $post_id );
+		$rows = class_exists( 'RYV_States_I18n' ) ? RYV_States_I18n::get_value( 'featured_partners', $post_id ) : get_field( 'featured_partners', $post_id );
+
+		if ( class_exists( 'RYV_States_I18n' ) ) {
+			$rows = RYV_States_I18n::name_rows(
+				$rows,
+				array(
+					'field_ryv_featured_partner_logo' => 'logo',
+					'field_ryv_featured_partner_name' => 'name',
+					'field_ryv_featured_partner_url'  => 'url',
+				)
+			);
+		}
 
 		if ( is_array( $rows ) && count( $rows ) > 0 ) {
 			$cards = self::build_cards_markup( $rows );
@@ -71,9 +82,6 @@ class RYV_Featured_Partners_Renderer {
 							'logo'        => null,
 							'name'        => $legacy_name,
 							'url'         => (string) get_field( 'ryv_partner_link_url', $post_id ),
-							'location'    => (string) get_field( 'ryv_partner_location', $post_id ),
-							'description' => (string) get_field( 'ryv_partner_description', $post_id ),
-							'quote'       => (string) get_field( 'ryv_partner_quote', $post_id ),
 						),
 					)
 				)
@@ -157,12 +165,10 @@ class RYV_Featured_Partners_Renderer {
 	}
 
 	/**
-	 * One partner's card. Every piece past the name/logo header is
-	 * independently optional - a row missing `description` just skips that
-	 * paragraph rather than rendering an empty one, same for `quote`,
-	 * `location`, and the "Visit" link (which additionally needs `url`, not
-	 * just a non-empty field, since there's nowhere to send a click without
-	 * one).
+	 * One partner's card: logo, name and - when the row has a URL - a "Visit"
+	 * link. (Location, description and quote were dropped from the rows at
+	 * the client's request; the list-wide description/quote below the cards
+	 * covers that copy.)
 	 *
 	 * @param array $row
 	 * @return string '' if the row has no name (nothing safe to anchor a
@@ -174,11 +180,8 @@ class RYV_Featured_Partners_Renderer {
 			return '';
 		}
 
-		$logo_id     = isset( $row['logo'] ) ? absint( $row['logo'] ) : 0;
-		$url         = trim( (string) ( $row['url'] ?? '' ) );
-		$location    = trim( (string) ( $row['location'] ?? '' ) );
-		$description = trim( (string) ( $row['description'] ?? '' ) );
-		$quote       = trim( (string) ( $row['quote'] ?? '' ) );
+		$logo_id = isset( $row['logo'] ) ? absint( $row['logo'] ) : 0;
+		$url     = trim( (string) ( $row['url'] ?? '' ) );
 
 		if ( $logo_id && wp_attachment_is_image( $logo_id ) ) {
 			$alt       = trim( (string) get_post_meta( $logo_id, '_wp_attachment_image_alt', true ) );
@@ -199,23 +202,6 @@ class RYV_Featured_Partners_Renderer {
 			$logo_html = self::placeholder_logo_svg();
 		}
 
-		$location_html = '' !== $location
-			? sprintf( '<p class="ryv-partner-card-location">%s</p>', esc_html( $location ) )
-			: '';
-
-		// Trusted HTML, same boundary as every other rich-text ACF field in
-		// this plugin (node.content/node.title, ryv_partner_description
-		// before it) - admin-only (manage_options via the builder, or
-		// edit_post via ACF on the state's own edit screen), never visitor
-		// input.
-		$description_html = '' !== $description
-			? sprintf( '<div class="ryv-partner-card-description">%s</div>', wp_kses_post( $description ) )
-			: '';
-
-		$quote_html = '' !== $quote
-			? sprintf( '<blockquote class="ryv-partner-card-quote"><p>%s</p></blockquote>', self::format_quote( $quote ) )
-			: '';
-
 		$link_html = '';
 		if ( '' !== $url ) {
 			$link_html = sprintf(
@@ -224,7 +210,7 @@ class RYV_Featured_Partners_Renderer {
 				esc_html(
 					sprintf(
 						/* translators: %s: partner name */
-						__( 'Visit %s', 'ryv-eligibility-tool' ),
+						self::localized( __( 'Visit %s', 'ryv-eligibility-tool' ), 'Visitar %s' ),
 						$name
 					)
 				)
@@ -234,14 +220,11 @@ class RYV_Featured_Partners_Renderer {
 		return sprintf(
 			'<article class="ryv-partner-card">'
 				. '<header class="ryv-partner-card-header">%1$s<div class="ryv-partner-card-heading">'
-				. '<h3 class="ryv-partner-card-name">%2$s</h3>%3$s'
-				. '</div></header>%4$s%5$s%6$s'
+				. '<h3 class="ryv-partner-card-name">%2$s</h3>'
+				. '</div></header>%3$s'
 				. '</article>',
 			$logo_html, // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- wp_get_attachment_image()/placeholder_logo_svg(), both already-safe markup.
 			esc_html( $name ),
-			$location_html, // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- built from esc_html() above.
-			$description_html, // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- wp_kses_post() above.
-			$quote_html, // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- format_quote() above (wp_kses()+nl2br()).
 			$link_html // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- built from esc_url()/esc_html() above.
 		);
 	}
@@ -289,6 +272,25 @@ class RYV_Featured_Partners_Renderer {
 			. '<path d="M10.5 11.5H13.5M10.5 14.5H13.5M10.5 17.5H13.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>'
 			. '</svg>'
 			. '</span>';
+	}
+
+	/**
+	 * Visitor-facing wording for the state page, in the page's language.
+	 * The site ships no compiled translations for this plugin's textdomain,
+	 * so the Spanish edition's strings live here rather than in `__()`.
+	 *
+	 * @param string $english English text.
+	 * @param string $spanish Spanish text.
+	 * @return string
+	 */
+	public static function localized( string $english, string $spanish ): string {
+		$lang = apply_filters( 'wpml_current_language', null );
+
+		if ( ! is_string( $lang ) || '' === $lang ) {
+			$lang = substr( determine_locale(), 0, 2 );
+		}
+
+		return 'es' === $lang ? $spanish : $english;
 	}
 
 	/**
