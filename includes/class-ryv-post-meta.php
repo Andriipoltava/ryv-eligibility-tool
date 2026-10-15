@@ -78,14 +78,6 @@ class RYV_Post_Meta {
 	 * @return WP_Term[]
 	 */
 	public static function get_terms_of_kind( int $post_id, string $kind ): array {
-		// Resources keep topics and states in two separate taxonomies of
-		// their own, so no slug test is needed there.
-		if ( class_exists( 'RYV_Resources_CPT' ) && RYV_Resources_CPT::POST_TYPE === get_post_type( $post_id ) ) {
-			$taxonomy = 'state' === $kind ? 'resource-state' : RYV_Resources_CPT::TAXONOMY;
-			$terms    = taxonomy_exists( $taxonomy ) ? get_the_terms( $post_id, $taxonomy ) : array();
-			return is_array( $terms ) ? array_values( $terms ) : array();
-		}
-
 		$terms = get_the_terms( $post_id, 'category' );
 
 		if ( ! is_array( $terms ) ) {
@@ -282,6 +274,5 @@ class RYV_Post_Meta {
 		$manager->register( new RYV_Tag_Author_Title() );
 		$manager->register( new RYV_Tag_Author_Photo() );
 		$manager->register( new RYV_Tag_Byline_Meta() );
-		$manager->register( new RYV_Tag_Resource_Link() );
 	}
 }
