@@ -779,16 +779,25 @@ heading, or the 28px gap lands on the empty anchor).
   pushed the sidebar off-screen and wrapped Share under the author: the
   content column is `width: 50%` + grow, the author block `width: auto`.
 
-### No single resource page
+### Single resource page (downloads)
 
-Resources have no designed page of their own: every card's button goes to
-the resource permalink, which the "External Permalink" box (`_links_to`,
-Admin Site Enhancements' External Permalinks module) redirects to the file
-or website. A "Single Resource" template (+ ACF Page Content field,
-`RYV: Resource File / URL` tag, "Related Resource Card" loop items) was
-built once from the blog post's Figma - a misread; the Figma article page is
-for blog posts only - and removed again (templates trashed, code deleted).
-Don't rebuild it.
+Most resources have no page of their own: the card's button goes to the
+resource permalink, which the "External Permalink" box (`_links_to`, Admin
+Site Enhancements' External Permalinks module) redirects to the file or
+website. A resource **without** an External Permalink (the downloads the
+client adds) renders the Theme Builder "Single Resource" template
+(`include/singular/ryv_resources`): tags, title, description, a Download
+button, share links, featured image, ACF Page Content, related resources.
+This was removed once (misread of the blog Figma) and restored on client
+request (Oct 2026) - the code is back: `RYV: Resource File / URL` tag
+(`RYV_Tag_Resource_Link`, uploaded File first, else URL, via
+`RYV_Resources_CPT::get_target_url()`) and the Page Content field.
+
+The Download button is fully dynamic: label from `[ryv_resource_button_text]`
+(the "Button Text" preset/custom field), link from the Resource File / URL
+tag. **If that tag is ever unregistered, the template's button silently
+falls back to `#`** (this is exactly how the button broke on dev). No date
+line and no "Can I vote in my state?" card on this template, per client.
 
 ### Resource card tags (type + state)
 
