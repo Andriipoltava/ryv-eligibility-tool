@@ -250,3 +250,18 @@
 .ryv-sa-save-id-msg.ryv-sa-save-id-error {
 	color: #b32d2e;
 }
+
+/*
+ * Next Node selects (node + option level). Their labels are "id — title" and
+ * the id has no spaces, so a long one can't wrap: select2's default
+ * `text-overflow: ellipsis` then has no first word that fits and renders the
+ * selection as blank, with only the clear "x" showing - it looked like the
+ * route was unset when it was saved fine. Keep the text inside the box
+ * (leaving room for the "x"/arrow) and clip it instead.
+ */
+.acf-field[data-name="ryv_form_nodes"] .acf-field[data-key="field_ryv_node_next_node"] .acf-selection,
+.acf-field[data-name="ryv_form_nodes"] .acf-field[data-key="field_ryv_option_next_node"] .acf-selection {
+	display: block;
+	max-width: 90%;
+	overflow: hidden;
+}

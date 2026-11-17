@@ -89,6 +89,36 @@ class RYV_States_Template {
 		add_filter( 'pre_option_elementor_element_cache_ttl', array( $this, 'disable_element_cache_on_state_pages' ) );
 		add_action( 'save_post_elementor_library', array( __CLASS__, 'clear_element_cache' ), 99 );
 		add_action( 'elementor/editor/after_save', array( __CLASS__, 'clear_element_cache' ), 99 );
+		
+		// A Counter fed by an empty RYV repeater tag would otherwise animate to 0.
+		add_filter( 'elementor/widget/render_content', array( $this, 'hide_empty_counter' ), 10, 2 );
+	}
+	
+	/**
+	 * Render nothing for a Counter widget whose Number comes from the
+	 * "RYV: ACF Repeater Text" tag and is empty for this state - Elementor's
+	 * Counter shows its starting number (0) when the ending number is blank,
+	 * so an unfilled stat read as a real "0".
+	 *
+	 * @param string                 $content Widget HTML.
+	 * @param \Elementor\Widget_Base $widget  The widget.
+	 * @return string
+	 */
+	public function hide_empty_counter( $content, $widget ) {
+		if ( 'counter' !== $widget->get_name() ) {
+			return $content;
+		}
+
+		$dynamic = (array) $widget->get_settings( '__dynamic__' );
+		if ( empty( $dynamic['ending_number'] ) || false === strpos( (string) $dynamic['ending_number'], 'ryv-acf-repeater-text' ) ) {
+			return $content;
+		}
+
+		$number = trim( (string) $widget->get_settings_for_display( 'ending_number' ) );
+
+		return '' === $number
+			? '<div class="ryv-counter-empty" style="visibility:hidden" aria-hidden="true">' . $content . '</div>'
+			: $content;
 	}
 
 	/**

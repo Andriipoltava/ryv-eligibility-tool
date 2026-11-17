@@ -123,8 +123,16 @@ class RYV_Tag_ACF_Repeater_Text extends \Elementor\Core\DynamicTags\Tag {
 				// token - the Counter widget this feeds needs a bare
 				// integer string ("158300"), not "158,300", which its JS
 				// can't parse and renders as "NaN".
+				// I REPLACED THE 3 LINES BELOW THIS
+// 				preg_match( '/^[\d,.]+/', $value, $matches );
+// 				$value = isset( $matches[0] ) ? preg_replace( '/[^0-9]/', '', $matches[0] ) : '';
+// 				break;
+				// Keeps the decimal point (only the thousand-separator commas
+				// are removed): "0.23%" -> "0.23", not "023" -> 23. Elementor's
+				// Counter animates to as many decimal places as the number it
+				// is given has. A trailing "." (e.g. "5.") is dropped.
 				preg_match( '/^[\d,.]+/', $value, $matches );
-				$value = isset( $matches[0] ) ? preg_replace( '/[^0-9]/', '', $matches[0] ) : '';
+				$value = isset( $matches[0] ) ? rtrim( str_replace( ',', '', $matches[0] ), '.' ) : '';
 				break;
 			case 'suffix':
 				// Strips the same leading run 'digits_only' captures above,

@@ -36,6 +36,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 class RYV_Resources_Search {
 
 	const QUERY_ID = 'ryv_resources_search';
+	const BLOG_QUERY_ID = 'ryv_blog_search';
 
 	const PARAM_SEARCH = 'ryv_search';
 
@@ -103,6 +104,7 @@ class RYV_Resources_Search {
 	 */
 	public function __construct() {
 		add_action( 'elementor/query/' . self::QUERY_ID, array( $this, 'filter_query' ) );
+		add_action( 'elementor/query/' . self::BLOG_QUERY_ID, array( $this, 'filter_blog_query' ) );
 		add_filter( 'elementor/widget/render_content', array( $this, 'append_found_count' ), 10, 2 );
 		add_filter( 'elementor/posts/wp_link_page', array( $this, 'keep_filters_in_pagination' ) );
 	}
@@ -161,7 +163,7 @@ class RYV_Resources_Search {
 	 */
 	public function append_found_count( $content, $widget ) {
 		if ( ! $this->last_query || 'loop-grid' !== $widget->get_name()
-			|| self::QUERY_ID !== $widget->get_settings_for_display( 'post_query_query_id' ) ) {
+			|| ! in_array( $widget->get_settings_for_display( 'post_query_query_id' ), array( self::QUERY_ID, self::BLOG_QUERY_ID ), true ) ) {
 			return $content;
 		}
 
@@ -289,6 +291,37 @@ class RYV_Resources_Search {
 		$this->apply_filters_to( $query );
 		$this->running = false;
 	}
+	
+	/**
+	 * Same as filter_query(), for a Loop Grid of blog posts (search + sort, no state).
+	 *
+	 * @param WP_Query $query The Loop Grid's query, before it runs.
+	 */
+	public function filter_blog_query( $query ) {
+		if ( $this->running || ! $query instanceof WP_Query ) {
+			return;
+		}
+
+		$this->running = true;
+
+		$query->set( 'post_type', 'post' );
+		$query->set( 'post_status', 'publish' );
+
+		$filters          = self::get_current_filters();
+		$this->last_query = $query;
+
+		if ( '' !== $filters['sort'] ) {
+			$query->set( 'orderby', self::SORTS[ $filters['sort'] ]['orderby'] );
+			$query->set( 'order', self::SORTS[ $filters['sort'] ]['order'] );
+		}
+
+		if ( '' !== $filters['search'] ) {
+			$ids = self::get_blog_search_matches( $filters['search'] );
+			$query->set( 'post__in', $ids ? $ids : array( 0 ) );
+		}
+
+		$this->running = false;
+	}
 
 	/**
 	 * @param WP_Query $query The Loop Grid's query, before it runs.
@@ -404,6 +437,31 @@ class RYV_Resources_Search {
 				WHERE p.post_type = %s AND p.post_status = 'publish'
 				AND ( p.post_title LIKE %s OR m.meta_value LIKE %s )",
 				RYV_Resources_CPT::POST_TYPE,
+				$like,
+				$like
+			)
+		);
+
+		return array_map( 'intval', $ids );
+	}
+	
+	/**
+	 * Blog post ids whose title, excerpt or content contains $term.
+	 *
+	 * @param string $term Search text.
+	 * @return int[]
+	 */
+	private static function get_blog_search_matches( string $term ): array {
+		global $wpdb;
+
+		$like = '%' . $wpdb->esc_like( $term ) . '%';
+
+		$ids = $wpdb->get_col( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+			$wpdb->prepare(
+				"SELECT p.ID FROM {$wpdb->posts} p
+				WHERE p.post_type = 'post' AND p.post_status = 'publish'
+				AND ( p.post_title LIKE %s OR p.post_excerpt LIKE %s OR p.post_content LIKE %s )",
+				$like,
 				$like,
 				$like
 			)

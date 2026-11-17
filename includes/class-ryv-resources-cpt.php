@@ -102,6 +102,7 @@ class RYV_Resources_CPT {
 		add_action( 'init', array( $this, 'maybe_seed_default_terms' ), 20 );
 		add_action( 'init', array( $this, 'maybe_seed_resource_tag_terms' ), 21 );
 		add_filter( 'register_taxonomy_args', array( $this, 'adjust_state_taxonomy_args' ), 10, 2 );
+		add_filter( 'elementor/frontend/widget/should_render', array( $this, 'hide_empty_cta_button' ), 10, 2 );
 		add_filter( 'manage_' . self::POST_TYPE . '_posts_columns', array( $this, 'admin_columns' ) );
 		add_action( 'manage_' . self::POST_TYPE . '_posts_custom_column', array( $this, 'render_admin_column' ), 10, 2 );
 
@@ -154,6 +155,54 @@ class RYV_Resources_CPT {
 
 		$presets = self::cta_presets();
 		return $presets[ $preset ] ?? '';
+	}
+
+	/**
+	 * Where a resource's CTA points: its uploaded File, else its URL field,
+	 * else '' (the resource then only has its own page).
+	 *
+	 * @param int $post_id Resource post ID.
+	 * @return string
+	 */
+	public static function get_target_url( int $post_id ): string {
+		if ( ! function_exists( 'get_field' ) ) {
+			return '';
+		}
+
+		$file = get_field( 'ryv_resource_file', $post_id );
+		if ( is_array( $file ) && ! empty( $file['url'] ) ) {
+			return (string) $file['url'];
+		}
+		if ( is_numeric( $file ) && $file ) {
+			return (string) wp_get_attachment_url( (int) $file );
+		}
+
+		return trim( (string) get_field( 'ryv_resource_url', $post_id ) );
+	}
+
+	/**
+	 * Hides a button widget whose link is the "RYV: Resource File / URL" tag
+	 * when the resource has neither a File nor a URL - otherwise it renders
+	 * as a live-looking button with no href. Keyed on the tag, not a widget
+	 * id or class, so it works on whatever template carries the button.
+	 *
+	 * @param bool                 $should_render Elementor's current decision.
+	 * @param \Elementor\Widget_Base $widget       Widget being rendered.
+	 * @return bool
+	 */
+	public function hide_empty_cta_button( $should_render, $widget ) {
+		if ( ! $should_render || 'button' !== $widget->get_name() ) {
+			return $should_render;
+		}
+
+		$data = $widget->get_data();
+		$tag  = $data['settings']['__dynamic__']['link'] ?? '';
+
+		if ( ! is_string( $tag ) || false === strpos( $tag, 'name="ryv-resource-link"' ) ) {
+			return $should_render;
+		}
+
+		return '' !== self::get_target_url( (int) get_the_ID() );
 	}
 
 	/**
@@ -420,7 +469,7 @@ class RYV_Resources_CPT {
 					'label'        => 'Format',
 					'name'         => 'ryv_resource_format',
 					'type'         => 'text',
-					'instructions' => 'Optional, legacy. The tags on cards come from Resource Types (right sidebar).',
+					'instructions' => 'Optional, legacy. The tags on cards now come from Resource Types (right sidebar) - this is only shown when no type is ticked.',
 					'wrapper'      => array( 'width' => '50' ),
 				),
 				array(
@@ -429,6 +478,16 @@ class RYV_Resources_CPT {
 					'name'  => 'ryv_resource_description',
 					'type'  => 'textarea',
 					'rows'  => 3,
+				),
+				array(
+					'key'          => 'field_ryv_resource_content',
+					'label'        => 'Page Content',
+					'name'         => 'ryv_resource_content',
+					'type'         => 'wysiwyg',
+					'tabs'         => 'all',
+					'toolbar'      => 'full',
+					'media_upload' => 1,
+					'instructions' => 'Body of this resource\'s own page (shown when it has no external URL). Use Heading 2 for sections - they become the "In this article" list.',
 				),
 				array(
 					'key'     => 'field_ryv_resource_url',
