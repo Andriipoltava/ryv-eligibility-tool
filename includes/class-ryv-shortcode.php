@@ -131,7 +131,7 @@ class RYV_Shortcode {
 			// No label controls on a shortcode embed, so the rendered form's
 			// own language pack is the whole of `data-labels` here.
 			esc_attr( wp_json_encode( RYV_Form_Translations::ui_labels( RYV_Form_Translations::get_language( $form_id ) ) ) ),
-			esc_attr( wp_json_encode( $this->get_language_editions( $form_id ) ) )
+			esc_attr( wp_json_encode( self::get_language_editions( $form_id ) ) )
 		);
 	}
 
@@ -149,7 +149,7 @@ class RYV_Shortcode {
 	 * @param int $form_id The form being embedded.
 	 * @return array<int,array<string,mixed>>
 	 */
-	private function get_language_editions( int $form_id ): array {
+	public static function get_language_editions( int $form_id, string $state_slug = '' ): array {
 		$editions = RYV_Form_Translations::get_editions( $form_id );
 
 		if ( count( $editions ) < 2 ) {
@@ -159,12 +159,21 @@ class RYV_Shortcode {
 		$payload = array();
 
 		foreach ( $editions as $code => $post ) {
-			$code      = (string) $code;
+			$code       = (string) $code;
+			$entry_node = '';
+
+			// Same state in the other edition's graph: both editions' picker
+			// options share one untranslated `value`, only node ids differ.
+			if ( '' !== $state_slug && class_exists( 'RYV_States_Sync' ) ) {
+				$schema     = RYV_CPT::get_schema( (int) $post->ID );
+				$entry_node = (string) RYV_States_Sync::find_start_node( $schema['nodes'] ?? array(), $schema['entry_node'] ?? null, $state_slug );
+			}
+
 			$payload[] = array(
 				'code'       => $code,
 				'form_id'    => (int) $post->ID,
 				'label'      => RYV_Form_Translations::default_switch_label( $code ),
-				'entry_node' => '',
+				'entry_node' => $entry_node,
 				'labels'     => RYV_Form_Translations::ui_labels( $code ),
 			);
 		}

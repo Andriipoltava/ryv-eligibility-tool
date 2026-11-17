@@ -1078,6 +1078,17 @@ export function renderLeadCaptureCard(
     form.appendChild(wrapLabel);
   });
 
+  // Honeypot (see RYV_API::submit_lead()): off-screen rather than
+  // display:none so simple bots still treat it as a real field, removed from
+  // tab order / assistive tech / autofill so a human never fills it.
+  const honeypotWrap = el('div', { attrs: { 'aria-hidden': 'true' } });
+  honeypotWrap.style.cssText = 'position:absolute;left:-10000px;top:auto;width:1px;height:1px;overflow:hidden;';
+  const honeypot = el('input', {
+    attrs: { type: 'text', name: 'ryv_website', tabindex: '-1', autocomplete: 'off' },
+  });
+  honeypotWrap.appendChild(honeypot);
+  form.appendChild(honeypotWrap);
+
   const errorBox = el('p', { className: 'ryv-lead-form-error' });
   errorBox.style.display = 'none';
 
@@ -1107,7 +1118,7 @@ export function renderLeadCaptureCard(
       values[name] = control.value.trim();
     });
 
-    Promise.resolve(onSubmit(values)).catch((err) => {
+    Promise.resolve(onSubmit(values, { ryv_website: honeypot.value })).catch((err) => {
       submitBtn.disabled = false;
       submitBtn.textContent = labels.submit;
       errorBox.textContent = (err && err.message) || labels.leadError;

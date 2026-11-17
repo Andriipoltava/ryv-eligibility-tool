@@ -158,6 +158,13 @@ class RYV_API {
 	 * @return WP_REST_Response|WP_Error
 	 */
 	public function log_progress( WP_REST_Request $request ) {
+		// A real visitor logs once per answer; this is generous enough for a
+		// whole school/library behind one address while still stopping a flood.
+		$retry = RYV_Rate_Limiter::hit( 'log', 240, 10 * MINUTE_IN_SECONDS );
+		if ( $retry ) {
+			return RYV_Rate_Limiter::error( $retry );
+		}
+
 		$post_id = (int) $request['post_id'];
 		$post    = $this->get_viewable_form( $post_id );
 
@@ -208,11 +215,26 @@ class RYV_API {
 	 * @return WP_REST_Response|WP_Error
 	 */
 	public function submit_lead( WP_REST_Request $request ) {
+		// Each accepted submission can send emails and store a row, so this is
+		// much tighter than the progress log.
+		$retry = RYV_Rate_Limiter::hit( 'submit', 10, HOUR_IN_SECONDS );
+		if ( $retry ) {
+			return RYV_Rate_Limiter::error( $retry );
+		}
+
 		$post_id = (int) $request['post_id'];
 		$post    = $this->get_viewable_form( $post_id );
 
 		if ( ! $post ) {
 			return $this->not_found_error();
+		}
+
+		// Honeypot: a field no human can see or reach. Anything in it is a
+		// bot, which is answered with a normal-looking success so it can't
+		// tell it was caught - and nothing is stored or emailed.
+		$honeypot = $request->get_param( 'ryv_website' );
+		if ( is_scalar( $honeypot ) && '' !== trim( (string) $honeypot ) ) {
+			return new WP_REST_Response( array( 'ok' => true ), 200 );
 		}
 
 		$node_id = sanitize_text_field( (string) $request->get_param( 'node_id' ) );

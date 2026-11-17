@@ -25,6 +25,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 			<li><a href="#ryv-help-states-nodes"><?php esc_html_e( 'Editing a State\'s Questions from Its Own Page', 'ryv-eligibility-tool' ); ?></a></li>
 			<li><a href="#ryv-help-import"><?php esc_html_e( 'Importing a Drupal YAML Export', 'ryv-eligibility-tool' ); ?></a></li>
 			<li><a href="#ryv-help-embed"><?php esc_html_e( 'Adding a Form to a Page', 'ryv-eligibility-tool' ); ?></a></li>
+			<li><a href="#ryv-help-partner-embed"><?php esc_html_e( 'Sharing the Tool With Partners (Embed)', 'ryv-eligibility-tool' ); ?></a></li>
 			<li><a href="#ryv-help-styles"><?php esc_html_e( 'Styling a Form', 'ryv-eligibility-tool' ); ?></a></li>
 			<li><a href="#ryv-help-lead-capture"><?php esc_html_e( 'Collecting Contact Info (Form Submission Nodes)', 'ryv-eligibility-tool' ); ?></a></li>
 			<li><a href="#ryv-help-activity"><?php esc_html_e( 'Activity Log & Submissions', 'ryv-eligibility-tool' ); ?></a></li>
@@ -165,6 +166,42 @@ if ( ! defined( 'ABSPATH' ) ) {
 			);
 			?>
 		</p>
+	</section>
+
+	<section id="ryv-help-partner-embed" class="card ryv-help-card">
+		<h2><?php esc_html_e( 'Sharing the Tool With Partners (Embed)', 'ryv-eligibility-tool' ); ?></h2>
+		<p>
+			<?php esc_html_e( 'Partners can put the eligibility tool on their own website without any access to this site. It appears as a self-contained frame showing only the questionnaire - no menus, header or footer.', 'ryv-eligibility-tool' ); ?>
+		</p>
+
+		<h3><?php esc_html_e( 'Getting the link or code (you)', 'ryv-eligibility-tool' ); ?></h3>
+		<ol>
+			<li><?php esc_html_e( 'Go to RYV Forms → Embed & Share.', 'ryv-eligibility-tool' ); ?></li>
+			<li><?php esc_html_e( 'Pick the form (use the Spanish edition for a Spanish embed) and adjust the options - layout, title/description, colors, and so on. The live preview on the right updates as you go; the Desktop/Tablet/Phone buttons show how it will look on each screen size.', 'ryv-eligibility-tool' ); ?></li>
+			<li><?php esc_html_e( 'Copy the Link (for a partner who just wants to link to the tool) or the Embed code (for a partner who wants it inside their page) and send it to them.', 'ryv-eligibility-tool' ); ?></li>
+		</ol>
+
+		<h3><?php esc_html_e( 'Which websites may embed it', 'ryv-eligibility-tool' ); ?></h3>
+		<p>
+			<?php esc_html_e( 'At the bottom of the same page, "Access & security" controls who can show the tool inside their site. By default any website can. Once you know your partners, switch to "Only the websites listed below" and add one address per line (for example partner.org, or *.partner.org to include all of its subdomains). A partner whose website is not on the list will see a blank frame. The same section has a master switch that turns every embed and share link off at once.', 'ryv-eligibility-tool' ); ?>
+		</p>
+
+		<h3><?php esc_html_e( 'Instructions to send to a partner', 'ryv-eligibility-tool' ); ?></h3>
+		<ol>
+			<li><?php esc_html_e( 'Paste the embed code into the HTML of the page where the tool should appear (in WordPress, use a "Custom HTML" block; in other site builders, an "HTML" or "Embed" element).', 'ryv-eligibility-tool' ); ?></li>
+			<li><?php esc_html_e( 'Keep the <script> line that comes after the <iframe> - it makes the frame grow and shrink to fit the tool so there is no inner scroll bar. Without it the tool still works, but at a fixed height.', 'ryv-eligibility-tool' ); ?></li>
+			<li><?php esc_html_e( 'Place it in a container at least 320 pixels wide. The frame fills the width of whatever it is placed in.', 'ryv-eligibility-tool' ); ?></li>
+			<li><?php esc_html_e( 'Do not edit the web address inside src="..." - the options that follow the ? in it (layout, colors, and so on) are how the tool is customized. To change them, ask us for a new code.', 'ryv-eligibility-tool' ); ?></li>
+			<li><?php esc_html_e( 'Tell us the exact address of the website (for example www.partner.org) so it can be added to the allowed list.', 'ryv-eligibility-tool' ); ?></li>
+		</ol>
+
+		<h3><?php esc_html_e( 'If the frame is blank', 'ryv-eligibility-tool' ); ?></h3>
+		<ul>
+			<li><?php esc_html_e( 'The partner\'s website is probably not on the allowed list - add it and save.', 'ryv-eligibility-tool' ); ?></li>
+			<li><?php esc_html_e( 'The partner\'s own site may block embedded content from other websites. Their web person needs to allow this site in their frame/content security settings.', 'ryv-eligibility-tool' ); ?></li>
+			<li><?php esc_html_e( 'If it is blank everywhere, including in the preview on the Embed & Share page, the host or CDN may be adding a header that forbids framing. Ask the host to exempt the /embed/ path.', 'ryv-eligibility-tool' ); ?></li>
+			<li><?php esc_html_e( 'A "not found" page means the form is not published or embedding is switched off.', 'ryv-eligibility-tool' ); ?></li>
+		</ul>
 	</section>
 
 	<section id="ryv-help-styles" class="card ryv-help-card">

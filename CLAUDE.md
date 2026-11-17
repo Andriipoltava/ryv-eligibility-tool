@@ -933,6 +933,50 @@ of the CSS/JS. `admin/class-ryv-shortcode-hint.php` adds a read-only meta box
 to the post/page editor listing every published form and its shortcode, so an
 author doesn't need to already know a form's post ID.
 
+### Partner embed / share link (`includes/class-ryv-embed.php`)
+
+`/embed/{form-slug-or-id}/` (rewrite rule, soft-flushed once per
+`REWRITE_VERSION` on `init` 99 so a plain plugin update works) serves a bare
+HTML document - no theme chrome, no admin bar, `noindex` - mounting the same
+`.ryv-app-wrapper` as the widget/shortcode. Presentation comes from a
+whitelisted query string (`layout`, `title`, `description`, `restart`, `pad`,
+`fit`, `state`, hex `primary`/`secondary`/`text`/`bg`), each sanitized individually.
+`state=alabama` sets `data-entry-node` via `RYV_States_Sync::find_start_node()` (ACF-gated;
+unknown state or no ACF = normal picker) and ships each language edition's own
+entry node for that state so the language switch stays on it.
+Slug is used in the URL unless it's shared across WPML languages, then the ID.
+
+Framing security = `Content-Security-Policy: frame-ancestors` built from the
+**RYV Forms -> Embed & Share** settings (`ryv_embed_settings`: enabled, any /
+allow-list, domains). Every domain is forced through `normalize_origin()`'s
+strict grammar on save *and* on read, since it feeds a header. It also
+`header_remove('X-Frame-Options')`; a host/CDN that adds its own XFO must
+exempt `/embed/`. Drafts, unknown forms and "embedding off" all return the
+same 404 (admins can still preview when off, `frame-ancestors 'self'`).
+`<base target="_blank">` keeps every link inside the tool from loading the
+full site inside a partner's frame.
+
+Auto-height: `assets/js/embed-child.js` (in the frame) posts `{source:'ryv-embed',
+type:'resize',height}`; `assets/js/embed.js` (partner includes it) only trusts
+a message whose `source` is one of its `iframe[data-ryv-embed]` windows *and*
+whose origin equals that iframe's src origin, clamps the height, and acks so
+the child can hide its own scrollbar. Both are plain scripts, not modules.
+
+### Abuse protection on the public write routes
+
+`POST /form/{id}/log` and `/submit` are anonymous by design, so they carry two
+cheap guards. `RYV_Rate_Limiter` (`includes/class-ryv-rate-limiter.php`) is a
+fixed-window counter in a transient keyed by an HMAC of `REMOTE_ADDR` only
+(never `X-Forwarded-For`, which a client controls) - 240 log hits/10 min,
+10 submissions/hour, answered with 429 + `Retry-After`; behind a CDN/proxy
+supply the real address via the `ryv_rate_limit_ip` filter, tune or disable a
+bucket via `ryv_rate_limit`. It fails open when no address is available, and
+nothing about the visitor is written to a plugin table (the schema stays
+anonymous). Lead forms also render a **honeypot** (`ryv_website`, off-screen,
+`tabindex=-1`, `aria-hidden`); if filled, `submit_lead()` returns a normal
+`{ok:true}` without storing or emailing, so a bot can't tell it was caught. It
+travels beside `form_data` (never inside it), so it isn't recorded as an answer.
+
 ### Drupal YAML exporter (`includes/class-ryv-drupal-yaml-exporter.php`)
 
 The inverse of `RYV_YAML_Parser`: reconstructs `#states`-gated Drupal

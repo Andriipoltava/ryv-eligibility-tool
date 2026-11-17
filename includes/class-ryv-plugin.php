@@ -179,11 +179,13 @@ final class RYV_Plugin {
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-leads.php';
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-edit-log.php';
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-schema-diff.php';
+		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-rate-limiter.php';
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-api.php';
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-admin-api.php';
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-assets.php';
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-elementor.php';
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-shortcode.php';
+		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-embed.php';
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-resource-button-shortcode.php';
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-states-field-shortcode.php';
 		require_once RYV_PLUGIN_DIR . 'includes/class-ryv-featured-partners-renderer.php';
@@ -235,6 +237,7 @@ final class RYV_Plugin {
 			require_once RYV_PLUGIN_DIR . 'admin/class-ryv-logs-page.php';
 			require_once RYV_PLUGIN_DIR . 'admin/class-ryv-submissions-page.php';
 			require_once RYV_PLUGIN_DIR . 'admin/class-ryv-shortcode-hint.php';
+			require_once RYV_PLUGIN_DIR . 'admin/class-ryv-embed-page.php';
 			require_once RYV_PLUGIN_DIR . 'admin/class-ryv-help-page.php';
 			require_once RYV_PLUGIN_DIR . 'admin/class-ryv-translations-page.php';
 			require_once RYV_PLUGIN_DIR . 'admin/class-ryv-states-tools-page.php';
@@ -273,6 +276,7 @@ final class RYV_Plugin {
 		new RYV_Assets();
 		new RYV_Elementor();
 		new RYV_Shortcode();
+		new RYV_Embed();
 		new RYV_Resource_Button_Shortcode();
 		new RYV_States_Field_Shortcode();
 		new RYV_States_Partners_Shortcode();
@@ -306,6 +310,7 @@ final class RYV_Plugin {
 			$this->logs_page        = new RYV_Logs_Page();
 			$this->submissions_page = new RYV_Submissions_Page();
 			new RYV_Shortcode_Hint();
+			new RYV_Embed_Page();
 			$this->help_page         = new RYV_Help_Page();
 			$this->translations_page = new RYV_Translations_Page();
 			new RYV_States_Tools_Page();
