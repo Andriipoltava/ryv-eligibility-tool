@@ -67,9 +67,18 @@ $opt = RYV_Embed::OPTION;
 				</div>
 
 				<div class="ryv-embed-field">
+					<label for="ryv-embed-look"><?php esc_html_e( 'Look', 'ryv-eligibility-tool' ); ?></label>
+					<select id="ryv-embed-look">
+						<option value="site"><?php esc_html_e( 'Same as the website (default) - title, steps and questions like the home page', 'ryv-eligibility-tool' ); ?></option>
+						<option value="plain"><?php esc_html_e( 'Minimal - just the questions, simple styling', 'ryv-eligibility-tool' ); ?></option>
+					</select>
+				</div>
+
+				<div class="ryv-embed-field">
 					<label for="ryv-embed-layout"><?php esc_html_e( 'Layout', 'ryv-eligibility-tool' ); ?></label>
 					<select id="ryv-embed-layout">
-						<option value="stacked"><?php esc_html_e( 'All questions stacked (default)', 'ryv-eligibility-tool' ); ?></option>
+						<option value=""><?php esc_html_e( 'Like the website (default)', 'ryv-eligibility-tool' ); ?></option>
+						<option value="stacked"><?php esc_html_e( 'All questions stacked', 'ryv-eligibility-tool' ); ?></option>
 						<option value="wizard"><?php esc_html_e( 'One question at a time', 'ryv-eligibility-tool' ); ?></option>
 					</select>
 				</div>
@@ -96,10 +105,12 @@ $opt = RYV_Embed::OPTION;
 					<input type="text" id="ryv-embed-label-submit" class="widefat" maxlength="60" placeholder="Submit">
 					<label for="ryv-embed-label-placeholder"><small><?php esc_html_e( 'Dropdown placeholder', 'ryv-eligibility-tool' ); ?></small></label>
 					<input type="text" id="ryv-embed-label-placeholder" class="widefat" maxlength="60" placeholder="&mdash; Select &mdash;">
+					<label for="ryv-embed-note"><small><?php esc_html_e( 'Note under the steps (Same-as-website look)', 'ryv-eligibility-tool' ); ?></small></label>
+					<textarea id="ryv-embed-note" class="widefat" rows="2" maxlength="400" data-default="<?php echo esc_attr( RYV_Embed::default_note() ); ?>"><?php echo esc_textarea( RYV_Embed::default_note() ); ?></textarea>
 					<span class="description"><?php esc_html_e( 'Leave blank to use the form\'s own wording. Plain text only. The title and description show only if enabled above.', 'ryv-eligibility-tool' ); ?></span>
 				</div>
 
-				<div class="ryv-embed-field">
+				<div class="ryv-embed-field ryv-embed-plain-only" id="ryv-embed-plain-align">
 					<label for="ryv-embed-align"><?php esc_html_e( 'Alignment', 'ryv-eligibility-tool' ); ?></label>
 					<select id="ryv-embed-align">
 						<option value="left"><?php esc_html_e( 'Left - title, description and questions in one column (default)', 'ryv-eligibility-tool' ); ?></option>
@@ -107,7 +118,7 @@ $opt = RYV_Embed::OPTION;
 					</select>
 				</div>
 
-				<div class="ryv-embed-field">
+				<div class="ryv-embed-field ryv-embed-plain-only" id="ryv-embed-plain-fit">
 					<label for="ryv-embed-fit"><?php esc_html_e( 'Content width', 'ryv-eligibility-tool' ); ?></label>
 					<select id="ryv-embed-fit">
 						<option value="compact"><?php esc_html_e( 'Compact, centered (default)', 'ryv-eligibility-tool' ); ?></option>
@@ -199,6 +210,31 @@ $opt = RYV_Embed::OPTION;
 			<?php esc_html_e( 'Currently enforced:', 'ryv-eligibility-tool' ); ?>
 			<code>Content-Security-Policy: frame-ancestors <?php echo esc_html( $ancestors ); ?></code><br>
 			<?php esc_html_e( 'Embedded pages are also hidden from search engines. If a partner sees a blank frame, a firewall/CDN setting on this site may be adding its own X-Frame-Options header - ask your host to exempt the /embed/ path.', 'ryv-eligibility-tool' ); ?>
+		</p>
+
+		<?php $ryv_ip = RYV_Rate_Limiter::resolve_ip(); ?>
+		<p class="description" id="ryv-embed-ip-check">
+			<strong><?php esc_html_e( 'Spam protection (rate limit):', 'ryv-eligibility-tool' ); ?></strong>
+			<?php esc_html_e( 'visitors are counted by their address. Right now the site sees you as', 'ryv-eligibility-tool' ); ?>
+			<code><?php echo esc_html( $ryv_ip['ip'] ); ?></code>
+			<?php
+			echo 'cloudflare' === $ryv_ip['source']
+				? esc_html__( '(real address taken from Cloudflare).', 'ryv-eligibility-tool' )
+				: esc_html__( '(direct connection address).', 'ryv-eligibility-tool' );
+			?>
+			<br>
+			<?php esc_html_e( 'If this is not your own public address, every visitor is being counted as one person and could be blocked together - ask your developer to supply the real address (filter ryv_rate_limit_ip).', 'ryv-eligibility-tool' ); ?>
+			<br>
+			<small>
+				<?php
+				printf(
+					/* translators: 1: connection address, 2: Cloudflare header value */
+					esc_html__( 'Details: connection %1$s, Cloudflare header %2$s.', 'ryv-eligibility-tool' ),
+					'<code>' . esc_html( '' !== $ryv_ip['remote_addr'] ? $ryv_ip['remote_addr'] : '-' ) . '</code>',
+					'<code>' . esc_html( '' !== $ryv_ip['cf_header'] ? $ryv_ip['cf_header'] : '-' ) . '</code>'
+				);
+				?>
+			</small>
 		</p>
 
 		<?php submit_button( __( 'Save access settings', 'ryv-eligibility-tool' ) ); ?>

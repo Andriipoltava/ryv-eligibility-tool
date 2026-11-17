@@ -10,7 +10,7 @@
   var els = {
     form: $id('ryv-embed-form'), layout: $id('ryv-embed-layout'), title: $id('ryv-embed-title'),
     description: $id('ryv-embed-description'), restart: $id('ryv-embed-restart'), pad: $id('ryv-embed-pad'),
-    fit: $id('ryv-embed-fit'), align: $id('ryv-embed-align'), titleText: $id('ryv-embed-title-text'), descText: $id('ryv-embed-desc-text'),
+    fit: $id('ryv-embed-fit'), align: $id('ryv-embed-align'), look: $id('ryv-embed-look'), note: $id('ryv-embed-note'), titleText: $id('ryv-embed-title-text'), descText: $id('ryv-embed-desc-text'),
     labels: { label_start_over: $id('ryv-embed-label-start-over'), label_continue: $id('ryv-embed-label-continue'), label_submit: $id('ryv-embed-label-submit'), label_placeholder: $id('ryv-embed-label-placeholder') }, heightPx: $id('ryv-embed-height-px'), link: $id('ryv-embed-link'),
     open: $id('ryv-embed-open'), state: $id('ryv-embed-state'), stateField: $id('ryv-embed-state-field'), code: $id('ryv-embed-code'), preview: $id('ryv-embed-preview')
   };
@@ -52,13 +52,17 @@
     var form = cfg.forms[parseInt(els.form.value, 10)];
     var p = [];
     if (els.state.value) p.push('state=' + encodeURIComponent(els.state.value));
-    if (els.layout.value === 'wizard') p.push('layout=wizard');
+    var plain = els.look.value === 'plain';
+    if (plain) p.push('look=plain');
+    if (els.layout.value) p.push('layout=' + els.layout.value);
     if (!els.title.checked) p.push('title=0');
     if (!els.description.checked) p.push('description=0');
     if (!els.restart.checked) p.push('restart=0');
     if (!els.pad.checked) p.push('pad=0');
-    if (els.fit.value === 'full') p.push('fit=full');
-    if (els.align.value === 'center') p.push('align=center');
+    if (plain && els.fit.value === 'full') p.push('fit=full');
+    if (plain && els.align.value === 'center') p.push('align=center');
+    var nt = els.note.value.trim();
+    if (!plain && nt !== els.note.getAttribute('data-default')) p.push('note=' + (nt ? encodeURIComponent(nt) : '0'));
     var tt = els.titleText.value.trim(), dt = els.descText.value.trim();
     if (tt) p.push('title_text=' + encodeURIComponent(tt));
     if (dt) p.push('description_text=' + encodeURIComponent(dt));
@@ -74,7 +78,15 @@
     return form.url + (form.url.indexOf('?') > -1 ? '&' : '?') + p.join('&');
   }
 
+  function syncLookFields() {
+    var plain = els.look.value === 'plain';
+    Array.prototype.forEach.call(document.querySelectorAll('.ryv-embed-plain-only'), function (n) { n.style.display = plain ? '' : 'none'; });
+    els.note.parentNode.style.opacity = '';
+    els.note.disabled = plain;
+  }
+
   function update() {
+    syncLookFields();
     var form = cfg.forms[parseInt(els.form.value, 10)];
     var url = buildUrl();
     var auto = heightMode() === 'auto';

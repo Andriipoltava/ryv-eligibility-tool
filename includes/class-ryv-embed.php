@@ -96,6 +96,36 @@ class RYV_Embed {
 		// Priority 1: before redirect_canonical() (priority 10) gets a chance
 		// to "correct" a URL that, to core, looks like an unknown home query.
 		add_action( 'template_redirect', array( $this, 'maybe_render' ), 1 );
+		// A page's Elementor data changed: the cached "which widget settings
+		// does the site look come from" lookup is stale.
+		add_action( 'updated_post_meta', array( __CLASS__, 'maybe_bump_source_cache' ), 10, 3 );
+		add_action( 'added_post_meta', array( __CLASS__, 'maybe_bump_source_cache' ), 10, 3 );
+	}
+
+	/**
+	 * Option holding the cache generation for the site-look source lookup.
+	 */
+	const SOURCE_CACHE_OPTION = 'ryv_embed_source_gen';
+
+	/**
+	 * Source widget (page id, widget id, settings) for the "site" look, or
+	 * null to use the minimal look.
+	 *
+	 * @var array|null
+	 */
+	private $site_src = null;
+
+	/**
+	 * Invalidate the source lookup when any page's Elementor data is saved.
+	 *
+	 * @param int    $meta_id    Unused.
+	 * @param int    $object_id  Unused.
+	 * @param string $meta_key   Meta key.
+	 */
+	public static function maybe_bump_source_cache( $meta_id, $object_id, $meta_key ) {
+		if ( '_elementor_data' === $meta_key ) {
+			update_option( self::SOURCE_CACHE_OPTION, (string) microtime( true ), false );
+		}
 	}
 
 	/**
@@ -410,6 +440,22 @@ class RYV_Embed {
 
 		add_action( 'wp_enqueue_scripts', array( $this, 'enqueue' ), 10 );
 		add_action( 'wp_enqueue_scripts', array( $this, 'add_inline_styles' ), 11 );
+		// The widget's Style-tab values use the Elementor Kit's global fonts/colors,
+		// which are defined under `.elementor-kit-{id}` on <body>.
+		add_filter(
+			'body_class',
+			static function ( $classes ) {
+				if ( class_exists( '\\Elementor\\Plugin' ) && isset( \Elementor\Plugin::$instance->kits_manager ) ) {
+					$kit = (int) \Elementor\Plugin::$instance->kits_manager->get_active_id();
+					if ( $kit ) {
+						$classes[] = 'elementor-kit-' . $kit;
+					}
+				}
+
+				return $classes;
+			}
+		);
+		$this->site_src = ( 'site' === $this->args['look'] ) ? self::find_site_source( (int) $form->ID ) : null;
 		$this->isolate_document();
 
 		$this->render_document();
@@ -472,7 +518,11 @@ class RYV_Embed {
 		}
 		$blocked[] = 'widget-';
 		$blocked[] = 'e-apple-webkit';
+		$source_handle = $this->site_src ? 'elementor-post-' . (int) $this->site_src['post_id'] : '';
 		foreach ( (array) wp_styles()->queue as $handle ) {
+			if ( '' !== $source_handle && $handle === $source_handle ) {
+				continue;
+			}
 			if ( 0 === strpos( $handle, 'elementor-post-' ) && $handle !== $kit_handle ) {
 				wp_dequeue_style( $handle );
 				continue;
@@ -591,6 +641,257 @@ class RYV_Embed {
 	}
 
 	/**
+	 * Find the Elementor widget the site itself uses for this form, so the
+	 * embed can render with that placement's own settings (fonts, sizes, card,
+	 * step sidebar) and look like the website, without anyone re-styling it.
+	 *
+	 * Prefers a widget whose form is this one (or a linked translation), then
+	 * any widget (its form swapped for this one). The home page wins ties. The
+	 * state-page template (auto_state_entry) is skipped. Cached; flushed when
+	 * any page's Elementor data is saved.
+	 *
+	 * @param int $form_id Form post ID.
+	 * @return array{post_id:int,widget_id:string,settings:array}|null
+	 */
+	public static function find_site_source( int $form_id ): ?array {
+		if ( ! class_exists( '\\Elementor\\Plugin' ) || ! class_exists( 'Elementor\\Core\\Files\\CSS\\Post' ) ) {
+			return null;
+		}
+
+		$key    = 'ryv_embed_src_' . $form_id . '_' . md5( (string) get_option( self::SOURCE_CACHE_OPTION, '0' ) );
+		$cached = get_transient( $key );
+		if ( is_array( $cached ) ) {
+			return $cached ? $cached : null;
+		}
+
+		global $wpdb;
+		$front = (int) get_option( 'page_on_front' );
+		$ids   = $wpdb->get_col( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+			$wpdb->prepare(
+				"SELECT p.ID FROM {$wpdb->posts} p
+				 INNER JOIN {$wpdb->postmeta} m ON m.post_id = p.ID AND m.meta_key = '_elementor_data'
+				 WHERE p.post_status = 'publish' AND p.post_type IN ('page','post')
+				   AND m.meta_value LIKE %s
+				 ORDER BY (p.ID = %d) DESC, p.ID ASC LIMIT 40",
+				'%ryv_eligibility_tool%',
+				$front
+			)
+		);
+
+		// A widget's form_id is often the *original-language* form even on a
+		// translated page (WPML re-points it at render time), so "same form"
+		// alone would pick the English page for the Spanish form. Prefer, in
+		// order: same form, same language as the form, anything.
+		$lang  = RYV_Form_Translations::get_language( $form_id );
+		$exact = null;
+		$same  = null;
+		$any   = null;
+		foreach ( (array) $ids as $post_id ) {
+			$data = json_decode( (string) get_post_meta( (int) $post_id, '_elementor_data', true ), true );
+			if ( ! is_array( $data ) ) {
+				continue;
+			}
+			$post_lang = '';
+			if ( '' !== $lang && has_filter( 'wpml_post_language_details' ) ) {
+				$details   = apply_filters( 'wpml_post_language_details', null, (int) $post_id );
+				$post_lang = is_array( $details ) && ! empty( $details['language_code'] ) ? (string) $details['language_code'] : '';
+			}
+			self::walk_for_widget(
+				$data,
+				static function ( array $el ) use ( $post_id, $form_id, $lang, $post_lang, &$exact, &$same, &$any ) {
+					$settings = isset( $el['settings'] ) && is_array( $el['settings'] ) ? $el['settings'] : array();
+					if ( 'yes' === ( $settings['auto_state_entry'] ?? '' ) ) {
+						return;
+					}
+					$found = array(
+						'post_id'   => (int) $post_id,
+						'widget_id' => (string) $el['id'],
+						'settings'  => $settings,
+					);
+					if ( null === $any ) {
+						$any = $found;
+					}
+					if ( null === $same && '' !== $lang && $post_lang === $lang ) {
+						$same = $found;
+					}
+					if ( null === $exact && (int) ( $settings['form_id'] ?? 0 ) === $form_id && ( '' === $lang || '' === $post_lang || $post_lang === $lang ) ) {
+						$exact = $found;
+					}
+				}
+			);
+			if ( $exact ) {
+				break;
+			}
+		}
+
+		$result = $exact ?: ( $same ?: $any );
+		set_transient( $key, $result ?: array(), 12 * HOUR_IN_SECONDS );
+
+		return $result;
+	}
+
+	/**
+	 * Call $fn for every ryv_eligibility_tool widget in an Elementor tree.
+	 *
+	 * @param array    $nodes Elements.
+	 * @param callable $fn    fn( array $element ): void.
+	 */
+	private static function walk_for_widget( array $nodes, callable $fn ) {
+		foreach ( $nodes as $el ) {
+			if ( ! is_array( $el ) ) {
+				continue;
+			}
+			if ( isset( $el['widgetType'], $el['id'] ) && 'ryv_eligibility_tool' === $el['widgetType'] ) {
+				$fn( $el );
+			}
+			if ( ! empty( $el['elements'] ) && is_array( $el['elements'] ) ) {
+				self::walk_for_widget( $el['elements'], $fn );
+			}
+		}
+	}
+
+	/**
+	 * Render the site's own widget for this form, then apply the partner's
+	 * options to the markup. '' means "could not render" (caller falls back to
+	 * the minimal look).
+	 *
+	 * @param int    $form_id    Form ID.
+	 * @param string $entry_node Entry node for ?state=, or ''.
+	 * @param string $state_slug State slug for the language editions, or ''.
+	 * @return string
+	 */
+	private function render_site_widget( int $form_id, string $entry_node, string $state_slug ): string {
+		$settings = $this->site_src['settings'];
+
+		$settings['form_id']          = (string) $form_id;
+		$settings['auto_state_entry'] = '';
+		$settings['show_title']       = $this->args['title'] ? 'yes' : '';
+		$settings['show_description'] = $this->args['description'] ? 'yes' : '';
+		$settings['show_start_over']  = $this->args['restart'] ? 'yes' : '';
+		if ( '' !== $this->args['layout'] ) {
+			$settings['question_layout'] = $this->args['layout'];
+		}
+
+		// The widget re-points a form to the page's language; this document is
+		// served in the site default, so pin the language to the form's own.
+		$lang   = RYV_Form_Translations::get_language( $form_id );
+		$filter = static function ( $current ) use ( $lang ) {
+			return '' !== $lang ? $lang : $current;
+		};
+		add_filter( 'wpml_current_language', $filter, 99 );
+
+		$html = '';
+		try {
+			$widget = \Elementor\Plugin::$instance->elements_manager->create_element_instance(
+				array(
+					'id'         => $this->site_src['widget_id'],
+					'elType'     => 'widget',
+					'widgetType' => 'ryv_eligibility_tool',
+					'settings'   => $settings,
+					'elements'   => array(),
+				)
+			);
+			if ( $widget ) {
+				ob_start();
+				$widget->print_element();
+				$html = (string) ob_get_clean();
+			}
+		} catch ( \Throwable $e ) {
+			$html = '';
+			if ( ob_get_level() > 0 ) {
+				ob_end_clean();
+			}
+		}
+
+		remove_filter( 'wpml_current_language', $filter, 99 );
+
+		if ( '' === $html || false === strpos( $html, 'ryv-app-wrapper' ) ) {
+			return '';
+		}
+
+		return $this->adjust_site_markup( $html, $form_id, $entry_node, $state_slug );
+	}
+
+	/**
+	 * Apply ?state=, copy and label overrides to the widget's markup.
+	 *
+	 * @param string $html       Widget HTML.
+	 * @param int    $form_id    Form ID.
+	 * @param string $entry_node Entry node.
+	 * @param string $state_slug State slug.
+	 * @return string
+	 */
+	private function adjust_site_markup( string $html, int $form_id, string $entry_node, string $state_slug ): string {
+		if ( '' !== $entry_node ) {
+			$html = (string) preg_replace( '/data-entry-node="[^"]*"/', 'data-entry-node="' . esc_attr( $entry_node ) . '"', $html, 1 );
+			$html = (string) preg_replace(
+				'/data-language-editions="[^"]*"/',
+				'data-language-editions="' . esc_attr( wp_json_encode( RYV_Shortcode::get_language_editions( $form_id, $state_slug ) ) ) . '"',
+				$html,
+				1
+			);
+		}
+
+		if ( $this->args['labels'] ) {
+			$args = $this->args['labels'];
+			$html = (string) preg_replace_callback(
+				'/data-labels="([^"]*)"/',
+				static function ( $m ) use ( $args ) {
+					$current = json_decode( html_entity_decode( $m[1], ENT_QUOTES ), true );
+					$current = is_array( $current ) ? $current : array();
+
+					return 'data-labels="' . esc_attr( wp_json_encode( array_merge( $current, $args ) ) ) . '"';
+				},
+				$html,
+				1
+			);
+		}
+
+		if ( '' !== $this->args['title_text'] ) {
+			$text = esc_html( $this->args['title_text'] );
+			$html = (string) preg_replace_callback( '/(<h2 class="ryv-header-title">).*?(<\/h2>)/s', static function ( $m ) use ( $text ) { return $m[1] . $text . $m[2]; }, $html, 1 );
+		}
+		if ( '' !== $this->args['desc_text'] ) {
+			$text = esc_html( $this->args['desc_text'] );
+			$html = (string) preg_replace_callback( '/(<p class="ryv-header-description">).*?(<\/p>)/s', static function ( $m ) use ( $text ) { return $m[1] . $text . $m[2]; }, $html, 1 );
+		}
+
+		// Note under the step list (the website prints its disclaimer there,
+		// from a separate text block that is not part of the widget).
+		$note = $this->args['note'];
+		if ( null === $note ) {
+			$note = self::default_note( RYV_Form_Translations::get_language( $form_id ) );
+		}
+		if ( '' !== $note && false !== strpos( $html, 'ryv-step-sidebar-slot' ) ) {
+			$html = str_replace(
+				'<div class="ryv-step-sidebar-slot"></div>',
+				'<div class="ryv-step-sidebar-slot"></div><div class="ryv-embed-note"><p>' . esc_html( $note ) . '</p></div>',
+				$html
+			);
+		}
+
+		return $html;
+	}
+
+	/**
+	 * The disclaimer the website shows under the step list.
+	 *
+	 * @return string
+	 */
+	public static function default_note( string $lang = '' ): string {
+		/**
+		 * Filters the default note shown under the steps in the embed.
+		 *
+		 * @param string $note Text.
+		 */
+		$text = 'es' === $lang
+			? 'Restore Your Vote no proporciona asesoramiento jurídico. El uso de este sitio no crea una relación abogado-cliente.'
+			: __( 'Restore Your Vote does not provide legal advice. Using this site does not create an attorney-client relationship.', 'ryv-eligibility-tool' );
+
+		return (string) apply_filters( 'ryv_embed_default_note', $text, $lang );
+	}
+
+	/**
 	 * Document <title>.
 	 *
 	 * @return string
@@ -683,7 +984,11 @@ class RYV_Embed {
 		};
 
 		return array(
-			'layout'      => 'wizard' === $text( 'layout' ) ? 'wizard' : 'stacked',
+			// '' = take it from the site's own widget (site look) / stacked (minimal).
+			'layout'      => in_array( $text( 'layout' ), array( 'wizard', 'stacked' ), true ) ? $text( 'layout' ) : '',
+			'look'        => 'plain' === $text( 'look' ) ? 'plain' : 'site',
+			// null = the site's default note; '' = none; text = custom.
+			'note'        => array_key_exists( 'note', $get ) ? ( '0' === $text( 'note' ) ? '' : self::sanitize_copy( $text( 'note' ), 400 ) ) : null,
 			'title'       => $flag( 'title' ),
 			'description' => $flag( 'description' ),
 			'restart'     => $flag( 'restart' ),
@@ -731,6 +1036,16 @@ class RYV_Embed {
 			RYV_VERSION,
 			true
 		);
+
+		// Site look: the source page's generated Elementor CSS carries every
+		// Style-tab choice of that widget (fonts, sizes, card, steps...).
+		if ( $this->site_src && class_exists( '\\Elementor\\Core\\Files\\CSS\\Post' ) ) {
+			try {
+				\Elementor\Core\Files\CSS\Post::create( (int) $this->site_src['post_id'] )->enqueue();
+			} catch ( \Throwable $e ) { // phpcs:ignore Generic.CodeAnalysis.EmptyStatement.DetectedCatch
+				$this->site_src = null;
+			}
+		}
 	}
 
 	/**
@@ -749,7 +1064,7 @@ class RYV_Embed {
 		if ( '' !== $this->args['text'] ) {
 			$vars[] = '--ryv-text-color:' . $this->args['text'];
 		}
-		if ( 'full' === $this->args['fit'] ) {
+		if ( 'full' === $this->args['fit'] && ! $this->site_src ) {
 			// Form and its title/description fill the frame together; the header
 			// has its own width cap (--ryv-header-width) that would otherwise
 			// stay at its narrow default above a full-width form.
@@ -759,7 +1074,13 @@ class RYV_Embed {
 
 		if ( $vars ) {
 			// Values are whitelisted above (hex colors / fixed literals).
-			wp_add_inline_style( RYV_Assets::STYLE_HANDLE, ':root,.ryv-app-wrapper{' . implode( ';', $vars ) . '}' );
+			if ( $this->site_src ) {
+				// The widget's own Style-tab values are set on the widget
+				// wrapper, so a partner's color has to out-rank them.
+				wp_add_inline_style( RYV_Assets::STYLE_HANDLE, '.ryv-embed .elementor-element,.ryv-embed .ryv-app-wrapper{' . str_replace( ';', '!important;', implode( ';', $vars ) ) . '!important}' );
+			} else {
+				wp_add_inline_style( RYV_Assets::STYLE_HANDLE, ':root,.ryv-app-wrapper{' . implode( ';', $vars ) . '}' );
+			}
 		}
 	}
 
@@ -777,6 +1098,14 @@ class RYV_Embed {
 		$align = 'center' === $this->args['align']
 			? '.ryv-embed .ryv-header-align{text-align:center!important}.ryv-embed .ryv-app-wrapper{margin-left:auto!important;margin-right:auto!important}'
 			: '.ryv-embed .ryv-header-align{text-align:left!important}.ryv-embed .ryv-app-wrapper{margin-left:0!important;margin-right:auto!important}';
+
+		if ( $this->site_src ) {
+			// Sidebar is sticky + height-capped for a full page; in a frame that
+			// only fights the auto-height, so let it flow.
+			$align = '.ryv-embed .ryv-layout-sidebar{position:static!important;max-height:none!important;overflow:visible!important}'
+				. '.ryv-embed-note{margin:1.5rem 0 0;padding:0 0 0 1rem;border-left:4px solid #ec2927;color:#4a6577;font:400 15px/1.5 "District Pro",sans-serif}'
+				. '.ryv-embed-note p{margin:0;font:inherit;color:inherit}';
+		}
 
 		printf(
 			'<style id="ryv-embed-base">html,html body.ryv-embed-body{margin:0;padding:0;height:auto;min-height:0;background:%1$s!important}html body.ryv-embed-body{overflow:visible!important}.ryv-embed{box-sizing:border-box;padding:%2$s}%3$s</style>' . "\n",
@@ -815,19 +1144,25 @@ class RYV_Embed {
 </head>
 <body <?php body_class( 'ryv-embed-body' ); ?>>
 <?php wp_body_open(); ?>
-<main class="ryv-embed">
+<main class="ryv-embed<?php echo $this->site_src ? ' ryv-embed--site' : ''; ?>">
 		<?php
-		$this->render_header();
+		$site_html = $this->site_src ? $this->render_site_widget( $form_id, $entry_node, $state_slug ) : '';
+		if ( '' !== $site_html ) {
+			echo '<div data-elementor-type="wp-page" class="elementor elementor-' . (int) $this->site_src['post_id'] . '">' . $site_html . '</div>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- rendered by Elementor/our widget, already escaped there.
+		} else {
+			// Minimal look (or no site widget to copy): our own markup.
+			$this->render_header();
 
-		printf(
-			'<div class="ryv-app-wrapper" data-form-id="%d" data-show-start-over="%d" data-question-layout="%s" data-entry-node="%s" data-labels="%s" data-language-editions="%s"></div>',
-			$form_id,
-			$this->args['restart'] ? 1 : 0,
-			esc_attr( $this->args['layout'] ),
-			esc_attr( $entry_node ),
-			esc_attr( wp_json_encode( array_merge( RYV_Form_Translations::ui_labels( RYV_Form_Translations::get_language( $form_id ) ), $this->args['labels'] ) ) ),
-			esc_attr( wp_json_encode( RYV_Shortcode::get_language_editions( $form_id, $state_slug ) ) )
-		);
+			printf(
+				'<div class="ryv-app-wrapper" data-form-id="%d" data-show-start-over="%d" data-question-layout="%s" data-entry-node="%s" data-labels="%s" data-language-editions="%s"></div>',
+				$form_id,
+				$this->args['restart'] ? 1 : 0,
+				esc_attr( '' !== $this->args['layout'] ? $this->args['layout'] : 'stacked' ),
+				esc_attr( $entry_node ),
+				esc_attr( wp_json_encode( array_merge( RYV_Form_Translations::ui_labels( RYV_Form_Translations::get_language( $form_id ) ), $this->args['labels'] ) ) ),
+				esc_attr( wp_json_encode( RYV_Shortcode::get_language_editions( $form_id, $state_slug ) ) )
+			);
+		}
 		?>
 </main>
 		<?php wp_footer(); ?>

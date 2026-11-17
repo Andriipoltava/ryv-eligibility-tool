@@ -189,11 +189,12 @@ if ( ! defined( 'ABSPATH' ) ) {
 		<h3><?php esc_html_e( 'What you can customize', 'ryv-eligibility-tool' ); ?></h3>
 		<ul>
 			<li><strong><?php esc_html_e( 'Start at', 'ryv-eligibility-tool' ); ?></strong> - <?php esc_html_e( 'pick one state to skip the "Select your state" question and open on that state\'s first question.', 'ryv-eligibility-tool' ); ?></li>
-			<li><strong><?php esc_html_e( 'Layout', 'ryv-eligibility-tool' ); ?></strong> - <?php esc_html_e( 'all questions stacked one under another (default), or one question at a time.', 'ryv-eligibility-tool' ); ?></li>
+			<li><strong><?php esc_html_e( 'Look', 'ryv-eligibility-tool' ); ?></strong> - <?php esc_html_e( '"Same as the website" (default) uses the same settings as the home page: title, description, step list and a note on the left, the question card on the right. "Minimal" shows just the questions with simple styling.', 'ryv-eligibility-tool' ); ?></li>
+			<li><strong><?php esc_html_e( 'Layout', 'ryv-eligibility-tool' ); ?></strong> - <?php esc_html_e( 'like the website (default), all questions stacked one under another, or one question at a time.', 'ryv-eligibility-tool' ); ?></li>
 			<li><strong><?php esc_html_e( 'Show', 'ryv-eligibility-tool' ); ?></strong> - <?php esc_html_e( 'turn the title, description, "Start Over" button and the padding around the tool on or off.', 'ryv-eligibility-tool' ); ?></li>
-			<li><strong><?php esc_html_e( 'Text', 'ryv-eligibility-tool' ); ?></strong> - <?php esc_html_e( 'optional own wording for the title, description and the Start Over / Continue / Submit buttons and dropdown hint. Plain text only; blank keeps the form\'s own wording. Enter it per language - the Spanish form needs Spanish text.', 'ryv-eligibility-tool' ); ?></li>
-			<li><strong><?php esc_html_e( 'Alignment', 'ryv-eligibility-tool' ); ?></strong> - <?php esc_html_e( 'left (title, description and questions in one column) or centered.', 'ryv-eligibility-tool' ); ?></li>
-			<li><strong><?php esc_html_e( 'Content width, Colors, Frame height', 'ryv-eligibility-tool' ); ?></strong> - <?php esc_html_e( 'compact or full width; accent/secondary/text/background colors; automatic or fixed height.', 'ryv-eligibility-tool' ); ?></li>
+			<li><strong><?php esc_html_e( 'Text', 'ryv-eligibility-tool' ); ?></strong> - <?php esc_html_e( 'optional own wording for the title, description, the note under the steps and the Start Over / Continue / Submit buttons and dropdown hint. Plain text only; blank keeps the website wording. Enter it per language - the Spanish form needs Spanish text.', 'ryv-eligibility-tool' ); ?></li>
+			<li><strong><?php esc_html_e( 'Alignment', 'ryv-eligibility-tool' ); ?></strong> - <?php esc_html_e( 'Minimal look only: left (title, description and questions in one column) or centered.', 'ryv-eligibility-tool' ); ?></li>
+			<li><strong><?php esc_html_e( 'Content width, Colors, Frame height', 'ryv-eligibility-tool' ); ?></strong> - <?php esc_html_e( 'compact or full width (Minimal look only); accent/secondary/text/background colors; automatic or fixed height.', 'ryv-eligibility-tool' ); ?></li>
 		</ul>
 		<p>
 			<?php esc_html_e( 'Every option is also a setting in the link (for example ?state=alabama&title=0&align=center), which is how the code you copy carries them.', 'ryv-eligibility-tool' ); ?>
@@ -206,7 +207,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 		<h3><?php esc_html_e( 'Which websites may embed it', 'ryv-eligibility-tool' ); ?></h3>
 		<p>
-			<?php esc_html_e( 'At the bottom of the same page, "Access & security" controls who can show the tool inside their site. By default any website can. Once you know your partners, switch to "Only the websites listed below" and add one address per line (for example partner.org, or *.partner.org to include all of its subdomains). A partner whose website is not on the list will see a blank frame. The same section has a master switch that turns every embed and share link off at once.', 'ryv-eligibility-tool' ); ?>
+			<?php esc_html_e( 'At the bottom of the same page, "Access & security" controls who can show the tool inside their site. By default any website can. Once you know your partners, switch to "Only the websites listed below" and add one address per line (for example partner.org, or *.partner.org to include all of its subdomains). A partner whose website is not on the list will see a blank frame. The same section has a master switch that turns every embed and share link off at once, and shows how visitors are counted for spam protection (if the address shown is not your own public address, tell your developer).', 'ryv-eligibility-tool' ); ?>
 		</p>
 
 		<h3><?php esc_html_e( 'Instructions to send to a partner', 'ryv-eligibility-tool' ); ?></h3>
@@ -222,8 +223,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 			<?php esc_html_e( 'What visitors see:', 'ryv-eligibility-tool' ); ?>
 		</p>
 		<figure style="margin:12px 0;max-width:760px">
-			<img src="<?php echo esc_url( RYV_PLUGIN_URL . 'assets/img/help/embed-result.jpg' ); ?>" alt="<?php echo esc_attr__( 'The tool with title, description and questions stacked one under another', 'ryv-eligibility-tool' ); ?>" style="display:block;max-width:100%;height:auto;border:1px solid #c3c4c7;border-radius:4px">
-			<figcaption class="description"><?php esc_html_e( 'Title, description and questions, one under another.', 'ryv-eligibility-tool' ); ?></figcaption>
+			<img src="<?php echo esc_url( RYV_PLUGIN_URL . 'assets/img/help/embed-result.jpg' ); ?>" alt="<?php echo esc_attr__( 'The embedded tool looking like the website home page', 'ryv-eligibility-tool' ); ?>" style="display:block;max-width:100%;height:auto;border:1px solid #c3c4c7;border-radius:4px">
+			<figcaption class="description"><?php esc_html_e( 'The default look matches the website. On a narrow screen the two columns stack one under another.', 'ryv-eligibility-tool' ); ?></figcaption>
 		</figure>
 		<p>
 			<a href="<?php echo esc_url( RYV_PLUGIN_URL . 'docs/partner-embed-guide.html' ); ?>" target="_blank" rel="noopener"><?php esc_html_e( 'Open the printable partner guide (a ready-to-send page with screenshots)', 'ryv-eligibility-tool' ); ?></a>

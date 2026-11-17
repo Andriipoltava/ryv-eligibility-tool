@@ -953,6 +953,22 @@ whitelisted query string (`layout`, `title`, `description`, `restart`, `pad`,
 `state=alabama` sets `data-entry-node` via `RYV_States_Sync::find_start_node()` (ACF-gated;
 unknown state or no ACF = normal picker) and ships each language edition's own
 entry node for that state so the language switch stays on it.
+**Look**: by default (`look` absent) the embed renders the site's *own* Elementor
+widget - `find_site_source()` finds a published page whose `ryv_eligibility_tool`
+widget matches the form (same form, else same language, else any; home page wins
+ties; the state-template widget is skipped; cached in a transient that
+`_elementor_data` saves invalidate), instantiates it with that placement's settings
+(overriding only form/title/description/start-over/layout), prints it inside
+`.elementor.elementor-{page}` and enqueues that page's generated Elementor CSS -
+that file carries every Style-tab choice, so the embed looks like the home page
+(title, description, step sidebar, boxed card) with no re-styling. The Kit's
+globals live under `.elementor-kit-{id}` on `<body>`, so the embed adds that
+class. The widget's `wpml_current_language` is pinned to the form's language
+(or it would swap the Spanish form back to English). `state`, labels, copy
+overrides and the note under the steps (the website prints that disclaimer from
+a separate text widget, so it is `default_note()`/`note=`) are applied to the
+widget's markup after rendering. `look=plain` (or no source widget found) keeps
+the minimal self-built markup. `align` and `fit` only apply to the minimal look.
 `align` (`left` default | `center`) puts title, description and questions on one
 axis (the Elementor-style centered 360px form under a left header read as two
 columns). `title_text`/`description_text` (plain text, 160/400 chars) and
@@ -990,7 +1006,7 @@ the child can hide its own scrollbar. Both are plain scripts, not modules.
 `POST /form/{id}/log` and `/submit` are anonymous by design, so they carry two
 cheap guards. `RYV_Rate_Limiter` (`includes/class-ryv-rate-limiter.php`) is a
 fixed-window counter in a transient keyed by an HMAC of `REMOTE_ADDR` only
-(never `X-Forwarded-For`, which a client controls) - 240 log hits/10 min,
+(never `X-Forwarded-For`, which a client controls; `CF-Connecting-IP` is believed only when `REMOTE_ADDR` is inside Cloudflare's published ranges, `RYV_Rate_Limiter::CLOUDFLARE_RANGES`, filter `ryv_trusted_proxy_ranges`; Embed & Share shows which address the site sees for you) - 240 log hits/10 min,
 10 submissions/hour, answered with 429 + `Retry-After`; behind a CDN/proxy
 supply the real address via the `ryv_rate_limit_ip` filter, tune or disable a
 bucket via `ryv_rate_limit`. It fails open when no address is available, and
