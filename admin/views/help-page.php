@@ -181,6 +181,29 @@ if ( ! defined( 'ABSPATH' ) ) {
 			<li><?php esc_html_e( 'Copy the Link (for a partner who just wants to link to the tool) or the Embed code (for a partner who wants it inside their page) and send it to them.', 'ryv-eligibility-tool' ); ?></li>
 		</ol>
 
+		<?php // Options reference, kept next to the screenshot it describes. ?>
+		<figure style="margin:12px 0;max-width:760px">
+			<img src="<?php echo esc_url( RYV_PLUGIN_URL . 'assets/img/help/embed-customize.jpg' ); ?>" alt="<?php echo esc_attr__( 'Embed and Share page with the customize options and live preview', 'ryv-eligibility-tool' ); ?>" style="display:block;max-width:100%;height:auto;border:1px solid #c3c4c7;border-radius:4px">
+			<figcaption class="description"><?php esc_html_e( 'Customize options on the left, live preview on the right.', 'ryv-eligibility-tool' ); ?></figcaption>
+		</figure>
+		<h3><?php esc_html_e( 'What you can customize', 'ryv-eligibility-tool' ); ?></h3>
+		<ul>
+			<li><strong><?php esc_html_e( 'Start at', 'ryv-eligibility-tool' ); ?></strong> - <?php esc_html_e( 'pick one state to skip the "Select your state" question and open on that state\'s first question.', 'ryv-eligibility-tool' ); ?></li>
+			<li><strong><?php esc_html_e( 'Layout', 'ryv-eligibility-tool' ); ?></strong> - <?php esc_html_e( 'all questions stacked one under another (default), or one question at a time.', 'ryv-eligibility-tool' ); ?></li>
+			<li><strong><?php esc_html_e( 'Show', 'ryv-eligibility-tool' ); ?></strong> - <?php esc_html_e( 'turn the title, description, "Start Over" button and the padding around the tool on or off.', 'ryv-eligibility-tool' ); ?></li>
+			<li><strong><?php esc_html_e( 'Text', 'ryv-eligibility-tool' ); ?></strong> - <?php esc_html_e( 'optional own wording for the title, description and the Start Over / Continue / Submit buttons and dropdown hint. Plain text only; blank keeps the form\'s own wording. Enter it per language - the Spanish form needs Spanish text.', 'ryv-eligibility-tool' ); ?></li>
+			<li><strong><?php esc_html_e( 'Alignment', 'ryv-eligibility-tool' ); ?></strong> - <?php esc_html_e( 'left (title, description and questions in one column) or centered.', 'ryv-eligibility-tool' ); ?></li>
+			<li><strong><?php esc_html_e( 'Content width, Colors, Frame height', 'ryv-eligibility-tool' ); ?></strong> - <?php esc_html_e( 'compact or full width; accent/secondary/text/background colors; automatic or fixed height.', 'ryv-eligibility-tool' ); ?></li>
+		</ul>
+		<p>
+			<?php esc_html_e( 'Every option is also a setting in the link (for example ?state=alabama&title=0&align=center), which is how the code you copy carries them.', 'ryv-eligibility-tool' ); ?>
+		</p>
+
+		<figure style="margin:12px 0;max-width:760px">
+			<img src="<?php echo esc_url( RYV_PLUGIN_URL . 'assets/img/help/embed-share.jpg' ); ?>" alt="<?php echo esc_attr__( 'The Share box with the link and embed code, and the Access and security settings', 'ryv-eligibility-tool' ); ?>" style="display:block;max-width:100%;height:auto;border:1px solid #c3c4c7;border-radius:4px">
+			<figcaption class="description"><?php esc_html_e( 'The Share box (link and embed code) and the Access & security settings.', 'ryv-eligibility-tool' ); ?></figcaption>
+		</figure>
+
 		<h3><?php esc_html_e( 'Which websites may embed it', 'ryv-eligibility-tool' ); ?></h3>
 		<p>
 			<?php esc_html_e( 'At the bottom of the same page, "Access & security" controls who can show the tool inside their site. By default any website can. Once you know your partners, switch to "Only the websites listed below" and add one address per line (for example partner.org, or *.partner.org to include all of its subdomains). A partner whose website is not on the list will see a blank frame. The same section has a master switch that turns every embed and share link off at once.', 'ryv-eligibility-tool' ); ?>
@@ -194,6 +217,17 @@ if ( ! defined( 'ABSPATH' ) ) {
 			<li><?php esc_html_e( 'Do not edit the web address inside src="..." - the options that follow the ? in it (layout, colors, and so on) are how the tool is customized. To change them, ask us for a new code.', 'ryv-eligibility-tool' ); ?></li>
 			<li><?php esc_html_e( 'Tell us the exact address of the website (for example www.partner.org) so it can be added to the allowed list.', 'ryv-eligibility-tool' ); ?></li>
 		</ol>
+
+		<p>
+			<?php esc_html_e( 'What visitors see:', 'ryv-eligibility-tool' ); ?>
+		</p>
+		<figure style="margin:12px 0;max-width:760px">
+			<img src="<?php echo esc_url( RYV_PLUGIN_URL . 'assets/img/help/embed-result.jpg' ); ?>" alt="<?php echo esc_attr__( 'The tool with title, description and questions stacked one under another', 'ryv-eligibility-tool' ); ?>" style="display:block;max-width:100%;height:auto;border:1px solid #c3c4c7;border-radius:4px">
+			<figcaption class="description"><?php esc_html_e( 'Title, description and questions, one under another.', 'ryv-eligibility-tool' ); ?></figcaption>
+		</figure>
+		<p>
+			<a href="<?php echo esc_url( RYV_PLUGIN_URL . 'docs/partner-embed-guide.html' ); ?>" target="_blank" rel="noopener"><?php esc_html_e( 'Open the printable partner guide (a ready-to-send page with screenshots)', 'ryv-eligibility-tool' ); ?></a>
+		</p>
 
 		<h3><?php esc_html_e( 'If the frame is blank', 'ryv-eligibility-tool' ); ?></h3>
 		<ul>

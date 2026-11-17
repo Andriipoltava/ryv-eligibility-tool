@@ -40,6 +40,8 @@ $opt = RYV_Embed::OPTION;
 	<h1><?php esc_html_e( 'Embed & Share', 'ryv-eligibility-tool' ); ?></h1>
 	<p class="description">
 		<?php esc_html_e( 'Give partners a link or a snippet of code to put the eligibility tool on their own website. It shows only the tool - no menus, header or footer of this site.', 'ryv-eligibility-tool' ); ?>
+		<a href="<?php echo esc_url( admin_url( 'admin.php?page=ryv-help#ryv-help-partner-embed' ) ); ?>"><?php esc_html_e( 'Instructions', 'ryv-eligibility-tool' ); ?></a> |
+		<a href="<?php echo esc_url( RYV_PLUGIN_URL . 'docs/partner-embed-guide.html' ); ?>" target="_blank" rel="noopener"><?php esc_html_e( 'Partner guide to send', 'ryv-eligibility-tool' ); ?></a>
 	</p>
 
 	<?php settings_errors( $opt ); ?>
@@ -78,6 +80,23 @@ $opt = RYV_Embed::OPTION;
 					<label><input type="checkbox" id="ryv-embed-description" checked> <?php esc_html_e( 'Form description', 'ryv-eligibility-tool' ); ?></label>
 					<label><input type="checkbox" id="ryv-embed-restart" checked> <?php esc_html_e( '"Start Over" button', 'ryv-eligibility-tool' ); ?></label>
 					<label><input type="checkbox" id="ryv-embed-pad" checked> <?php esc_html_e( 'Padding around the tool', 'ryv-eligibility-tool' ); ?></label>
+				</div>
+
+				<div class="ryv-embed-field ryv-embed-texts">
+					<span class="ryv-embed-label"><?php esc_html_e( 'Text (optional)', 'ryv-eligibility-tool' ); ?></span>
+					<label for="ryv-embed-title-text"><small><?php esc_html_e( 'Title', 'ryv-eligibility-tool' ); ?></small></label>
+					<input type="text" id="ryv-embed-title-text" class="widefat" maxlength="160">
+					<label for="ryv-embed-desc-text"><small><?php esc_html_e( 'Description', 'ryv-eligibility-tool' ); ?></small></label>
+					<textarea id="ryv-embed-desc-text" class="widefat" rows="3" maxlength="400"></textarea>
+					<label for="ryv-embed-label-start-over"><small><?php esc_html_e( '"Start Over" button', 'ryv-eligibility-tool' ); ?></small></label>
+					<input type="text" id="ryv-embed-label-start-over" class="widefat" maxlength="60" placeholder="Start Over">
+					<label for="ryv-embed-label-continue"><small><?php esc_html_e( '"Continue" button', 'ryv-eligibility-tool' ); ?></small></label>
+					<input type="text" id="ryv-embed-label-continue" class="widefat" maxlength="60" placeholder="Continue">
+					<label for="ryv-embed-label-submit"><small><?php esc_html_e( '"Submit" button', 'ryv-eligibility-tool' ); ?></small></label>
+					<input type="text" id="ryv-embed-label-submit" class="widefat" maxlength="60" placeholder="Submit">
+					<label for="ryv-embed-label-placeholder"><small><?php esc_html_e( 'Dropdown placeholder', 'ryv-eligibility-tool' ); ?></small></label>
+					<input type="text" id="ryv-embed-label-placeholder" class="widefat" maxlength="60" placeholder="&mdash; Select &mdash;">
+					<span class="description"><?php esc_html_e( 'Leave blank to use the form\'s own wording. Plain text only. The title and description show only if enabled above.', 'ryv-eligibility-tool' ); ?></span>
 				</div>
 
 				<div class="ryv-embed-field">

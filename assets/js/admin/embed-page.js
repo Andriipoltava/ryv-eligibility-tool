@@ -10,7 +10,8 @@
   var els = {
     form: $id('ryv-embed-form'), layout: $id('ryv-embed-layout'), title: $id('ryv-embed-title'),
     description: $id('ryv-embed-description'), restart: $id('ryv-embed-restart'), pad: $id('ryv-embed-pad'),
-    fit: $id('ryv-embed-fit'), align: $id('ryv-embed-align'), heightPx: $id('ryv-embed-height-px'), link: $id('ryv-embed-link'),
+    fit: $id('ryv-embed-fit'), align: $id('ryv-embed-align'), titleText: $id('ryv-embed-title-text'), descText: $id('ryv-embed-desc-text'),
+    labels: { label_start_over: $id('ryv-embed-label-start-over'), label_continue: $id('ryv-embed-label-continue'), label_submit: $id('ryv-embed-label-submit'), label_placeholder: $id('ryv-embed-label-placeholder') }, heightPx: $id('ryv-embed-height-px'), link: $id('ryv-embed-link'),
     open: $id('ryv-embed-open'), state: $id('ryv-embed-state'), stateField: $id('ryv-embed-state-field'), code: $id('ryv-embed-code'), preview: $id('ryv-embed-preview')
   };
   var colors = {};
@@ -58,6 +59,13 @@
     if (!els.pad.checked) p.push('pad=0');
     if (els.fit.value === 'full') p.push('fit=full');
     if (els.align.value === 'center') p.push('align=center');
+    var tt = els.titleText.value.trim(), dt = els.descText.value.trim();
+    if (tt) p.push('title_text=' + encodeURIComponent(tt));
+    if (dt) p.push('description_text=' + encodeURIComponent(dt));
+    Object.keys(els.labels).forEach(function (k) {
+      var v = els.labels[k].value.trim();
+      if (v) p.push(k + '=' + encodeURIComponent(v));
+    });
     ['primary', 'secondary', 'text', 'bg'].forEach(function (k) {
       var v = (colors[k] || '').trim();
       if (/^#?[0-9a-f]{3,8}$/i.test(v)) p.push(k + '=' + encodeURIComponent(v.replace('#', '')));
@@ -95,6 +103,13 @@
     clear: function (e) { colors[$(e.target).data('param') || $(e.target).closest('.wp-picker-container').find('.ryv-embed-color').data('param')] = ''; setTimeout(update, 0); }
   });
 
+  function fillTextPlaceholders() {
+    var f = cfg.forms[parseInt(els.form.value, 10)] || {};
+    els.titleText.placeholder = f.title || '';
+    els.descText.placeholder = f.desc || '';
+  }
+  els.form.addEventListener('change', fillTextPlaceholders);
+  fillTextPlaceholders();
   els.form.addEventListener('change', fillStates);
   root.addEventListener('input', update);
   root.addEventListener('change', update);

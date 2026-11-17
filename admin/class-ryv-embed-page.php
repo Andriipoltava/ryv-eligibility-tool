@@ -144,6 +144,7 @@ class RYV_Embed_Page {
 				'states' => $this->get_states( (int) $form->ID ),
 				'id'    => (int) $form->ID,
 				'title' => $form->post_title,
+				'desc'  => $form->post_excerpt,
 				'label' => $form->post_title . ( '' !== $lang ? ' (' . strtoupper( $lang ) . ')' : '' ),
 				'url'   => RYV_Embed::build_url( $form ),
 			);

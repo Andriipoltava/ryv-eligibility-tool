@@ -953,6 +953,20 @@ whitelisted query string (`layout`, `title`, `description`, `restart`, `pad`,
 `state=alabama` sets `data-entry-node` via `RYV_States_Sync::find_start_node()` (ACF-gated;
 unknown state or no ACF = normal picker) and ships each language edition's own
 entry node for that state so the language switch stays on it.
+`align` (`left` default | `center`) puts title, description and questions on one
+axis (the Elementor-style centered 360px form under a left header read as two
+columns). `title_text`/`description_text` (plain text, 160/400 chars) and
+`label_start_over|continue|submit|placeholder` (60 chars, whitelist
+`LABEL_PARAMS` -> engine label keys) override copy server-side: labels ride the
+existing `data-labels` attribute, so no engine change. The embed document is
+isolated from third-party plugins (`isolate_document()`: only the tool's own
+scripts, footer allow-list, head deny-list of known plugins; filters
+`ryv_embed_allowed_script_handles`, `ryv_embed_blocked_style_prefixes`,
+`ryv_embed_blocked_head_owners`, `ryv_embed_allowed_footer_callbacks`) - a new
+plugin that injects a banner/popup into the embed needs adding there.
+Partner-facing docs: Help page section (screenshots in `assets/img/help/`) and
+the standalone `docs/partner-embed-guide.html` (screenshots inlined as base64;
+linked from Embed & Share).
 Slug is used in the URL unless it's shared across WPML languages, then the ID.
 
 Framing security = `Content-Security-Policy: frame-ancestors` built from the

@@ -623,6 +623,47 @@ class RYV_Embed {
 	}
 
 	/**
+	 * Engine label keys a partner may reword, mapped to their query params.
+	 */
+	const LABEL_PARAMS = array(
+		'label_start_over'  => 'startOver',
+		'label_continue'    => 'continue',
+		'label_submit'      => 'submit',
+		'label_placeholder' => 'selectPlaceholder',
+	);
+
+	/**
+	 * Plain text only, trimmed and length-capped (no markup, no control chars).
+	 *
+	 * @param string $value Raw value.
+	 * @param int    $max   Max characters.
+	 * @return string
+	 */
+	private static function sanitize_copy( string $value, int $max ): string {
+		$value = trim( sanitize_text_field( $value ) );
+
+		return function_exists( 'mb_substr' ) ? mb_substr( $value, 0, $max ) : substr( $value, 0, $max );
+	}
+
+	/**
+	 * Whitelisted label overrides from the query string.
+	 *
+	 * @param callable $text fn( string $key ): string.
+	 * @return array<string,string> engine label key => text
+	 */
+	private static function read_labels( callable $text ): array {
+		$out = array();
+		foreach ( self::LABEL_PARAMS as $param => $key ) {
+			$val = self::sanitize_copy( $text( $param ), 60 );
+			if ( '' !== $val ) {
+				$out[ $key ] = $val;
+			}
+		}
+
+		return $out;
+	}
+
+	/**
 	 * Whitelisted, sanitized presentation options from the query string.
 	 *
 	 * Read-only GET: nothing here changes state, so no nonce is involved.
@@ -650,6 +691,10 @@ class RYV_Embed {
 			'fit'         => 'full' === $text( 'fit' ) ? 'full' : 'compact',
 			'align'       => 'center' === $text( 'align' ) ? 'center' : 'left',
 			'state'       => sanitize_title( $text( 'state' ) ),
+			// Plain-text copy overrides. Length-capped; escaped on output.
+			'title_text'  => self::sanitize_copy( $text( 'title_text' ), 160 ),
+			'desc_text'   => self::sanitize_copy( $text( 'description_text' ), 400 ),
+			'labels'      => self::read_labels( $text ),
 			'primary'     => self::sanitize_color( $text( 'primary' ) ),
 			'secondary'   => self::sanitize_color( $text( 'secondary' ) ),
 			'text'        => self::sanitize_color( $text( 'text' ) ),
@@ -776,7 +821,7 @@ class RYV_Embed {
 			$this->args['restart'] ? 1 : 0,
 			esc_attr( $this->args['layout'] ),
 			esc_attr( $entry_node ),
-			esc_attr( wp_json_encode( RYV_Form_Translations::ui_labels( RYV_Form_Translations::get_language( $form_id ) ) ) ),
+			esc_attr( wp_json_encode( array_merge( RYV_Form_Translations::ui_labels( RYV_Form_Translations::get_language( $form_id ) ), $this->args['labels'] ) ) ),
 			esc_attr( wp_json_encode( RYV_Shortcode::get_language_editions( $form_id, $state_slug ) ) )
 		);
 		?>
@@ -792,12 +837,15 @@ class RYV_Embed {
 	 * styling) as the Elementor widget's header.
 	 */
 	private function render_header() {
-		$title = ( $this->args['title'] && '' !== trim( $this->form->post_title ) )
-			? sprintf( '<h2 class="ryv-header-title">%s</h2>', esc_html( $this->form->post_title ) )
+		$title_src = '' !== $this->args['title_text'] ? $this->args['title_text'] : $this->form->post_title;
+		$desc_src  = '' !== $this->args['desc_text'] ? $this->args['desc_text'] : $this->form->post_excerpt;
+
+		$title = ( $this->args['title'] && '' !== trim( $title_src ) )
+			? sprintf( '<h2 class="ryv-header-title">%s</h2>', esc_html( $title_src ) )
 			: '';
 
-		$description = ( $this->args['description'] && '' !== trim( $this->form->post_excerpt ) )
-			? sprintf( '<p class="ryv-header-description">%s</p>', esc_html( $this->form->post_excerpt ) )
+		$description = ( $this->args['description'] && '' !== trim( $desc_src ) )
+			? sprintf( '<p class="ryv-header-description">%s</p>', esc_html( $desc_src ) )
 			: '';
 
 		if ( '' === $title && '' === $description ) {
