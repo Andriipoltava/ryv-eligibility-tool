@@ -750,7 +750,11 @@ class RYV_Embed {
 			$vars[] = '--ryv-text-color:' . $this->args['text'];
 		}
 		if ( 'full' === $this->args['fit'] ) {
+			// Form and its title/description fill the frame together; the header
+			// has its own width cap (--ryv-header-width) that would otherwise
+			// stay at its narrow default above a full-width form.
 			$vars[] = '--ryv-wrapper-max-width:100%';
+			$vars[] = '--ryv-header-width:100%';
 		}
 
 		if ( $vars ) {
@@ -775,7 +779,7 @@ class RYV_Embed {
 			: '.ryv-embed .ryv-header-align{text-align:left!important}.ryv-embed .ryv-app-wrapper{margin-left:0!important;margin-right:auto!important}';
 
 		printf(
-			'<style id="ryv-embed-base">html,html body.ryv-embed-body{margin:0;padding:0;height:auto;min-height:0;background:%1$s!important}.ryv-embed{box-sizing:border-box;padding:%2$s}%3$s</style>' . "\n",
+			'<style id="ryv-embed-base">html,html body.ryv-embed-body{margin:0;padding:0;height:auto;min-height:0;background:%1$s!important}html body.ryv-embed-body{overflow:visible!important}.ryv-embed{box-sizing:border-box;padding:%2$s}%3$s</style>' . "\n",
 			esc_html( $bg ),
 			esc_html( $padding ),
 			$align // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- fixed literal, one of two branches above.

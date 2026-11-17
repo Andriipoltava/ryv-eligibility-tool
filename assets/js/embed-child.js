@@ -19,7 +19,20 @@
     var body = document.body;
     // scrollHeight (not offsetHeight) so absolutely-positioned overflow, such
     // as the open state dropdown, is included rather than clipped.
-    return Math.ceil(Math.max(body.scrollHeight, body.offsetHeight));
+    var h = Math.max(body.scrollHeight, body.offsetHeight);
+
+    // An open dropdown is absolutely positioned, so it can extend past the
+    // content; count its bottom edge (+ a small gap) so the frame is tall
+    // enough to show it instead of clipping it.
+    var menus = document.querySelectorAll('.ryv-select2-menu');
+    for (var i = 0; i < menus.length; i++) {
+      var r = menus[i].getBoundingClientRect();
+      if (r.height > 0) {
+        h = Math.max(h, Math.ceil(r.bottom + (window.pageYOffset || 0)) + 16);
+      }
+    }
+
+    return Math.ceil(h);
   }
 
   function send() {
