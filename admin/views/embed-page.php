@@ -81,6 +81,14 @@ $opt = RYV_Embed::OPTION;
 				</div>
 
 				<div class="ryv-embed-field">
+					<label for="ryv-embed-align"><?php esc_html_e( 'Alignment', 'ryv-eligibility-tool' ); ?></label>
+					<select id="ryv-embed-align">
+						<option value="left"><?php esc_html_e( 'Left - title, description and questions in one column (default)', 'ryv-eligibility-tool' ); ?></option>
+						<option value="center"><?php esc_html_e( 'Centered', 'ryv-eligibility-tool' ); ?></option>
+					</select>
+				</div>
+
+				<div class="ryv-embed-field">
 					<label for="ryv-embed-fit"><?php esc_html_e( 'Content width', 'ryv-eligibility-tool' ); ?></label>
 					<select id="ryv-embed-fit">
 						<option value="compact"><?php esc_html_e( 'Compact, centered (default)', 'ryv-eligibility-tool' ); ?></option>

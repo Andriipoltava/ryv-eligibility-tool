@@ -410,9 +410,184 @@ class RYV_Embed {
 
 		add_action( 'wp_enqueue_scripts', array( $this, 'enqueue' ), 10 );
 		add_action( 'wp_enqueue_scripts', array( $this, 'add_inline_styles' ), 11 );
+		$this->isolate_document();
 
 		$this->render_document();
 		exit;
+	}
+
+	/**
+	 * Keep third-party plugins out of the bare embed document.
+	 *
+	 * The page runs the normal wp_head/wp_footer so core, Elementor and the
+	 * RYV tool still print their own styles/scripts, but everything else that
+	 * hooks in (cookie banner, language switcher, events calendar, popups,
+	 * SEO/analytics snippets, admin bar) is dropped: it has no business inside
+	 * a partner's iframe, and a cookie banner in particular would show up on
+	 * someone else's site. Everything here is a plain allow/deny list that a
+	 * site can extend with the filters below.
+	 */
+	private function isolate_document() {
+		show_admin_bar( false );
+
+		// Scripts: only the tool itself (+ the resize helper) may load.
+		add_action( 'wp_enqueue_scripts', array( $this, 'prune_assets' ), PHP_INT_MAX - 1 );
+		add_action( 'wp_head', array( $this, 'prune_head' ), 0 );
+		add_action( 'wp_footer', array( $this, 'prune_footer' ), 0 );
+	}
+
+	/**
+	 * Dequeue every script except the allow-list, and styles belonging to
+	 * known non-essential plugins.
+	 */
+	public function prune_assets() {
+		$scripts = wp_scripts();
+		/**
+		 * Script handles that may load on an embed page.
+		 *
+		 * @param string[] $handles Handles.
+		 */
+		$allowed = (array) apply_filters( 'ryv_embed_allowed_script_handles', array( RYV_Assets::SCRIPT_HANDLE, self::CHILD_HANDLE ) );
+
+		foreach ( (array) $scripts->queue as $handle ) {
+			if ( ! in_array( $handle, $allowed, true ) ) {
+				wp_dequeue_script( $handle );
+			}
+		}
+
+		/**
+		 * Style handle prefixes dropped from embed pages.
+		 *
+		 * @param string[] $prefixes Prefixes.
+		 */
+		$blocked = (array) apply_filters(
+			'ryv_embed_blocked_style_prefixes',
+			array( 'cky', 'cookie-law', 'wpml', 'sitepress', 'tribe', 'tec-', 'stellarwp', 'gform', 'yoast', 'wp-stream', 'admin-bar' )
+		);
+		// Elementor Theme Builder header/footer/page CSS is not needed, but the
+		// active Kit's sheet (global fonts/colors) is.
+		$kit_handle = '';
+		if ( class_exists( '\\Elementor\\Plugin' ) && isset( \Elementor\Plugin::$instance->kits_manager ) ) {
+			$kit_handle = 'elementor-post-' . (int) \Elementor\Plugin::$instance->kits_manager->get_active_id();
+		}
+		$blocked[] = 'widget-';
+		$blocked[] = 'e-apple-webkit';
+		foreach ( (array) wp_styles()->queue as $handle ) {
+			if ( 0 === strpos( $handle, 'elementor-post-' ) && $handle !== $kit_handle ) {
+				wp_dequeue_style( $handle );
+				continue;
+			}
+			foreach ( $blocked as $prefix ) {
+				if ( 0 === strpos( $handle, $prefix ) ) {
+					wp_dequeue_style( $handle );
+					break;
+				}
+			}
+		}
+	}
+
+	/**
+	 * Drop head output from known non-essential plugins and core's discovery
+	 * links (feeds, REST/oEmbed, generator tags).
+	 */
+	public function prune_head() {
+		/**
+		 * Callback owners (class-name prefixes) removed from wp_head.
+		 *
+		 * @param string[] $prefixes Prefixes.
+		 */
+		$blocked = (array) apply_filters(
+			'ryv_embed_blocked_head_owners',
+			array( 'CookieYes\\', 'WP_Stream\\', 'Tribe', 'TEC\\', 'SitePress', 'WPML', 'GFForms', 'Yoast\\', 'ASENHA\\', 'ElementorPro\\', 'Elementor\\Modules\\GeneratorTag' )
+		);
+		self::prune_hook(
+			'wp_head',
+			static function ( $callback ) use ( $blocked ) {
+				$owner = self::callback_owner( $callback );
+				foreach ( $blocked as $prefix ) {
+					if ( '' !== $owner && 0 === strpos( $owner, $prefix ) ) {
+						return true;
+					}
+				}
+
+				return in_array( $owner, array( 'feed_links', 'feed_links_extra', 'rest_output_link_wp_head', 'rsd_link', 'wp_generator', 'wp_shortlink_wp_head', 'wp_oembed_add_discovery_links', 'wp_oembed_add_host_js', 'wp_resource_hints' ), true );
+			}
+		);
+	}
+
+	/**
+	 * Footer is allow-list only: core's own style/script printers stay,
+	 * everything else (banners, popups, switchers, analytics) goes.
+	 */
+	public function prune_footer() {
+		/**
+		 * Callbacks that may run on wp_footer of an embed page.
+		 *
+		 * @param string[] $allowed Function names.
+		 */
+		$allowed = (array) apply_filters(
+			'ryv_embed_allowed_footer_callbacks',
+			array( 'wp_print_footer_scripts', 'wp_enqueue_global_styles', 'wp_enqueue_stored_styles', 'wp_maybe_inline_styles', 'WP_Duotone::output_footer_assets', 'WP_Script_Modules::print_import_map', 'WP_Script_Modules::print_enqueued_script_modules', 'WP_Script_Modules::print_script_module_preloads', 'WP_Script_Modules::print_script_module_data' )
+		);
+		self::prune_hook(
+			'wp_footer',
+			static function ( $callback ) use ( $allowed ) {
+				return ! in_array( self::callback_owner( $callback ), $allowed, true );
+			}
+		);
+		// Plugins also print inline CSS/JS through the footer-scripts hook.
+		self::prune_hook(
+			'wp_print_footer_scripts',
+			static function ( $callback ) {
+				return '_wp_footer_scripts' !== self::callback_owner( $callback );
+			}
+		);
+	}
+
+	/**
+	 * Remove callbacks from a hook for which $should_remove returns true.
+	 * Skips priority 0 (this class's own pruning hooks run there).
+	 *
+	 * @param string   $hook          Hook name.
+	 * @param callable $should_remove fn( callable ): bool.
+	 */
+	private static function prune_hook( string $hook, callable $should_remove ) {
+		global $wp_filter;
+		if ( empty( $wp_filter[ $hook ] ) || ! ( $wp_filter[ $hook ] instanceof WP_Hook ) ) {
+			return;
+		}
+
+		foreach ( $wp_filter[ $hook ]->callbacks as $priority => $callbacks ) {
+			if ( 0 === (int) $priority ) {
+				continue;
+			}
+			foreach ( $callbacks as $id => $cb ) {
+				if ( $should_remove( $cb['function'] ) ) {
+					unset( $wp_filter[ $hook ]->callbacks[ $priority ][ $id ] );
+				}
+			}
+		}
+	}
+
+	/**
+	 * Printable owner of a callback: "func", "Class::method" or '' for
+	 * closures. Closures have no owner, so they are never matched by a deny
+	 * list (and are always removed by an allow list).
+	 *
+	 * @param mixed $callback Callback.
+	 * @return string
+	 */
+	private static function callback_owner( $callback ): string {
+		if ( is_string( $callback ) ) {
+			return $callback;
+		}
+		if ( is_array( $callback ) && isset( $callback[0], $callback[1] ) ) {
+			$class = is_object( $callback[0] ) ? get_class( $callback[0] ) : (string) $callback[0];
+
+			return $class . '::' . $callback[1];
+		}
+
+		return '';
 	}
 
 	/**
@@ -473,6 +648,7 @@ class RYV_Embed {
 			'restart'     => $flag( 'restart' ),
 			'pad'         => $flag( 'pad' ),
 			'fit'         => 'full' === $text( 'fit' ) ? 'full' : 'compact',
+			'align'       => 'center' === $text( 'align' ) ? 'center' : 'left',
 			'state'       => sanitize_title( $text( 'state' ) ),
 			'primary'     => self::sanitize_color( $text( 'primary' ) ),
 			'secondary'   => self::sanitize_color( $text( 'secondary' ) ),
@@ -546,10 +722,18 @@ class RYV_Embed {
 		$padding = $this->args['pad'] ? '16px' : '0';
 		$bg      = '' !== $this->args['bg'] ? $this->args['bg'] : 'transparent';
 
+		// Title, description and questions share one axis: flush left by
+		// default, or all centered. (Left-aligned header over a centered form
+		// reads as two columns.)
+		$align = 'center' === $this->args['align']
+			? '.ryv-embed .ryv-header-align{text-align:center!important}.ryv-embed .ryv-app-wrapper{margin-left:auto!important;margin-right:auto!important}'
+			: '.ryv-embed .ryv-header-align{text-align:left!important}.ryv-embed .ryv-app-wrapper{margin-left:0!important;margin-right:auto!important}';
+
 		printf(
-			'<style id="ryv-embed-base">html,html body.ryv-embed-body{margin:0;padding:0;height:auto;min-height:0;background:%1$s!important}.ryv-embed{box-sizing:border-box;padding:%2$s}</style>' . "\n",
+			'<style id="ryv-embed-base">html,html body.ryv-embed-body{margin:0;padding:0;height:auto;min-height:0;background:%1$s!important}.ryv-embed{box-sizing:border-box;padding:%2$s}%3$s</style>' . "\n",
 			esc_html( $bg ),
-			esc_html( $padding )
+			esc_html( $padding ),
+			$align // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- fixed literal, one of two branches above.
 		);
 	}
 

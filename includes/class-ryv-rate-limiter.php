@@ -72,18 +72,24 @@ class RYV_Rate_Limiter {
 	/**
 	 * Build the 429 response for a blocked request.
 	 *
+	 * A WP_REST_Response rather than a WP_Error: core only turns a `headers`
+	 * entry into real HTTP headers for responses, not for WP_Error data.
+	 *
 	 * @param int $retry_after Seconds until the window resets.
-	 * @return WP_Error
+	 * @return WP_REST_Response
 	 */
-	public static function error( int $retry_after ): WP_Error {
-		return new WP_Error(
-			'ryv_rate_limited',
-			__( 'Too many requests. Please wait a moment and try again.', 'ryv-eligibility-tool' ),
+	public static function error( int $retry_after ): WP_REST_Response {
+		$response = new WP_REST_Response(
 			array(
-				'status'  => 429,
-				'headers' => array( 'Retry-After' => (string) $retry_after ),
-			)
+				'code'    => 'ryv_rate_limited',
+				'message' => __( 'Too many requests. Please wait a moment and try again.', 'ryv-eligibility-tool' ),
+				'data'    => array( 'status' => 429 ),
+			),
+			429
 		);
+		$response->header( 'Retry-After', (string) $retry_after );
+
+		return $response;
 	}
 
 	/**

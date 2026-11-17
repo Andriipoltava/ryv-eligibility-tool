@@ -10,7 +10,7 @@
   var els = {
     form: $id('ryv-embed-form'), layout: $id('ryv-embed-layout'), title: $id('ryv-embed-title'),
     description: $id('ryv-embed-description'), restart: $id('ryv-embed-restart'), pad: $id('ryv-embed-pad'),
-    fit: $id('ryv-embed-fit'), heightPx: $id('ryv-embed-height-px'), link: $id('ryv-embed-link'),
+    fit: $id('ryv-embed-fit'), align: $id('ryv-embed-align'), heightPx: $id('ryv-embed-height-px'), link: $id('ryv-embed-link'),
     open: $id('ryv-embed-open'), state: $id('ryv-embed-state'), stateField: $id('ryv-embed-state-field'), code: $id('ryv-embed-code'), preview: $id('ryv-embed-preview')
   };
   var colors = {};
@@ -57,6 +57,7 @@
     if (!els.restart.checked) p.push('restart=0');
     if (!els.pad.checked) p.push('pad=0');
     if (els.fit.value === 'full') p.push('fit=full');
+    if (els.align.value === 'center') p.push('align=center');
     ['primary', 'secondary', 'text', 'bg'].forEach(function (k) {
       var v = (colors[k] || '').trim();
       if (/^#?[0-9a-f]{3,8}$/i.test(v)) p.push(k + '=' + encodeURIComponent(v.replace('#', '')));
