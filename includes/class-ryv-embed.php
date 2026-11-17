@@ -992,6 +992,7 @@ class RYV_Embed {
 			'title'       => $flag( 'title' ),
 			'description' => $flag( 'description' ),
 			'restart'     => $flag( 'restart' ),
+			'steps'       => $flag( 'steps' ),
 			'pad'         => $flag( 'pad' ),
 			'fit'         => 'full' === $text( 'fit' ) ? 'full' : 'compact',
 			'align'       => 'center' === $text( 'align' ) ? 'center' : 'left',
@@ -1103,6 +1104,7 @@ class RYV_Embed {
 			// Sidebar is sticky + height-capped for a full page; in a frame that
 			// only fights the auto-height, so let it flow.
 			$align = '.ryv-embed .ryv-layout-sidebar{position:static!important;max-height:none!important;overflow:visible!important}'
+				. ( $this->args['steps'] ? '' : '.ryv-embed .ryv-step-sidebar-slot{display:none!important}' )
 				. '.ryv-embed-note{margin:1.5rem 0 0;padding:0 0 0 1rem;border-left:4px solid #ec2927;color:#4a6577;font:400 15px/1.5 "District Pro",sans-serif}'
 				. '.ryv-embed-note p{margin:0;font:inherit;color:inherit}';
 		}

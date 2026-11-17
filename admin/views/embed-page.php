@@ -87,6 +87,8 @@ $opt = RYV_Embed::OPTION;
 					<span class="ryv-embed-label"><?php esc_html_e( 'Show', 'ryv-eligibility-tool' ); ?></span>
 					<label><input type="checkbox" id="ryv-embed-title" checked> <?php esc_html_e( 'Form title', 'ryv-eligibility-tool' ); ?></label>
 					<label><input type="checkbox" id="ryv-embed-description" checked> <?php esc_html_e( 'Form description', 'ryv-eligibility-tool' ); ?></label>
+					<label class="ryv-embed-site-only"><input type="checkbox" id="ryv-embed-steps" checked> <?php esc_html_e( 'Steps (1, 2, 3 list)', 'ryv-eligibility-tool' ); ?></label>
+					<label class="ryv-embed-site-only"><input type="checkbox" id="ryv-embed-show-note" checked> <?php esc_html_e( 'Note under the steps', 'ryv-eligibility-tool' ); ?></label>
 					<label><input type="checkbox" id="ryv-embed-restart" checked> <?php esc_html_e( '"Start Over" button', 'ryv-eligibility-tool' ); ?></label>
 					<label><input type="checkbox" id="ryv-embed-pad" checked> <?php esc_html_e( 'Padding around the tool', 'ryv-eligibility-tool' ); ?></label>
 				</div>
